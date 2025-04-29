@@ -3,6 +3,7 @@ from typing_extensions import Self
 from dataclasses import dataclass
 from dataclasses import MISSING
 from dataclasses import fields
+from datacube import Datacube
 from dataclasses import field
 from datetime import datetime
 from os.path import exists
@@ -14,6 +15,7 @@ from os import makedirs
 from json import load
 from json import dump
 
+
 def parse_date(date_str: str) -> date:
     return datetime.strptime(date_str, '%Y-%m-%d').date()
 
@@ -24,18 +26,20 @@ class Args:
     lat         : float = field(metadata={'help': 'Latitude of the area of interest'})
     lon         : float = field(metadata={'help': 'Longitude of the area of interest'})
     buffer      : float = field(metadata={'help': 'Buffer in degrees around lat/lon'})
-    start_time  : date = field(metadata={'help': 'Start date (YYYY-MM-DD)'})
-    end_time    : date = field(metadata={'help': 'End date (YYYY-MM-DD)'})
-    out_dir     : str = field(metadata={'help': 'Output dir for storing files'}, default='Data/shelter')
-    stub        : str = field(metadata={'help': 'Stub name for the file naming'}, default='')
-    path_out    : str = field(init=False)
+    start_time  : date  = field(metadata={'help': 'Start date (YYYY-MM-DD)'})
+    end_time    : date  = field(metadata={'help': 'End date (YYYY-MM-DD)'})
+    out_dir     : str   = field(metadata={'help': 'Output dir for storing files'}, default='Data/shelter')
+    stub        : str   = field(metadata={'help': 'Stub name for the file naming'}, default='')
+    path_out    : str   = field(init=False)
+    app_name    : str   = 'Shelter'
 
     x           = property(lambda s: s.lon)
     y           = property(lambda s: s.lat)
     centre      = property(lambda s: (s.x, s.y))
-    lat_range   = property(lambda s: (s.x - s.buffer, s.lat + s.buffer))
+    lat_range   = property(lambda s: (s.lat - s.buffer, s.lat + s.buffer))
     lon_range   = property(lambda s: (s.lon - s.buffer, s.lon + s.buffer))
     time        = property(lambda s: (s.start_time, s.end_time))
+    bbox        = property(lambda s: [s.lon_range[0], s.lat_range[0], s.lon_range[1], s.lat_range[1]])
 
     query       = property(
                     lambda s: {
@@ -43,6 +47,7 @@ class Args:
                         'y': s.y,
                         'x': s.x,
                         'time': s.time,
+                        'buffer': s.buffer,
                         'resolution': (-10, 10),
                         'output_crs': 'epsg:6933',
                         'group_by': 'solar_day'
@@ -54,6 +59,7 @@ class Args:
     unique_query_id     = property(lambda s: s.__sha256__)
     path_stubs_mapping  = property(lambda s: join(s.out_dir, 'stubs_mapping.json'))
     stubs_mapping       = property(lambda s: {} if not exists(s.path_stubs_mapping) else load(open(s.path_stubs_mapping)))
+    dc                  = property(lambda s: Datacube(app=s.app_name))
 
     def __post_init__(s: Self):
         m(s.out_dir)
@@ -80,11 +86,13 @@ class Args:
                 stubs_mapping[stub] = unique_query_id
                 dump(stubs_mapping, open(s.path_stubs_mapping, 'w'))
         
-        object.__setattr__(s, 'path_out', path_out)
+
+
+        object.__setattr__(s, 'path_out', path_out + '_ds2.pkl')
         object.__setattr__(s, 'stub', stub)
 
     @staticmethod
-    def from_cli()->Self:
+    def from_cli()->'Args':
         parser = ArgumentParser(description='Parse arguments for DEA Sentinel data download')
 
         for field_ in fields(Args):
@@ -104,10 +112,12 @@ class Args:
                     parser.add_argument(name, type=_type, required=False, help=help_text, default=default)
             
         args = parser.parse_args()
-        args
         return Args(**vars(args))
 
-args: Args = Args.from_cli()
-print(args.stub)
-print(args.path_out)
-# print(args.query)
+def t():
+    args: Args = Args.from_cli()
+    args.stub
+    args.path_out
+    return True
+
+if __name__ == '__main__': print('passed' if t() else 'failed')
