@@ -54,7 +54,7 @@ class Args:
                     }
                 )
     
-    __str__             =  lambda s: str(s.query)
+    __str__             = lambda s: str(s.query)
     __sha256__          = property(lambda s: sha256(s.__str__().encode()).hexdigest())
     unique_query_id     = property(lambda s: s.__sha256__)
     path_stubs_mapping  = property(lambda s: join(s.out_dir, 'stubs_mapping.json'))
@@ -86,7 +86,6 @@ class Args:
                 stubs_mapping[stub] = unique_query_id
                 dump(stubs_mapping, open(s.path_stubs_mapping, 'w'))
         
-
 
         object.__setattr__(s, 'path_out', path_out + '_ds2.pkl')
         object.__setattr__(s, 'stub', stub)
