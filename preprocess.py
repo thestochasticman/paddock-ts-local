@@ -6,43 +6,9 @@ import xarray as xr
 from Args import Args
 import numpy as np
 import pickle
+import hdstats
 
 load_pickle = lambda path: pickle.load(open(path, 'rb'))
-
-import numpy as np
-import pandas as pd
-
-def completion(data):
-    """
-    data: numpy array of shape (Y, X, T) with np.nan for missing.
-    Returns same shape, with nan gaps filled by linear interpolation along T,
-    then any remaining nans replaced by the mean of that pixel’s time series.
-    """
-    Y, X, T = data.shape
-    out = np.empty_like(data, dtype=np.float32)
-
-    for i in range(Y):
-        for j in range(X):
-            ts = pd.Series(data[i, j, :])
-            filled = ts.interpolate(limit_direction="both")
-            # if still nan (all-nan series), fill with 0
-            if filled.isna().all():
-                out[i, j, :] = 0.0
-            else:
-                out[i, j, :] = filled.fillna(filled.mean()).values
-    return out
-
-
-def fourier_mean(x, n=3, step=5):
-    result = np.empty((x.shape[0], x.shape[1], n), dtype=np.float32)
-
-    for i in range(x.shape[0]):
-        for j in range(x.shape[1]):
-            y = np.fft.fft(x[i,j,:])
-            for k in range(n):
-                result[i,j,k] = np.mean(np.abs(y[1+k*step:((k+1)*step+1) or None]))
-
-    return result
 
 def rescale(im):
     '''rescale raster (im) to between 0 and 255.
@@ -63,8 +29,8 @@ def transform(ds):
 	data[data == 0] = np.nan
 	data /= 10000.
 	ndwi_obs = (data[:,:,1,:]-data[:,:,3,:])/(data[:,:,1,:]+data[:,:,3,:]) # w = water. (g-nir)/(g+nir)
-	ndwi = completion(ndwi_obs)
-	f2 = fourier_mean(ndwi)
+	ndwi = hdstats.completion(ndwi_obs)
+	f2 = hdstats.fourier_mean(ndwi)
 	return f2
 
 def export_for_segmentation(ds, inp, out_stub):
