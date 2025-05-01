@@ -21,6 +21,8 @@ def parse_date(date_str: str) -> date:
 
 m = lambda x: [makedirs(x, exist_ok=True), x][1]
 
+args = ArgumentParser()
+
 @dataclass(frozen=True)
 class Args:
     lat         : float = field(metadata={'help': 'Latitude of the area of interest'})

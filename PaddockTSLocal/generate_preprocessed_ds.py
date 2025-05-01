@@ -1,9 +1,9 @@
 from dea_tools.bandindices import calculate_indices
-from ds_from_stac import f as ds_from_stac
+from PaddockTSLocal.ds_from_stac import f as ds_from_stac
 from os.path import exists
 import rioxarray 
 import xarray as xr
-from Args import Args
+from PaddockTSLocal.Args import Args
 import numpy as np
 import pickle
 import hdstats
