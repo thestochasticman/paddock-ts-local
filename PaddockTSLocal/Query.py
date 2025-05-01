@@ -38,12 +38,12 @@ class Query:
     bbox      : float     = field(init=False, metadata={'help': 'Area of Interest'})
 
     set_x           = lambda s: object.__setattr__(s, 'x', s.lon)
-    set_y           = lambda s: object.__setattr__(s, 'y', s.lon)
+    set_y           = lambda s: object.__setattr__(s, 'y', s.lat)
     set_centre      = lambda s: object.__setattr__(s, 'centre', (s.x, s.y))
     set_lat_range   = lambda s: object.__setattr__(s, 'lat_range', (s.x - s.buffer, s.x + s.buffer))
     set_lon_range   = lambda s: object.__setattr__(s, 'lon_range', (s.y - s.buffer, s.y + s.buffer))
     set_datetime    = lambda s: object.__setattr__(s, 'datetime', f'{str(s.start_time)}/{str(s.end_time)}')
-    set_bbox        = lambda s: object.__setattr__(s, 'bbox', [s.lon_range[0], s.lat_range[0], s.lon_range[1], s.lat_range[1]])
+    set_bbox        = lambda s: object.__setattr__(s, 'bbox', [s.lat_range[0], s.lon_range[0], s.lat_range[1], s.lon_range[1]])
     set_resolution  = lambda s: object.__setattr__(s, 'resolution', s.resolution if type(s.resolution) == tuple else (-s.resolution, s.resolution))
 
     def __str__(self): return self.to_json(indent=2)

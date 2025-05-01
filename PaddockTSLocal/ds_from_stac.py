@@ -1,40 +1,38 @@
-from PaddockTSLocal.Args import Args
+from PaddockTSLocal.Query import Query
+from PaddockTSLocal.Logger import Logger
 import pystac_client
 import odc.stac
 import pickle
 
-def f(args: Args = Args.from_cli()):
+def f(query: Query, logger: Logger):
     catalog = pystac_client.Client.open('https://explorer.dea.ga.gov.au/stac')
     odc.stac.configure_rio(
         cloud_defaults=True,
         aws={'aws_unsigned': True},
     )
-    collections = ['ga_s2am_ard_3']
-    query = catalog.search(
-        bbox=args.bbox,
-        collections=collections,
-        datetime=f'{str(args.start_time)}/{str(args.end_time)}'
+    query_results = catalog.search(
+        bbox=query.bbox,
+        collections=query.collections,
+        datetime=query.datetime,
     )
-    items = list(query.items())
+    items = list(query_results.items())
+    print(query.bbox)
     ds = odc.stac.load(
         items,
-        bands=['nbart_blue', 'nbart_green', 'nbart_red', 
-                      'nbart_red_edge_1', 'nbart_red_edge_2', 'nbart_red_edge_3',
-                      'nbart_nir_1', 'nbart_nir_2',
-                      'nbart_swir_2', 'nbart_swir_3'],
-        crs='utm',
+        bands=query.bands,
+        crs='epsg:6933',
         resolution=10,
         groupby='solar_day',
-        bbox=args.bbox,
+        bbox=query.bbox, 
     )
-    
-    with open(args.path_out, 'wb') as handle:
+    path = logger.get_path_query_dataset(None, query)
+    with open(path, 'wb') as handle:
         pickle.dump(ds, handle, protocol=pickle.HIGHEST_PROTOCOL)
     
     print(ds)
     return ds
 
-def t(): f(Args.from_cli())
+def t(): f(Query.from_cli(), Logger.from_cli())
 
 if __name__ == '__main__':
     t()
