@@ -29,7 +29,6 @@ def f(query: Query, logger: Logger):
     with open(path, 'wb') as handle:
         pickle.dump(ds, handle, protocol=pickle.HIGHEST_PROTOCOL)
     
-    print(ds)
     return ds
 
 def t(): f(Query.from_cli(), Logger.from_cli())
