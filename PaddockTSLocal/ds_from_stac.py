@@ -10,10 +10,15 @@ def f(query: Query, logger: Logger):
         cloud_defaults=True,
         aws={'aws_unsigned': True},
     )
+    filter_expression = {
+        "op": "<",
+        "args": [{"property": "eo:cloud_cover"}, 10]
+    }
     query_results = catalog.search(
         bbox=query.bbox,
         collections=query.collections,
         datetime=query.datetime,
+        filter=filter_expression
     )
     items = list(query_results.items())
     print(query.bbox)
@@ -31,7 +36,7 @@ def f(query: Query, logger: Logger):
     
     return ds
 
-def t(): f(Query.from_cli(), Logger.from_cli())
+def t(): f(Query.from_cli(), Logger.from_cli(), stub=4)
 
 if __name__ == '__main__':
     t()

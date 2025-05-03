@@ -44,7 +44,7 @@ class Logger:
         path_out = join(s.out_dir, f"{stub}_raw_ds2.pkl")
         return path_out
     
-    def get_path_query_preprocessed_dataset(s: Self, stub: str | NoneType, query: Query)->str:
+    def get_path_query_presegment_tiff(s: Self, stub: str | NoneType, query: Query)->str:
         if stub is None:
             stubs_mapping: dict = s.stubs_mapping
             query_string = query.__str__()
@@ -54,7 +54,7 @@ class Logger:
                 stubs_mapping[stub] = query_string
                 dump(stubs_mapping, open(s.path_stubs_mapping, 'w+'))
             
-        path_out = join(s.out_dir, f"{stub}_preprocessed_ds2.pkl")
+        path_out = join(s.out_dir, f"{stub}.tiff")
         return path_out
         
     @classmethod
