@@ -2,7 +2,7 @@ from os.path import expanduser
 from types import NoneType
 from dataclasses import dataclass
 from typing_extensions import Self
-from PaddockTSLocal.Query import Query
+from PaddockTSLocal.Download.Query import Query
 from argparse import ArgumentParser
 from datetime import date
 from os.path import exists

@@ -1,12 +1,14 @@
 from PaddockTSLocal.SamGeoPaddocks.download_weights import f as download_weights
 from PaddockTSLocal.SamGeoPaddocks.config import Config
-from PaddockTSLocal.Download.Logger import Logger
 from os.path import exists
 from samgeo import SamGeo
 
-def f(path_image: str, path_output: str, config: Config):
+def f(config: Config=Config()):
     if not exists(config.path): download_weights(config)
     return SamGeo(model_type=config.type, checkpoint=config.path)
-    
-def t(): 
-    pass
+
+def t():
+    model = f()
+    print(model)
+if __name__ == '__main__':
+    t()

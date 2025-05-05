@@ -1,5 +1,5 @@
-from PaddockTSLocal.Query import Query
-from PaddockTSLocal.Logger import Logger
+from PaddockTSLocal.Download.Query import Query
+from PaddockTSLocal.Download.Logger import Logger
 import pystac_client
 import odc.stac
 import pickle

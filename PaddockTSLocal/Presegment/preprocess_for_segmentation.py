@@ -1,11 +1,11 @@
 from PaddockTSLocal.Presegment.compute_ndwi_fourier import f as compute_ndwi_fourier
 from PaddockTSLocal.Presegment.rescale_image import f as rescale_image
 from PaddockTSLocal.Presegment.export import f as export
-from PaddockTSLocal.ds_from_stac import f as ds_from_stac
+from PaddockTSLocal.Download.ds_from_stac import f as ds_from_stac
 from dea_tools.bandindices import calculate_indices
 from datetime import date
-from PaddockTSLocal.Logger import Logger
-from PaddockTSLocal.Query import Query
+from PaddockTSLocal.Download.Logger import Logger
+from PaddockTSLocal.Download.Query import Query
 from os.path import exists
 import rioxarray
 import xarray as xr
