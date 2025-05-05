@@ -14,7 +14,8 @@ from json import load
 
 @dataclass(frozen=True)
 class Logger:
-    out_dir: str = expanduser('~/PaddockTSLocalData')
+    out_dir     : str = expanduser('~/PaddockTSLocalData')
+    samgeo_dir  : str = expanduser('~/SamGeo')
 
     path_stubs_mapping  = property(lambda s: join(s.out_dir, 'stubs_mapping.json'))
     stubs_mapping       = property(lambda s: load(open(s.path_stubs_mapping)))
@@ -56,11 +57,13 @@ class Logger:
             
         path_out = join(s.out_dir, f"{stub}.tiff")
         return path_out
+    
+
         
     @classmethod
     def from_cli(cls):
         parser = ArgumentParser()
-        parser.add_argument("--out_dir", type=str, default=expanduser('~/PaddockTSLocalData'),
+        parser.add_argument('--out_dir', type=str, default=expanduser('~/PaddockTSLocalData'),
                             help="Directory to store output files and stub mappings")
         args, _ = parser.parse_known_args()
         return cls(out_dir=args.out_dir)
