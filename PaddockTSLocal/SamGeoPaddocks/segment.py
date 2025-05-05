@@ -1,5 +1,6 @@
 from PaddockTSLocal.SamGeoPaddocks.download_weights import f as download_weights
 from PaddockTSLocal.SamGeoPaddocks.config import Config
+from samgeo import SamGeo, sam_model_registry
 from PaddockTSLocal.Logger import Logger
 from os.path import exists
 
