@@ -1,5 +1,5 @@
-from PaddockTSLocal.Download.Query import Query
-from PaddockTSLocal.Download.Logger import Logger
+from PaddockTSLocal.Query import Query
+from PaddockTSLocal.Logger import Logger
 import pystac_client
 import odc.stac
 import pickle
@@ -21,7 +21,6 @@ def f(query: Query, logger: Logger):
         filter=filter_expression
     )
     items = list(query_results.items())
-    print(query.bbox)
     ds = odc.stac.load(
         items,
         bands=query.bands,
