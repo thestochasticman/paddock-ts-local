@@ -1,10 +1,14 @@
 from PaddockTSLocal.Query import Query
-from PaddockTSLocal.Logger import Logger
+from os.path import join
+from os import makedirs
+from os import getcwd
 import pystac_client
 import odc.stac
 import pickle
 
-def f(query: Query, logger: Logger):
+
+def f(query: Query, out_dir: str, stub: str | None=None):
+    makedirs(out_dir, exist_ok=True)
     catalog = pystac_client.Client.open('https://explorer.dea.ga.gov.au/stac')
     odc.stac.configure_rio(
         cloud_defaults=True,
@@ -29,13 +33,36 @@ def f(query: Query, logger: Logger):
         groupby='solar_day',
         bbox=query.bbox, 
     )
-    path = logger.get_path_query_dataset(None, query)
+    stub = stub if stub is not None else query.get_stub()
+    path = join(out_dir, f"{stub}.pkl")
     with open(path, 'wb') as handle:
         pickle.dump(ds, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    
     return ds
 
-def t(): f(Query.from_cli(), Logger.from_cli(), stub=4)
+def t():
+    from datetime import date
+    query = Query(
+        lat=-33.5040,
+        lon=148.4,
+        buffer=0.01,
+        start_time=date(2020, 1, 1),
+        end_time=date(2020, 6, 1),
+        collections=['ga_s2am_ard_3', 'ga_s2bm_ard_3'],
+        bands=[
+            'nbart_blue',
+            'nbart_green',
+            'nbart_red', 
+            'nbart_red_edge_1',
+            'nbart_red_edge_2',
+            'nbart_red_edge_3',
+            'nbart_nir_1',
+            'nbart_nir_2',
+            'nbart_swir_2',
+            'nbart_swir_3'
+        ]
+    )
+    out_dir: str=join(getcwd(), 'Data', 'ds2'),
+    f(query, out_dir)
 
 if __name__ == '__main__':
     t()

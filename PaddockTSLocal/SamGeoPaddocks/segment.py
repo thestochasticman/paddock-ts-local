@@ -6,9 +6,11 @@ from samgeo import SamGeo
 
 def f(
         path_image: str,
+        path_model: str,
         path_output: str,
         config: Config,
     ):
+    if not exists(path_model)
     model = load_model(config)
     model.generate()
 

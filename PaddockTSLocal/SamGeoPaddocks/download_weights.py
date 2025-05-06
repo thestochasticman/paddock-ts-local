@@ -1,9 +1,20 @@
 from PaddockTSLocal.SamGeoPaddocks.config import Config
-from os.path import exists
+from os.path import dirname
+from os.path import join
+from os import makedirs
+from os import getcwd
 import wget
 
-def f(config: Config = Config()): wget.download(config.url, out=config.path)
+checkpoint = 'sam_vit_h_4b8939.pth'
 
-def t(): return [f(), exists(Config().path)][1]
+def f(path: str=join(getcwd(), 'Data', 'SamGeo', 'Model', checkpoint)):
+    makedirs(dirname(path), exist_ok=True)
+    checkpoint = 'sam_vit_h_4b8939.pth'
+    url = f"https://dl.fbaipublicfiles.com/segment_anything/{checkpoint}"
+    wget.download(url, out=path)
 
-if __name__ == '__main__': print(t())
+def t():
+    f()
+
+if __name__ == '__main__':
+    t()

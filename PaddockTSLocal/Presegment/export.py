@@ -3,6 +3,7 @@ import xarray as xr
 from xarray.core.dataset import Dataset
 import numpy as np
 from numpy.typing import NDArray
+import rioxarray
 
 def f(ds: Dataset, inp: NDArray[np.int_], path: str)->None:
       '''prepares a 3-band image for SAMgeo. 

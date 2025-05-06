@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # test_query.sh
-python3 PaddockTSLocal/Query.py \
+python PaddockTSLocal/Query.py \
   --lat -35.28 \
   --lon 149.13 \
   --buffer 0.1 \

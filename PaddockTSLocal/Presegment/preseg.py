@@ -4,30 +4,27 @@ from PaddockTSLocal.Presegment.export import f as export
 from PaddockTSLocal.Download.query_to_ds import f as ds_from_stac
 from dea_tools.bandindices import calculate_indices
 from datetime import date
-from PaddockTSLocal.Logger import Logger
 from PaddockTSLocal.Query import Query
+from os.path import join
+from os import getcwd
 from os.path import exists
 import rioxarray
 import xarray as xr
 import numpy as np
 import pickle
-import hdstats
 from os.path import abspath
 from matplotlib import pyplot as plt
+from os.path import basename
+from os import makedirs
 
 load_pickle = lambda path: pickle.load(open(path, 'rb'))
 
-def f(query: Query | None, stub: str | None, logger: Logger = None):
-    path_ds = logger.get_path_dataset(stub, query)
-    print(path_ds)
-    if not exists(path_ds): ds_from_stac(query, logger)
-    ds = load_pickle(logger.get_path_dataset(stub, query))
-    print(ds)
-    print(type(ds))
+def f(path_ds: str, path_out: str):
+    ds = load_pickle(path_ds)
     ds = calculate_indices(ds, ['NDVI', 'NDWI', 'SAVI'], collection='ga_s2_3')
     img_fourier = compute_ndwi_fourier(ds)
     img = rescale_image(img_fourier)
-    export(ds, img, logger.get_path_query_presegment_tiff(stub, query))
+    export(ds, img, path_out)
 
 def t():
     query = Query(
@@ -50,9 +47,14 @@ def t():
             'nbart_swir_3'
         ]
     )
-    logger = Logger()
-    stub = '4'
-    f(query, stub, logger)
+    path_ds = join(getcwd(), 'Data', 'ds2', f"{query.get_stub()}.pkl")
+    if not exists(path_ds):
+        from PaddockTSLocal.Download.query_to_ds import f as query_to_ds
+        query_to_ds(query=query)
+    out_dir: str=join(getcwd(), 'Data', 'preseg')
+    stub = basename(path_ds).split('.')[0]
+    path_out = join(out_dir, f"{stub}.tif")
+    f(path_ds, path_out)
 
 if __name__ == '__main__':
     t()
