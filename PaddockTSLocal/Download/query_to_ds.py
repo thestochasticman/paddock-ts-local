@@ -7,8 +7,8 @@ import odc.stac
 import pickle
 
 
-def f(query: Query, out_dir: str, stub: str | None=None):
-    makedirs(out_dir, exist_ok=True)
+def f(query: Query, path_ds: str):
+    
     catalog = pystac_client.Client.open('https://explorer.dea.ga.gov.au/stac')
     odc.stac.configure_rio(
         cloud_defaults=True,
@@ -33,9 +33,7 @@ def f(query: Query, out_dir: str, stub: str | None=None):
         groupby='solar_day',
         bbox=query.bbox, 
     )
-    stub = stub if stub is not None else query.get_stub()
-    path = join(out_dir, f"{stub}.pkl")
-    with open(path, 'wb') as handle:
+    with open(path_ds, 'wb') as handle:
         pickle.dump(ds, handle, protocol=pickle.HIGHEST_PROTOCOL)
     return ds
 
@@ -61,8 +59,10 @@ def t():
             'nbart_swir_3'
         ]
     )
-    out_dir: str=join(getcwd(), 'Data', 'ds2'),
-    f(query, out_dir)
+    out_dir: str=join(getcwd(), 'Data', 'ds2')
+    makedirs(out_dir, exist_ok=True)
+    path = join(out_dir, f"{query.get_stub()}.pkl")
+    f(query, path)
 
 if __name__ == '__main__':
     t()

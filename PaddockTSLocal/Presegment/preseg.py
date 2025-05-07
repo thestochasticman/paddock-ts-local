@@ -24,6 +24,7 @@ def f(path_ds: str, path_out: str):
     ds = calculate_indices(ds, ['NDVI', 'NDWI', 'SAVI'], collection='ga_s2_3')
     img_fourier = compute_ndwi_fourier(ds)
     img = rescale_image(img_fourier)
+    print(img)
     export(ds, img, path_out)
 
 def t():
