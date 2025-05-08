@@ -2,7 +2,7 @@ from PaddockTSLocal.VegFrac.unmix_fractional_cover import f as unmix_fractional_
 from PaddockTSLocal.VegFrac.get_model import f as get_model
 import numpy as np
 
-def f(ds, band_names, i, correction=True):
+def f(ds, band_names, i=4, correction=True):
     """
     Calculate the fractional cover using specified bands from an xarray Dataset.
 
@@ -49,13 +49,14 @@ def f(ds, band_names, i, correction=True):
     
     return fractions
 
-if __name__ == '__main__':
+def t():
     from PaddockTSLocal.Query import Query
     from datetime import date
     from os.path import join
     from os import getcwd
     from os.path import exists
-    
+    import pickle
+
     query = Query(
         lat=-33.5040,
         lon=148.4,
@@ -77,6 +78,13 @@ if __name__ == '__main__':
         ]
     )
     path_ds = join(getcwd(), 'Data', 'ds2', f"{query.get_stub()}.pkl")
+    load_pickle = lambda path: pickle.load(open(path, 'rb'))
     if not exists(path_ds):
         from PaddockTSLocal.Download.query_to_ds import f as query_to_ds
-        query_to_ds(query=query)
+        query_to_ds(query=query, path_ds=path_ds)
+    ds = load_pickle(path_ds)
+    band_names = ['nbart_blue', 'nbart_green', 'nbart_red', 'nbart_nir_1', 'nbart_swir_2', 'nbart_swir_3']
+    fractions = f(ds, band_names)
+
+if __name__ == '__main__':
+    t()
