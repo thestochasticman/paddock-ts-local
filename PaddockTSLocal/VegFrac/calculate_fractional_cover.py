@@ -1,8 +1,5 @@
-import tensorflow as tf
-from fractionalcover3 import unmix_fractional_cover
-from fractionalcover3 import data
 import numpy as np
-import xarray as xr
+
 
 
 def calculate_fractional_cover(ds, band_names, i, correction=True):
@@ -51,33 +48,3 @@ def calculate_fractional_cover(ds, band_names, i, correction=True):
         fractions[t] = unmix_fractional_cover(inref[t], fc_model=data.get_model(n=i))
     
     return fractions
-# # Example usage:
-# band_names = ['nbart_blue', 'nbart_green', 'nbart_red', 'nbart_nir_2', 'nbart_swir_2', 'nbart_swir_3']
-# i = 1  # or whichever model index you want to use
-# fractions = calculate_fractional_cover(ds, band_names, i)
-
-
-def add_fractional_cover_to_ds(ds, fractions):
-    """
-    Add the fractional cover bands to the original xarray.Dataset.
-
-    Parameters:
-    ds (xarray.Dataset): The original xarray Dataset containing the satellite data.
-    fractions (numpy.ndarray): The output array with fractional cover (time, bands, x, y).
-
-    Returns:
-    xarray.Dataset: The updated xarray Dataset with the new fractional cover bands.
-    """
-    # Create DataArray for each vegetation fraction
-    bg = xr.DataArray(fractions[:, 0, :, :], coords=[ds.coords['time'], ds.coords['y'], ds.coords['x']], dims=['time', 'y', 'x'])
-    pv = xr.DataArray(fractions[:, 1, :, :], coords=[ds.coords['time'], ds.coords['y'], ds.coords['x']], dims=['time', 'y', 'x'])
-    npv = xr.DataArray(fractions[:, 2, :, :], coords=[ds.coords['time'], ds.coords['y'], ds.coords['x']], dims=['time', 'y', 'x'])
-    
-    # Assign new DataArrays to the original Dataset
-    ds_updated = ds.assign(bg=bg, pv=pv, npv=npv)
-    
-    return ds_updated
-
-# # Example usage
-# ds_updated = add_fractional_cover_to_ds(ds, fractions)
-# print(ds_updated)
