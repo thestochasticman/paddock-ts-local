@@ -1,33 +1,28 @@
 from PaddockTSLocal.Presegment.compute_ndwi_fourier import f as compute_ndwi_fourier
 from PaddockTSLocal.Presegment.rescale_image import f as rescale_image
 from PaddockTSLocal.Presegment.export import f as export
-from PaddockTSLocal.Download.query_to_ds import f as ds_from_stac
-from dea_tools.bandindices import calculate_indices
 from datetime import date
 from PaddockTSLocal.Query import Query
 from os.path import join
 from os import getcwd
 from os.path import exists
 import rioxarray
-import xarray as xr
-import numpy as np
 import pickle
-from os.path import abspath
-from matplotlib import pyplot as plt
-from os.path import basename
-from os import makedirs
+
 
 load_pickle = lambda path: pickle.load(open(path, 'rb'))
 
 def f(path_ds: str, path_out: str):
     ds = load_pickle(path_ds)
-    ds = calculate_indices(ds, ['NDVI', 'NDWI', 'SAVI'], collection='ga_s2_3')
+    # ds = calculate_indices(ds, ['NDVI', 'CFI', 'NIRv'], collection='ga_s2_3')
     img_fourier = compute_ndwi_fourier(ds)
     img = rescale_image(img_fourier)
     print(img)
     export(ds, img, path_out)
 
 def t():
+    from os.path import basename
+    
     query = Query(
         lat=-33.5040,
         lon=148.4,

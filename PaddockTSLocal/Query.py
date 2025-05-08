@@ -9,6 +9,7 @@ from argparse import ArgumentParser
 from datetime import datetime
 from marshmallow import fields
 from hashlib import sha256
+from typing import Union, Tuple
 
 def parse_date(s: str)   -> date: return datetime.strptime(s, "%Y-%m-%d").date()
 def encode_date(d: date) -> str : return d.isoformat()
@@ -28,14 +29,14 @@ class Query:
 
     crs        : str                     = 'utm'
     groupby    : str                     = 'solarday'
-    resolution : int | tuple[int, int]   = (-10, 10)
+    resolution : Union[int, tuple[int, int]]   = (-10, 10)
 
     x         : float     = field(init=False, metadata={'help': 'Longitude of the area of interest'})
     y         : float     = field(init=False, metadata={'help': 'Latitude of the area of interest'})
     centre    : float     = field(init=False, metadata={'help': 'Centre of the Image to be retrieved from the Query'})
     lon_range : float     = field(init=False, metadata={'help': 'Range of Longitude'})
     lat_range : float     = field(init=False, metadata={'help': 'Range of Latitude'})
-    datetime : float      = field(init=False, metadata={'help': 'Range of Time'})
+    datetime  : float      = field(init=False, metadata={'help': 'Range of Time'})
     bbox      : float     = field(init=False, metadata={'help': 'Area of Interest'})
 
     set_x           = lambda s: object.__setattr__(s, 'x', s.lon)
