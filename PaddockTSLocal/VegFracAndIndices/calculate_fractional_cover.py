@@ -1,5 +1,5 @@
-from PaddockTSLocal.VegFrac.unmix_fractional_cover import f as unmix_fractional_cover
-from PaddockTSLocal.VegFrac.get_model import f as get_model
+from PaddockTSLocal.VegFracAndIndices.unmix_fractional_cover import f as unmix_fractional_cover
+from PaddockTSLocal.VegFracAndIndices.get_model import f as get_model
 import numpy as np
 
 def f(ds, band_names, i=4, correction=True):
