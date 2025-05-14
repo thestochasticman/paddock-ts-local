@@ -1,0 +1,2 @@
+from PaddockTSLocal.Download import download_ds2_from_query
+from PaddockTSLocal.NDWIFourierGeotiff import presegment

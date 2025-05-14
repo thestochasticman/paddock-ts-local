@@ -1,10 +1,20 @@
-from PaddockTSLocal.SamGeoPaddocks.load_model import f as load_model
-from PaddockTSLocal.SamGeoPaddocks.config import Config
+from geotiff import GeoTiff
+from os.path import dirname
 from os.path import exists
 from samgeo import SamGeo
+from os import makedirs
 import geopandas as gpd
 import numpy as np
-from geotiff import GeoTiff
+import wget
+
+def download_weights(path: str)->None:
+    makedirs(dirname(path), exist_ok=True)
+    url = 'https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth'
+    wget.download(url, out=path)
+
+def load_model(path: str)->SamGeo:
+    if not exists(path): download_weights(path)
+    return SamGeo(model_type='vit_h', checkpoint=path)
 
 def filter_polygons(vector, min_area_ha, max_area_ha, max_perim_area_ratio):
     pol = gpd.read_file(vector).drop(labels = 'value', axis = 1)
@@ -18,8 +28,8 @@ def filter_polygons(vector, min_area_ha, max_area_ha, max_perim_area_ratio):
     ]
     return pol_filt
 
-def f(
-        path_image: str,
+def segment(
+        path_geotiff: str,
         path_model: str,
         path_output_mask: str,
         path_output_vector: str,
@@ -27,11 +37,10 @@ def f(
         min_area_ha: int = 10,
         max_area_ha: int = 1500,
         max_perim_area_ratio: int = 30
-    ):
-    load_model(path_model)
+):
     model = load_model(path_model)
     model.generate(
-        path_image,
+        path_geotiff,
         path_output_mask,
         batch=True,
         foreground=True,
@@ -42,35 +51,14 @@ def f(
     filtered_gdf = filter_polygons(path_output_vector, min_area_ha, max_area_ha, max_perim_area_ratio)
     filtered_gdf.to_file(path_filtered_output_vector, driver='GPKG')
 
-def t():
-    from PaddockTSLocal.Query import Query
-    from datetime import date
+def test():
+    from PaddockTSLocal.Query import get_example_query
     from os.path import join
     from os import getcwd
-    from os import makedirs
 
-    query = Query(
-        lat=-33.5040,
-        lon=148.4,
-        buffer=0.01,
-        start_time=date(2020, 1, 1),
-        end_time=date(2020, 6, 1),
-        collections=['ga_s2am_ard_3', 'ga_s2bm_ard_3'],
-        bands=[
-            'nbart_blue',
-            'nbart_green',
-            'nbart_red', 
-            'nbart_red_edge_1',
-            'nbart_red_edge_2',
-            'nbart_red_edge_3',
-            'nbart_nir_1',
-            'nbart_nir_2',
-            'nbart_swir_2',
-            'nbart_swir_3'
-        ]
-    )
+    query = get_example_query()
     stub = query.get_stub()
-    preseg_dir: str=join(getcwd(), 'Data', 'preseg')
+    preseg_dir: str=join(getcwd(), 'Data', 'ndwi_tiff')
     seg_dir: str = join(getcwd(), 'Data', 'seg')
     model_dir: str = join(getcwd(), 'Data', 'Samgeo', 'Model')
     makedirs(seg_dir, exist_ok=True)
@@ -79,7 +67,7 @@ def t():
     path_filtered_output_vector = join(seg_dir, f"{stub}_filtered.gpkg")
     path_output_mask = join(seg_dir, f"{stub}.tif")
     path_model = join(model_dir, 'sam_vit_h_4b8939.pth')
-    f(path_preseg_image, path_model, path_output_mask, path_output_vector, path_filtered_output_vector)
+    segment(path_preseg_image, path_model, path_output_mask, path_output_vector, path_filtered_output_vector)
 
 if __name__ == '__main__':
-    t()
+    test()
