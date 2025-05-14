@@ -1,4 +1,3 @@
-
 from dataclasses_json import dataclass_json
 from dataclasses_json import config
 from typing_extensions import Self
@@ -9,7 +8,8 @@ from argparse import ArgumentParser
 from datetime import datetime
 from marshmallow import fields
 from hashlib import sha256
-from typing import Union, Tuple
+from typing import Union
+from typing import Tuple
 
 def parse_date(s: str)   -> date: return datetime.strptime(s, "%Y-%m-%d").date()
 def encode_date(d: date) -> str : return d.isoformat()
@@ -36,7 +36,7 @@ class Query:
     centre    : float     = field(init=False, metadata={'help': 'Centre of the Image to be retrieved from the Query'})
     lon_range : float     = field(init=False, metadata={'help': 'Range of Longitude'})
     lat_range : float     = field(init=False, metadata={'help': 'Range of Latitude'})
-    datetime  : float      = field(init=False, metadata={'help': 'Range of Time'})
+    datetime  : float     = field(init=False, metadata={'help': 'Range of Time'})
     bbox      : float     = field(init=False, metadata={'help': 'Area of Interest'})
 
     set_x           = lambda s: object.__setattr__(s, 'x', s.lon)
@@ -88,5 +88,27 @@ class Query:
 def t():
     query = Query.from_cli()
     print(query)
+
+def get_example_query()->Query:
+    return Query(
+        lat=-33.5040,
+        lon=148.4,
+        buffer=0.01,
+        start_time=date(2020, 1, 1),
+        end_time=date(2020, 6, 1),
+        collections=['ga_s2am_ard_3', 'ga_s2bm_ard_3'],
+        bands=[
+            'nbart_blue',
+            'nbart_green',
+            'nbart_red', 
+            'nbart_red_edge_1',
+            'nbart_red_edge_2',
+            'nbart_red_edge_3',
+            'nbart_nir_1',
+            'nbart_nir_2',
+            'nbart_swir_2',
+            'nbart_swir_3'
+        ]
+    )
 
 if __name__ == '__main__': t()

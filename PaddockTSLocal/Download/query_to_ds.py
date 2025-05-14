@@ -1,4 +1,5 @@
 from PaddockTSLocal.Query import Query
+from os.path import exists
 from os.path import join
 from os import makedirs
 from os import getcwd
