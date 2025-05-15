@@ -1,20 +1,26 @@
+import torch
+
 from geotiff import GeoTiff
 from os.path import dirname
 from os.path import exists
-from samgeo import SamGeo
+# from samgeo import SamGeo
+from PaddockTSLocal.CustomSamGeo import SamGeo
+import xarray as xr
 from os import makedirs
 import geopandas as gpd
 import numpy as np
 import wget
+
+torch.set_default_dtype(torch.float32)
 
 def download_weights(path: str)->None:
     makedirs(dirname(path), exist_ok=True)
     url = 'https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth'
     wget.download(url, out=path)
 
-def load_model(path: str)->SamGeo:
+def load_model(path: str, device='cpu')->SamGeo:
     if not exists(path): download_weights(path)
-    return SamGeo(model_type='vit_h', checkpoint=path)
+    return SamGeo(model_type='vit_h', checkpoint=path, device=device)
 
 def filter_polygons(vector, min_area_ha, max_area_ha, max_perim_area_ratio):
     pol = gpd.read_file(vector).drop(labels = 'value', axis = 1)
@@ -36,9 +42,10 @@ def segment(
         path_filtered_output_vector: str,
         min_area_ha: int = 10,
         max_area_ha: int = 1500,
-        max_perim_area_ratio: int = 30
+        max_perim_area_ratio: int = 30,
+        device='cpu'
 ):
-    model = load_model(path_model)
+    model = load_model(path_model, device)
     model.generate(
         path_geotiff,
         path_output_mask,
@@ -67,7 +74,7 @@ def test():
     path_filtered_output_vector = join(seg_dir, f"{stub}_filtered.gpkg")
     path_output_mask = join(seg_dir, f"{stub}.tif")
     path_model = join(model_dir, 'sam_vit_h_4b8939.pth')
-    segment(path_preseg_image, path_model, path_output_mask, path_output_vector, path_filtered_output_vector)
+    segment(path_preseg_image, path_model, path_output_mask, path_output_vector, path_filtered_output_vector, device='cpu')
 
 if __name__ == '__main__':
     test()

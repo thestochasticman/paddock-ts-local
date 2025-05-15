@@ -58,6 +58,7 @@ def rescale(im: NDArray[np.float64])->NDArray[np.float64]:
     return(_im)
 
 def convert_to_geotif(ds2: Dataset, inp: NDArray[np.float64])->xr.DataArray:
+    inp = inp.astype(np.float32)
     '''prepares a 3-band image for SAMgeo. 
     First rescale bands in the image. Then convert to xarray with original geo info. Then save geotif'''
     if inp.shape[2] == 3:
