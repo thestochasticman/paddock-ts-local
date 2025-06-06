@@ -106,6 +106,7 @@ def test():
     path = f"{NDWI_FOURIER_GEOTIFF_DIR}/{query.get_stub()}.tif"
     if exists(path): remove(path)
     presegment(query.get_stub())
+    print(path)
     return exists(path)
 
 if __name__ == '__main__':

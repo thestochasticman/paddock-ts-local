@@ -46,7 +46,7 @@ def segment(
         max_perim_area_ratio: int = 30,
         device='cpu'
 ):
-    path_preseg_image = f"{NDWI_FOURIER_GEOTIFF_DIR}/{stub}.pkl"
+    path_preseg_image = f"{NDWI_FOURIER_GEOTIFF_DIR}/{stub}.tif"
     path_output_mask = f"{SAMGEO_OUTPUT_MASK_DIR}/{stub}.tif"
     path_output_vector = f"{SAMGEO_OUTPUT_VECTOR_DIR}.gpkg"
     path_filtered_output_vector = f"{SAMGEO_FILTERED_OUTPUT_VECTOR_DIR}/{stub}.gpkg"
@@ -65,8 +65,6 @@ def segment(
 
 def test():
     from PaddockTSLocal.Query import get_example_query
-    from os.path import join
-    from os import getcwd
 
     query = get_example_query()
     stub = query.get_stub()
