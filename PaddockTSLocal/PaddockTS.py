@@ -40,7 +40,6 @@ def get_paddock_ts(stub: str):
         pickle.dump(keep_vars, f)
 
 
-
 def test():
     from PaddockTSLocal.Query import get_example_query
     from os.path import exists
