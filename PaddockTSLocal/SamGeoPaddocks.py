@@ -1,14 +1,19 @@
-import torch
+from PaddockTSLocal.Legend import SAMGEO_FILTERED_OUTPUT_VECTOR_DIR
+from PaddockTSLocal.Legend import SAMGEO_OUTPUT_VECTOR_DIR
+from PaddockTSLocal.Legend import NDWI_FOURIER_GEOTIFF_DIR
+from PaddockTSLocal.Legend import SAMGEO_OUTPUT_MASK_DIR
+from PaddockTSLocal.Legend import SAMGEO_MODEL_PATH
+from PaddockTSLocal.CustomSamGeo import SamGeo
 
 from geotiff import GeoTiff
 from os.path import dirname
+from geotiff import GeoTiff
+from os.path import dirname
 from os.path import exists
-# from samgeo import SamGeo
-from PaddockTSLocal.CustomSamGeo import SamGeo
-import xarray as xr
 from os import makedirs
 import geopandas as gpd
 import numpy as np
+import torch
 import wget
 
 torch.set_default_dtype(torch.float32)
@@ -35,19 +40,19 @@ def filter_polygons(vector, min_area_ha, max_area_ha, max_perim_area_ratio):
     return pol_filt
 
 def segment(
-        path_geotiff: str,
-        path_model: str,
-        path_output_mask: str,
-        path_output_vector: str,
-        path_filtered_output_vector: str,
+        stub: str,
         min_area_ha: int = 10,
         max_area_ha: int = 1500,
         max_perim_area_ratio: int = 30,
         device='cpu'
 ):
-    model = load_model(path_model, device)
+    path_preseg_image = f"{NDWI_FOURIER_GEOTIFF_DIR}/{stub}.pkl"
+    path_output_mask = f"{SAMGEO_OUTPUT_MASK_DIR}/{stub}.tif"
+    path_output_vector = f"{SAMGEO_OUTPUT_VECTOR_DIR}.gpkg"
+    path_filtered_output_vector = f"{SAMGEO_FILTERED_OUTPUT_VECTOR_DIR}/{stub}.gpkg"
+    model = load_model(SAMGEO_MODEL_PATH, device)
     model.generate(
-        path_geotiff,
+        path_preseg_image,
         path_output_mask,
         batch=True,
         foreground=True,
@@ -65,16 +70,7 @@ def test():
 
     query = get_example_query()
     stub = query.get_stub()
-    preseg_dir: str=join(getcwd(), 'Data', 'ndwi_tiff')
-    seg_dir: str = join(getcwd(), 'Data', 'seg')
-    model_dir: str = join(getcwd(), 'Data', 'Samgeo', 'Model')
-    makedirs(seg_dir, exist_ok=True)
-    path_preseg_image = join(preseg_dir, f"{stub}.tif")
-    path_output_vector = join(seg_dir, f"{stub}.gpkg")
-    path_filtered_output_vector = join(seg_dir, f"{stub}_filtered.gpkg")
-    path_output_mask = join(seg_dir, f"{stub}.tif")
-    path_model = join(model_dir, 'sam_vit_h_4b8939.pth')
-    segment(path_preseg_image, path_model, path_output_mask, path_output_vector, path_filtered_output_vector, device='cpu')
+    segment(stub, device='cpu')
 
 if __name__ == '__main__':
     test()
