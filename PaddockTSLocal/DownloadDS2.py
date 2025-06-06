@@ -1,6 +1,9 @@
 from dask.distributed import Client as DaskClient
+from PaddockTSLocal.Legend import DS2_DIR
 from xarray.core.dataset import Dataset
 from PaddockTSLocal.Query import Query
+from typing_extensions import Union
+from os import makedirs
 import pystac_client
 import odc.stac
 import pickle
@@ -108,7 +111,7 @@ def save_ds2_to_file(ds2: Dataset, path: str)->None:
 
 def download_ds2_from_query(
     query: Query,
-    path: str,
+    stub: Union[str, None] = None,
     num_workers: int = 4, 
     threads_per_worker: int = 2,
     tile_width: int = 1024,
@@ -124,17 +127,21 @@ def download_ds2_from_query(
         tile_height=tile_height,
         tile_time_series_length=tile_time_series_length 
     )
+    stub = stub if stub is not None else query.get_stub()
+    path = f"{DS2_DIR}/{stub}.pkl"
     save_ds2_to_file(ds2=ds2, path=path)
     return ds2
 
-def test_path_existence(query: Query, path: str)->bool:
+def test_path_existence(query: Query)->bool:
     from os.path import exists
-    ds2 = query_to_ds2(query)
-    save_ds2_to_file(ds2, path)
+    stub = query.get_stub()
+    path = f"{DS2_DIR}/{stub}.pkl"
     return exists(path)
 
-def test_returned_dataset_values(query: Query, path: str)->bool:
+def test_returned_dataset_values(query: Query)->bool:
     from pandas import to_datetime
+    stub = query.get_stub()
+    path = f"{DS2_DIR}/{stub}.pkl"
     load_pickle = lambda path: pickle.load(open(path, 'rb'))
     dataset: Dataset = load_pickle(path)
     returned_dates = [to_datetime(timestamp).date() for timestamp in dataset.time.values]
@@ -149,19 +156,19 @@ def test_returned_dataset_values(query: Query, path: str)->bool:
 
 def test():
     from PaddockTSLocal.Query import get_example_query
-    from os.path import join
-    from os import makedirs
-    from os import getcwd
-
+    from os.path import exists
+    from os import remove
+    
     query = get_example_query()
-    out_dir: str=join(getcwd(), 'Data', 'ds2')
-    makedirs(out_dir, exist_ok=True)
-    path = join(out_dir, f"{query.get_stub()}.pkl")
+    stub = query.get_stub()
+    path = f"{DS2_DIR}/{stub}.pkl"
+    if exists(path): remove(path)
+    download_ds2_from_query(query)
 
     return all(
         [
-            test_path_existence(query, path),
-            test_returned_dataset_values(query, path)
+            test_path_existence(query),
+            test_returned_dataset_values(query)
         ]
     )
 

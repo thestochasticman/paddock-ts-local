@@ -1,4 +1,7 @@
+from PaddockTSLocal.Legend import NDWI_FOURIER_GEOTIFF_DIR
+from PaddockTSLocal.Query import Query
 from PaddockTSLocal.utils import load_pickle
+from PaddockTSLocal.Legend import DS2_DIR
 from xarray.core.dataset import Dataset
 from typing_extensions import Union
 from numpy.typing import NDArray
@@ -42,7 +45,6 @@ def compute_ndwi_fourier(ds: Dataset)->NDArray[np.float64]:
     ndwi_obs = (data[:,:,1,:]-data[:,:,3,:])/(data[:,:,1,:]+data[:,:,3,:]) # w = water. (g-nir)/(g+nir)
     ndwi = completion(ndwi_obs)
     f2 = fourier_mean(ndwi)
-    print(f2.shape)
     return f2
 
 def rescale(im: NDArray[np.float64])->NDArray[np.float64]:
@@ -86,28 +88,25 @@ def ds2_to_ndwi_geotiff(ds2: Dataset)->xr.DataArray:
 def save_ndwi_geotiff(data_xr: xr.DataArray, path)->None:
     data_xr.transpose('band', 'y', 'x').rio.to_raster(path)
 
-def presegment(ds2: Union[str, Dataset], path: str)->xr.DataArray:
-    ds2 = load_pickle(ds2) if isinstance(ds2, str) else ds2
+def presegment(stub: str)->xr.DataArray:
+    path_ds2 = f"{DS2_DIR}/{stub}.pkl"
+    ds2 = load_pickle(path_ds2)
     ndwi_geotiff = ds2_to_ndwi_geotiff(ds2)
+    path = f"{NDWI_FOURIER_GEOTIFF_DIR}/{stub}.tif"
     save_ndwi_geotiff(ndwi_geotiff, path)
-    print(ndwi_geotiff)
     return ndwi_geotiff
     # save_ndwi_geotiff(ds2_to_ndwi_geotiff(load_pickle(ds2) if isinstance(ds2, str) else ds2), path)
 
 def test():
     from PaddockTSLocal.Query import get_example_query
-    from os.path import join
-    from os import makedirs
-    from os import getcwd
-    
+    from os.path import exists
+    from os import remove
+
     query = get_example_query()
-    ds2_dir: str=join(getcwd(), 'Data', 'ds2')
-    makedirs(ds2_dir, exist_ok=True)
-    path_ds2 = join(ds2_dir, f"{query.get_stub()}.pkl")
-    ndwi_tiff_dir:  str=join(getcwd(), 'Data', 'ndwi_tif')
-    makedirs(ndwi_tiff_dir, exist_ok=True)
-    path_ndwi_tiff = join(ndwi_tiff_dir, f"{query.get_stub()}.tif")
-    presegment(path_ds2, path_ndwi_tiff)
+    path = f"{NDWI_FOURIER_GEOTIFF_DIR}/{query.get_stub()}.tif"
+    if exists(path): remove(path)
+    presegment(query.get_stub())
+    return exists(path)
 
 if __name__ == '__main__':
-    test()
+    print(test())
