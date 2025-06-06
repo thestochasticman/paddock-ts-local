@@ -2,11 +2,12 @@
 import numpy as np
 import xarray as xr
 
-from tensorflow.lite.python.interpreter import Interpreter
+from tensorflow.lite.python.interpreter import Interpreter 
 import numpy as np
 
 from os.path import dirname
 from os.path import join
+
 
 def get_model(n: int):
     models_dir = join(dirname(__file__), 'resources')

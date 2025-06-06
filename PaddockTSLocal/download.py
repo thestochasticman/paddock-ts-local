@@ -109,7 +109,7 @@ def save_ds2_to_file(ds2: Dataset, path: str)->None:
 def download_ds2_from_query(
     query: Query,
     path: str,
-    num_workers: int = 4,
+    num_workers: int = 4, 
     threads_per_worker: int = 2,
     tile_width: int = 1024,
     tile_height: int = 1024,
