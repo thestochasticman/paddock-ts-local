@@ -31,7 +31,6 @@ def get_paddock_ts(stub: str):
         ts.append(array[None, :])
     pvt = np.vstack(ts)
 
-    
 
     np.save(f"{PADDOCK_TS_DIR}/{stub}_pvt", pvt, allow_pickle=True, fix_imports=True)
 
