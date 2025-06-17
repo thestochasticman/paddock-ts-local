@@ -48,6 +48,7 @@ class Query:
     set_bbox        = lambda s: object.__setattr__(s, 'bbox', [s.lat_range[0], s.lon_range[0], s.lat_range[1], s.lon_range[1]])
     set_resolution  = lambda s: object.__setattr__(s, 'resolution', s.resolution if type(s.resolution) == tuple else (-s.resolution, s.resolution))
 
+
     def __str__(s: Self)->str: return s.to_json(indent=2)
     
     def get_stub(s: Self): return sha256(s.__str__().encode()).hexdigest()

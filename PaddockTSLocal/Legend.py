@@ -12,7 +12,7 @@ def get_config():
         config = {
             'out_dir': expanduser('~/Documents/PaddockTSLocal'),
             'tmp_dir': expanduser('~/Downloads/PaddockTSLocal'),
-            'scratch_dir': expanduser('~/Scratch/PaddockTSLocal')
+            'scratch_dir': expanduser('~/Scratch/PaddockTSLocal'),
         }
         dump(config, open(path_config, 'w'))
     else:
@@ -45,6 +45,8 @@ SAMGEO_MODEL_PATH = f"{SAMGEO_MODELS_DIR}/sam_vit_h_4b8939.pth"
 DS2I_DIR = f"{TMP_DIR}/DS2I"
 PADDOCK_TS_DIR = f"{TMP_DIR}/PADDOCK_TS"
 
+SILO_DIR = f"{TMP_DIR}/SILO"
+
 if not exists(DS2_DIR): mkdir(DS2_DIR)
 if not exists(NDWI_FOURIER_GEOTIFF_DIR): mkdir(NDWI_FOURIER_GEOTIFF_DIR)
 if not exists(SAMGEO_DIR): mkdir(SAMGEO_DIR)
@@ -54,3 +56,4 @@ if not exists(SAMGEO_OUTPUT_VECTOR_DIR): mkdir(SAMGEO_OUTPUT_VECTOR_DIR)
 if not exists(SAMGEO_FILTERED_OUTPUT_VECTOR_DIR): mkdir(SAMGEO_FILTERED_OUTPUT_VECTOR_DIR)
 if not exists(DS2I_DIR): mkdir(DS2I_DIR)
 if not exists(PADDOCK_TS_DIR): mkdir(PADDOCK_TS_DIR)
+if not exists(SILO_DIR): mkdir(SILO_DIR)
