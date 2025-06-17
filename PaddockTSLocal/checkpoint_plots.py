@@ -7,7 +7,7 @@ import plotting_functions as pf
 import os
 from PaddockTSLocal.Legend import *
 import pickle
-
+from shapely.geometry import Polygon
 import cv2
 import xarray as xr
 import numpy as np
@@ -15,117 +15,11 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, FFMpegWriter
 
 
-def custom_animator(
-    ds: xr.Dataset,
-    bands: list[str],
-    output_path: str,
-    width_pixels: int = 600,
-    fps: int = 10,
-    dpi: int = 100,
-    scale_factor: float = 10000.0
-):
-    """
-    Animate an xarray Dataset along its 'time' dimension by:
-      1. Dividing raw band values by scale_factor
-      2. Replacing NaNs with 0
-      3. Clipping to [0…1]
-      4. Converting to uint8 [0…255]
-      5. Rendering with square pixels (aspect='equal')
-    """
-    # 1. Compute figure size & aspect ratio
-    ny, nx = ds.sizes['y'], ds.sizes['x']
-    aspect = ny / nx
-    fig_w, fig_h = width_pixels / dpi, (width_pixels * aspect) / dpi
-    fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=dpi)
-    ax.axis('off')
 
-    # 2. Helper to build and normalize one frame
-    def make_frame(idx: int) -> np.ndarray:
-        layers = []
-        for b in bands:
-            arr = ds[b].isel(time=idx).values.astype(float) / scale_factor
-            arr = np.nan_to_num(arr, nan=0.0, posinf=1.0, neginf=0.0)
-            arr = np.clip(arr, 0.0, 1.0)
-            layers.append((arr * 255).astype(np.uint8))
-        return np.stack(layers, axis=-1)
-
-    # 3. Diagnostic print: show the range after scaling (0–255)
-    all_vals = []
-    for b in bands:
-        vals = (ds[b].values.astype(float) / scale_factor).flatten()
-        all_vals.append(vals[np.isfinite(vals)])
-    all_vals = np.concatenate(all_vals)
-    print(f"Post-scale (uint8) data range: [{int(all_vals.min()*255)} … {int(all_vals.max()*255)}]")
-
-    # 4. Initialize the first frame
-    im = ax.imshow(make_frame(0), origin='upper', aspect='equal')
-
-    # 5. Update function for FuncAnimation
-    def _update(frame_idx: int):
-        im.set_data(make_frame(frame_idx))
-        return (im,)
-
-    # 6. Build and save the animation
-    anim = FuncAnimation(fig, _update, frames=ds.sizes['time'], blit=True)
-    anim.save(output_path, writer=FFMpegWriter(fps=fps))
-    plt.close(fig)
 
 def custom_animator(
     ds: xr.Dataset,
-    bands: list[str],
-    output_path: str,
-    width_pixels: int = 600,
-    fps: int = 10,
-    dpi: int = 100,
-    scale_factor: float = 10000.0,
-    clip_limit: float = 2.0,          # for CLAHE
-    tile_grid_size: tuple = (8, 8)    # for CLAHE
-):
-    # 1. Figure size & aspect
-    ny, nx = ds.sizes['y'], ds.sizes['x']
-    aspect = ny / nx
-    fig_w, fig_h = width_pixels/dpi, (width_pixels*aspect)/dpi
-    fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=dpi)
-    ax.axis('off')
-
-    # 2. Setup CLAHE once
-    clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=tile_grid_size)
-
-    # 3. Frame builder with scaling+CLAHE
-    def make_frame(idx: int) -> np.ndarray:
-        # a) Load & normalize to [0…255] uint8
-        layers = []
-        for b in bands:
-            arr = ds[b].isel(time=idx).values.astype(float) / scale_factor
-            arr = np.nan_to_num(arr, nan=0.0, posinf=1.0, neginf=0.0)
-            arr = np.clip(arr, 0.0, 1.0)
-            layers.append((arr * 255).astype(np.uint8))
-        rgb = np.stack(layers, axis=-1)  # shape (y,x,3), RGB
-
-        # b) Convert RGB→LAB
-        lab = cv2.cvtColor(rgb, cv2.COLOR_RGB2LAB)
-        l, a, b_ = cv2.split(lab)
-
-        # c) Apply CLAHE on L channel
-        l_eq = clahe.apply(l)
-
-        # d) Merge & convert back to RGB
-        lab_eq = cv2.merge((l_eq, a, b_))
-        rgb_eq = cv2.cvtColor(lab_eq, cv2.COLOR_LAB2RGB)
-        return rgb_eq
-
-    # 4. Init & animate
-    im = ax.imshow(make_frame(0), origin='upper', aspect='equal')
-    def _update(i):
-        im.set_data(make_frame(i))
-        return (im,)
-
-    anim = FuncAnimation(fig, _update, frames=ds.sizes['time'], blit=True)
-    anim.save(output_path, writer=FFMpegWriter(fps=fps))
-    plt.close(fig)
-
-def custom_animator(
-    ds: xr.Dataset,
+    pol: Polygon,
     bands: list[str],
     output_path: str,
     width_pixels: int = 600,
@@ -147,6 +41,11 @@ def custom_animator(
     fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=dpi)
     ax.axis('off')
 
+    left   = float(ds.x.min().values)
+    right  = float(ds.x.max().values)
+    bottom = float(ds.y.min().values)
+    top    = float(ds.y.max().values)
+    
     # 2. Compute the median composite reference and its max
     #    to serve as our fixed normalizer.
     red_med   = ds['nbart_red'  ].median(dim='time').values.astype(float)
@@ -172,19 +71,30 @@ def custom_animator(
             # to uint8
             layers.append((arr * 255).astype(np.uint8))
         return np.stack(layers, axis=-1)
-
+    
+   
     # 4. Initialize the first frame
-    im = ax.imshow(make_frame(0), origin='upper', aspect='equal')
+    pol.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
+    im = ax.imshow(make_frame(0), origin='upper', aspect='equal', extent=(left, right, bottom, top))
+    if 'crs' in ds.attrs:
+        pol = pol.to_crs(ds.attrs['crs'])
 
-    # 5. Update function for FuncAnimation
+
+    list_coords_pol = [tuple(polygon.exterior.coords) for polygon in pol.geometry]
+    # print(list_coords_pol[0])
+
     def _update(frame_idx: int):
         im.set_data(make_frame(frame_idx))
+        
         return (im,)
 
-    # 6. Build and save the animation
+    
     anim = FuncAnimation(fig, _update, frames=ds.sizes['time'], blit=True)
     anim.save(output_path, writer=FFMpegWriter(fps=fps))
     plt.close(fig)
+
+
+
 
 def plot(stub: str):
     ds2i = pickle.load(open(f"{DS2I_DIR}/{stub}.pkl", 'rb'))
@@ -217,8 +127,14 @@ def plot(stub: str):
         savefig_path=output_name_vegfrac)
 
     # Save the time lapses of RGB and veg fract with paddocks overlaid
-    output_path = f"{OUT_DIR}/{stub}+'_manpad_RGB.mp4"
-    custom_animator(ds2i, ['nbart_red', 'nbart_green', 'nbart_blue'], output_path=output_path, width_pixels=215)
+
+    custom_animator(
+        ds2i,
+        pol,
+        ['nbart_red', 'nbart_green', 'nbart_blue'],
+        f"{OUT_DIR}/{stub}+'_manpad_RGB.mp4"
+    )
+
     # xr_animation(ds2i, 
     #             bands = ['nbart_red', 'nbart_green', 'nbart_blue'], 
     #             output_path = output_path, 
@@ -227,7 +143,12 @@ def plot(stub: str):
     #             imshow_kwargs={"aspect": "equal"},
     #         )
 
-    # output_path = f"{OUT_DIR}/{stub}+'_manpad_vegfrac.mp4"
+    custom_animator(
+        ds2i,
+        pol,
+        ['bg', 'pv', 'npv'],
+        f"{OUT_DIR}/{stub}+'_manpad_vegfrac.mp4"
+    )
     # xr_animation(ds2i, 
     #             bands = ['bg', 'pv', 'npv'], 
     #             output_path = output_path, 

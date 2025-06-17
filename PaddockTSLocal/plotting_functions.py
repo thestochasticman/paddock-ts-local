@@ -163,7 +163,13 @@ def plot_paddock_map_auto_rgb(ds, pol, out_dir, stub):
     ax.imshow(rgb, extent=(left, right, bottom, top))
 
     # Overlay the paddock polygons.
-    pol.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
+    # pol.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
+
+    list_coords_pol = [polygon.exterior for polygon in pol.geometry]
+
+    for coords in list_coords_pol:
+        x, y = coords.xy
+        ax.plot(x, y, color='red')
 
     # Add paddock labels at the centroid of each polygon.
     for _, row in pol.iterrows():
