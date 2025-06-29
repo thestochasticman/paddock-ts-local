@@ -1,8 +1,8 @@
 from PaddockTSLocal.VegFrac import calculate_fractional_cover
 from PaddockTSLocal.VegFrac import add_fractional_cover_to_ds
 from PaddockTSLocal.utils import load_pickle
-from PaddockTSLocal.Legend import DS2I_DIR
-from PaddockTSLocal.Legend import DS2_DIR
+from PaddockTSLocal.legend import DS2I_DIR
+from PaddockTSLocal.legend import DS2_DIR
 from typing_extensions import Callable
 from PaddockTSLocal.indices import *
 import pickle

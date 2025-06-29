@@ -170,7 +170,6 @@ def download_environmental_data(query: Query, stub: str):
     terrain_tiles(lat, lon, buffer, outdir, stub, tmpdir)
 
 def test():
-    from PaddockTSLocal.query import get_example_query
     from datetime import date
 
     # query = get_example_query()

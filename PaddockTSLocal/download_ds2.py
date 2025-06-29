@@ -55,7 +55,7 @@ def query_to_ds2(
         bbox=query.bbox,
         collections=query.collections,
         datetime=query.datetime,
-        filter=query.filter.to_dict()
+        filter=filter_expression
     )
     items = list(query_results.items())
 

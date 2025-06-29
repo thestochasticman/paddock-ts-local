@@ -57,61 +57,163 @@ date_config = config(
     mm_field=fields.Date
 )
 
+# @dataclass_json
+# @dataclass(frozen=True)
+# class Query:
+#     """
+#     Represents a STAC-query specification, with automatic bounding‐box,
+#     datetime string, and unique stub generation for caching.
+
+#     Attributes:
+#     (User Defined)
+#         lat (float)             : Latitude of the area of interest,
+#         lon (float)             : Longitude of the area of interest,
+#         buffer (float)          : Buffer in degrees around (lat, lon),
+#         start_time (date)       : Start date of query (inclusive),
+#         end_time (date)         : End date of query (inclusive),
+#         collections (list[str]) : List of STAC collection IDs,
+#         bands (list[str])       : List of band names to load,
+#         crs (str)               : Coordinate reference system (default “EPSG:6933”),
+#         groupby (str)           : ODC groupby key (default “solarday”),
+#         resolution (int|tuple)  : Spatial resolution in metres (default 10),        
+#         filter (Filter)         : Expresson to Refine Search                        
+#         ---------------------------------------------------------------------------
+#     (Set in __post_init__: __post_init__)
+#         x (float)               : Same as `lon`,                                           
+#         y (float)               : Same as `lat`,                                           
+#         centre (tuple)          : (x, y) pair,                                        
+#         lon_range (tuple)       : (min_lon, max_lon),                              
+#         lat_range (tuple)       : (min_lat, max_lat),                              
+#         datetime (str)          : “YYYY-MM-DD/YYYY-MM-DD” string,                     
+#         bbox (list)             : [min_lat, min_lon, max_lat, max_lon],                  
+#     """
+#     lat         : float     = field(metadata={'help': 'Latitude of the area of interest'})
+#     lon         : float     = field(metadata={'help': 'Longitude of the area of interest'})
+#     buffer      : float     = field(metadata={'help': 'Buffer in degrees around lat/lon'})
+#     start_time  : date      = field(metadata={'help': 'Start date (YYYY-MM-DD)'} | date_config)
+#     end_time    : date      = field(metadata={'help': 'End date (YYYY-MM-DD)'} | date_config)
+#     collections : list[str] = field(metadata={'help': 'Products to use for the query'})
+#     bands       : list[str] = field(metadata={'help': 'List of band data required'})
+
+#     filter     : Filter     = field(
+#                                 default_factory=lambda: Filter.lt("eo:cloud_cover", 10),
+#                                 metadata={'help': 'Expression to Refine Search'}
+#                             )
+#     crs        : str        = 'EPSG:6933'
+#     groupby    : str        = 'solarday'
+#     resolution : int        = 10
+
+#     x         : float   = field(init=False, metadata={'help': 'Longitude of the area of interest'})
+#     y         : float   = field(init=False, metadata={'help': 'Latitude of the area of interest'})
+#     centre    : Tuple   = field(init=False, metadata={'help': 'Centre coordinate (x, y)'})
+#     lon_range : Tuple   = field(init=False, metadata={'help': 'Longitude range (min, max)'})
+#     lat_range : Tuple   = field(init=False, metadata={'help': 'Latitude range (min, max)'})
+#     datetime  : str     = field(init=False, metadata={'help': 'Time range string'})
+#     bbox      : list    = field(init=False, metadata={'help': 'Bounding box [min_lat, min_lon, max_lat, max_lon]'})
+
+#     # Post-init helpers to set derived fields
+#     set_x           = lambda s: object.__setattr__(s, 'x', s.lon)
+#     set_y           = lambda s: object.__setattr__(s, 'y', s.lat)
+#     set_centre      = lambda s: object.__setattr__(s, 'centre', (s.x, s.y))
+#     set_lat_range   = lambda s: object.__setattr__(s, 'lat_range', (s.x - s.buffer, s.x + s.buffer))
+#     set_lon_range   = lambda s: object.__setattr__(s, 'lon_range', (s.y - s.buffer, s.y + s.buffer))
+#     set_datetime    = lambda s: object.__setattr__(s, 'datetime', f'{str(s.start_time)}/{str(s.end_time)}')
+#     set_bbox        = lambda s: object.__setattr__(s, 'bbox', [s.lat_range[0], s.lon_range[0], s.lat_range[1], s.lon_range[1]])
+#     set_resolution  = lambda s: object.__setattr__(s, 'resolution', s.resolution if type(s.resolution) == tuple else (-s.resolution, s.resolution))
+
+#     def __post_init__(self: Self) -> None:
+#         """
+#         Populate all derived fields after the dataclass is initialized.
+#         """
+#         self.set_x()
+#         self.set_y()
+#         self.set_centre()
+#         self.set_lon_range()
+#         self.set_lat_range()
+#         self.set_datetime()
+#         self.set_bbox()
+
+#     def __str__(self: Self) -> str:
+#         """
+#         Serialize this Query to a pretty-printed JSON string.
+
+#         Returns:
+#             str: The JSON representation.
+#         """
+#         return self.to_json(indent=2)
+
+#     def get_stub(self: Self) -> str:
+#         """
+#         Compute a SHA-256 hash of this Query’s JSON to use as a cache key.
+
+#         Returns:
+#             str: The hex digest stub.
+#         """
+#         return sha256(str(self).encode()).hexdigest()
+
+#     @classmethod
+#     def from_cli(cls) -> "Query":
+#         """
+#         Parse CLI arguments and construct a Query object.
+
+#         Expected flags:
+#           --lat, --lon, --buffer,
+#           --start_time, --end_time,
+#           --collections (one or more), --bands (one or more)
+
+#         Returns:
+#             Query: The populated instance.
+#         """
+#         parser = ArgumentParser()
+#         grp = parser.add_argument_group("query")
+#         flds = cls.__dataclass_fields__
+
+#         grp.add_argument("--lat",         type=float, required=True, help=flds['lat'].metadata['help'])
+#         grp.add_argument("--lon",         type=float, required=True, help=flds['lon'].metadata['help'])
+#         grp.add_argument("--buffer",      type=float, required=True, help=flds['buffer'].metadata['help'])
+#         grp.add_argument("--start_time",  type=parse_date, required=True, help=flds['start_time'].metadata['help'])
+#         grp.add_argument("--end_time",    type=parse_date, required=True, help=flds['end_time'].metadata['help'])
+#         grp.add_argument("--collections", nargs='+', required=True, help=flds['collections'].metadata['help'])
+#         grp.add_argument("--bands",       nargs='+', required=True, help=flds['bands'].metadata['help'])
+
+#         args, _ = parser.parse_known_args()
+#         return cls(
+#             lat=args.lat,
+#             lon=args.lon,
+#             buffer=args.buffer,
+#             start_time=args.start_time,
+#             end_time=args.end_time,
+#             collections=args.collections,
+#             bands=args.bands,
+#         )
+
 @dataclass_json
 @dataclass(frozen=True)
 class Query:
-    """
-    Represents a STAC-query specification, with automatic bounding‐box,
-    datetime string, and unique stub generation for caching.
-
-    Attributes:
-    (User Defined)
-        lat (float)             : Latitude of the area of interest,
-        lon (float)             : Longitude of the area of interest,
-        buffer (float)          : Buffer in degrees around (lat, lon),
-        start_time (date)       : Start date of query (inclusive),
-        end_time (date)         : End date of query (inclusive),
-        collections (list[str]) : List of STAC collection IDs,
-        bands (list[str])       : List of band names to load,
-        crs (str)               : Coordinate reference system (default “EPSG:6933”),
-        groupby (str)           : ODC groupby key (default “solarday”),
-        resolution (int|tuple)  : Spatial resolution in metres (default 10),        
-        filter (Filter)         : Expresson to Refine Search                        
-        ---------------------------------------------------------------------------
-    (Set in __post_init__: __post_init__)
-        x (float)               : Same as `lon`,                                           
-        y (float)               : Same as `lat`,                                           
-        centre (tuple)          : (x, y) pair,                                        
-        lon_range (tuple)       : (min_lon, max_lon),                              
-        lat_range (tuple)       : (min_lat, max_lat),                              
-        datetime (str)          : “YYYY-MM-DD/YYYY-MM-DD” string,                     
-        bbox (list)             : [min_lat, min_lon, max_lat, max_lon],                  
-    """
     lat         : float     = field(metadata={'help': 'Latitude of the area of interest'})
     lon         : float     = field(metadata={'help': 'Longitude of the area of interest'})
     buffer      : float     = field(metadata={'help': 'Buffer in degrees around lat/lon'})
     start_time  : date      = field(metadata={'help': 'Start date (YYYY-MM-DD)'} | date_config)
     end_time    : date      = field(metadata={'help': 'End date (YYYY-MM-DD)'} | date_config)
-    collections : list[str] = field(metadata={'help': 'Products to use for the query'})
-    bands       : list[str] = field(metadata={'help': 'List of band data required'})
+    collections : list[str] = field(metadata={'help': 'products to use for the query'})
+    bands       : list[str] = field(metadata={'help': 'list of band data required'})
 
+    crs        : str        = 'EPSG:6933'
+    groupby    : str        = 'solarday'
+    resolution : int        = 10
     filter     : Filter     = field(
                                 default_factory=lambda: Filter.lt("eo:cloud_cover", 10),
                                 metadata={'help': 'Expression to Refine Search'}
                             )
-    crs        : str        = 'EPSG:6933'
-    groupby    : str        = 'solarday'
-    resolution : int        = 10
 
-    x         : float   = field(init=False, metadata={'help': 'Longitude of the area of interest'})
-    y         : float   = field(init=False, metadata={'help': 'Latitude of the area of interest'})
-    centre    : Tuple   = field(init=False, metadata={'help': 'Centre coordinate (x, y)'})
-    lon_range : Tuple   = field(init=False, metadata={'help': 'Longitude range (min, max)'})
-    lat_range : Tuple   = field(init=False, metadata={'help': 'Latitude range (min, max)'})
-    datetime  : str     = field(init=False, metadata={'help': 'Time range string'})
-    bbox      : list    = field(init=False, metadata={'help': 'Bounding box [min_lat, min_lon, max_lat, max_lon]'})
+    x         : float     = field(init=False, metadata={'help': 'Longitude of the area of interest'})
+    y         : float     = field(init=False, metadata={'help': 'Latitude of the area of interest'})
+    centre    : float     = field(init=False, metadata={'help': 'Centre of the Image to be retrieved from the Query'})
+    lon_range : float     = field(init=False, metadata={'help': 'Range of Longitude'})
+    lat_range : float     = field(init=False, metadata={'help': 'Range of Latitude'})
+    datetime  : float     = field(init=False, metadata={'help': 'Range of Time'})
+    bbox      : float     = field(init=False, metadata={'help': 'Area of Interest'})
 
-    # Post-init helpers to set derived fields
     set_x           = lambda s: object.__setattr__(s, 'x', s.lon)
     set_y           = lambda s: object.__setattr__(s, 'y', s.lat)
     set_centre      = lambda s: object.__setattr__(s, 'centre', (s.x, s.y))
@@ -119,62 +221,25 @@ class Query:
     set_lon_range   = lambda s: object.__setattr__(s, 'lon_range', (s.y - s.buffer, s.y + s.buffer))
     set_datetime    = lambda s: object.__setattr__(s, 'datetime', f'{str(s.start_time)}/{str(s.end_time)}')
     set_bbox        = lambda s: object.__setattr__(s, 'bbox', [s.lat_range[0], s.lon_range[0], s.lat_range[1], s.lon_range[1]])
-    set_resolution  = lambda s: object.__setattr__(s, 'resolution', s.resolution if type(s.resolution) == tuple else (-s.resolution, s.resolution))
+    # set_resolution  = lambda s: object.__setattr__(s, 'resolution', s.resolution if type(s.resolution) == tuple else (-s.resolution, s.resolution))
 
-    def __post_init__(self: Self) -> None:
-        """
-        Populate all derived fields after the dataclass is initialized.
-        """
-        self.set_x()
-        self.set_y()
-        self.set_centre()
-        self.set_lon_range()
-        self.set_lat_range()
-        self.set_datetime()
-        self.set_bbox()
 
-    def __str__(self: Self) -> str:
-        """
-        Serialize this Query to a pretty-printed JSON string.
-
-        Returns:
-            str: The JSON representation.
-        """
-        return self.to_json(indent=2)
-
-    def get_stub(self: Self) -> str:
-        """
-        Compute a SHA-256 hash of this Query’s JSON to use as a cache key.
-
-        Returns:
-            str: The hex digest stub.
-        """
-        return sha256(str(self).encode()).hexdigest()
+    def __str__(s: Self)->str: return s.to_json(indent=2)
+    
+    def get_stub(s: Self): return sha256(s.__str__().encode()).hexdigest()
 
     @classmethod
-    def from_cli(cls) -> "Query":
-        """
-        Parse CLI arguments and construct a Query object.
-
-        Expected flags:
-          --lat, --lon, --buffer,
-          --start_time, --end_time,
-          --collections (one or more), --bands (one or more)
-
-        Returns:
-            Query: The populated instance.
-        """
+    def from_cli(cls):
         parser = ArgumentParser()
-        grp = parser.add_argument_group("query")
-        flds = cls.__dataclass_fields__
+        query_group = parser.add_argument_group("query")
 
-        grp.add_argument("--lat",         type=float, required=True, help=flds['lat'].metadata['help'])
-        grp.add_argument("--lon",         type=float, required=True, help=flds['lon'].metadata['help'])
-        grp.add_argument("--buffer",      type=float, required=True, help=flds['buffer'].metadata['help'])
-        grp.add_argument("--start_time",  type=parse_date, required=True, help=flds['start_time'].metadata['help'])
-        grp.add_argument("--end_time",    type=parse_date, required=True, help=flds['end_time'].metadata['help'])
-        grp.add_argument("--collections", nargs='+', required=True, help=flds['collections'].metadata['help'])
-        grp.add_argument("--bands",       nargs='+', required=True, help=flds['bands'].metadata['help'])
+        query_group.add_argument("--lat", type=float, required=True, help=cls.__dataclass_fields__['lat'].metadata['help'])
+        query_group.add_argument("--lon", type=float, required=True, help=cls.__dataclass_fields__['lon'].metadata['help'])
+        query_group.add_argument("--buffer", type=float, required=True, help=cls.__dataclass_fields__['buffer'].metadata['help'])
+        query_group.add_argument("--start_time", type=parse_date, required=True, help=cls.__dataclass_fields__['start_time'].metadata['help'])
+        query_group.add_argument("--end_time", type=parse_date, required=True, help=cls.__dataclass_fields__['end_time'].metadata['help'])
+        query_group.add_argument("--collections", nargs='+', required=True, help=cls.__dataclass_fields__['collections'].metadata['help'])
+        query_group.add_argument("--bands", nargs='+', required=True, help=cls.__dataclass_fields__['bands'].metadata['help'])
 
         args, _ = parser.parse_known_args()
         return cls(
@@ -186,6 +251,15 @@ class Query:
             collections=args.collections,
             bands=args.bands,
         )
+    def __post_init__(s: Self)->None:
+        s.set_x()
+        s.set_y()
+        s.set_centre()
+        s.set_lat_range()
+        s.set_lon_range()
+        s.set_datetime()
+        s.set_bbox()
+        # s.set_resolution()
 
 
 

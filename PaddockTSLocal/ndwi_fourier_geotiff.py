@@ -1,13 +1,14 @@
-from PaddockTSLocal.Legend import NDWI_FOURIER_GEOTIFF_DIR
+from PaddockTSLocal.legend import NDWI_FOURIER_GEOTIFF_DIR
 from PaddockTSLocal.query import Query
 from PaddockTSLocal.utils import load_pickle
-from PaddockTSLocal.Legend import DS2_DIR
+from PaddockTSLocal.legend import DS2_DIR
 from xarray.core.dataset import Dataset
 from typing_extensions import Union
 from numpy.typing import NDArray
 import xarray as xr
 import numpy as np
 import rioxarray
+
 
 def fourier_mean(x, n=3, step=5):
     result = np.empty((x.shape[0], x.shape[1], n), dtype=np.float32)
@@ -98,7 +99,7 @@ def presegment(stub: str)->xr.DataArray:
     # save_ndwi_geotiff(ds2_to_ndwi_geotiff(load_pickle(ds2) if isinstance(ds2, str) else ds2), path)
 
 def test():
-    from PaddockTSLocal.Query import get_example_query
+    from PaddockTSLocal.query import get_example_query
     from os.path import exists
     from os import remove
 
