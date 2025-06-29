@@ -1,8 +1,8 @@
-from os.path import exists
 from os.path import expanduser
-from os import mkdir
+from os.path import exists
 from json import dump
 from json import load
+from os import mkdir
 
 def get_config():
     path_configs = expanduser('~/.configs')
@@ -18,7 +18,6 @@ def get_config():
     else:
         config = load(open(path_config))
     return config
-
 
 config = get_config()
 from os import makedirs

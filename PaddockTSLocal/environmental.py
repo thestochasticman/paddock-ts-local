@@ -46,8 +46,8 @@ from DAESIM_preprocess.ozwald_8day import ozwald_8day
 from DAESIM_preprocess.ozwald_daily import ozwald_daily
 from DAESIM_preprocess.silo_daily import silo_daily
 from DAESIM_preprocess.daesim_forcing import daesim_forcing, daesim_soils
-from PaddockTSLocal.Query import Query
-from PaddockTSLocal.Legend import *
+from PaddockTSLocal.query import Query
+from PaddockTSLocal.legend import *
 
 # Adjust logging configuration for the script
 logging.basicConfig(level=logging.INFO)
@@ -170,7 +170,7 @@ def download_environmental_data(query: Query, stub: str):
     terrain_tiles(lat, lon, buffer, outdir, stub, tmpdir)
 
 def test():
-    from PaddockTSLocal.Query import get_example_query
+    from PaddockTSLocal.query import get_example_query
     from datetime import date
 
     # query = get_example_query()

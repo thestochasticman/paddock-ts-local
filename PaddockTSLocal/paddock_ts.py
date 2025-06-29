@@ -1,7 +1,7 @@
-from PaddockTSLocal.Legend import SAMGEO_FILTERED_OUTPUT_VECTOR_DIR
-from PaddockTSLocal.Legend import PADDOCK_TS_DIR
+from PaddockTSLocal.legend import SAMGEO_FILTERED_OUTPUT_VECTOR_DIR
+from PaddockTSLocal.legend import PADDOCK_TS_DIR
 from PaddockTSLocal.utils import load_pickle
-from PaddockTSLocal.Legend import DS2_DIR
+from PaddockTSLocal.legend import DS2_DIR
 import geopandas as gpd
 import numpy as np
 import pickle

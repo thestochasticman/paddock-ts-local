@@ -1,5 +1,5 @@
 from dask.distributed import Client as DaskClient
-from PaddockTSLocal.Legend import DS2_DIR
+from PaddockTSLocal.legend import DS2_DIR
 from xarray.core.dataset import Dataset
 from PaddockTSLocal.query import Query
 from typing_extensions import Union
@@ -72,7 +72,6 @@ def query_to_ds2(
             'y': tile_height
         }
     )
-
     future = dask_client.compute(ds2_pipeline)
     ds2: Dataset = future.result()
     dask_client.close()
@@ -202,7 +201,6 @@ def test() -> bool:
         test_path_existence(query),
         test_returned_dataset_values(query)
     ])
-
 
 if __name__ == '__main__':
     print(test())
