@@ -3,6 +3,9 @@ import numpy as np
 import xarray as xr
 
 from tensorflow.lite.python.interpreter import Interpreter 
+from fc3u.unmixcover import unmix_fractional_cover
+from fc3u import data
+
 import numpy as np
 
 from os.path import dirname
@@ -19,46 +22,45 @@ def get_model(n: int):
     ]
     return Interpreter(model_path=available_models[n-1])
 
-def unmix_fractional_cover(surface_reflectance, fc_model: Interpreter, inNull=0, outNull=0):
-    """
-    Unmixes an array of surface reflectance.
+# def unmix_fractional_cover(surface_reflectance, fc_model: Interpreter, inNull=0, outNull=0):
+#     """
+#     Unmixes an array of surface reflectance.
 
-    :param surface_reflectance: The surface reflectance data organized in a 3D array
-        with shape (nbands, nrows, ncolumns). There should be 6 bands with values
-        scaled between 0 and 1.
-    :type surface_reflectance: numpy.ndarray
-    :param fc_model: The TensorFlow Lite model interpreter, which should be initialized
-        as shown in the included code block.
-    :type fc_model: tflite_runtime.interpreter.Interpreter
-    :param inNull: The null value for the input image. Values in the input array
-        equal to this will be replaced by `outNull`.
-    :type inNull: float, optional
-    :param outNull: The null value to replace in the output array.
-    :type outNull: float, optional
+#     :param surface_reflectance: The surface reflectance data organized in a 3D array
+#         with shape (nbands, nrows, ncolumns). There should be 6 bands with values
+#         scaled between 0 and 1.
+#     :type surface_reflectance: numpy.ndarray
+#     :param fc_model: The TensorFlow Lite model interpreter, which should be initialized
+#         as shown in the included code block.
+#     :type fc_model: tflite_runtime.interpreter.Interpreter
+#     :param inNull: The null value for the input image. Values in the input array
+#         equal to this will be replaced by `outNull`.
+#     :type inNull: float, optional
+#     :param outNull: The null value to replace in the output array.
+#     :type outNull: float, optional
 
-    :return: A 3D array where the first layer corresponds to bare ground,
-        the second layer corresponds to green vegetation, and the third layer
-        corresponds to non-green vegetation.
+#     :return: A 3D array where the first layer corresponds to bare ground,
+#         the second layer corresponds to green vegetation, and the third layer
+#         corresponds to non-green vegetation.
 
-    """
-    # Drop the Blue band. Blue is yukky
-    inshape = surface_reflectance[1:].shape
-    # reshape and transpose so it is (nrow x ncol) x 5
-    ref_data = np.reshape(surface_reflectance[1:], (inshape[0], -1)).T
+#     """
+#     # Drop the Blue band. Blue is yukky
+#     inshape = surface_reflectance[1:].shape
+#     # reshape and transpose so it is (nrow x ncol) x 5
+#     ref_data = np.reshape(surface_reflectance[1:], (inshape[0], -1)).T
 
-    # Run the prediction
-    inputDetails = fc_model.get_input_details()
-    outputDetails = fc_model.get_output_details()
-    fc_model.resize_tensor_input(inputDetails[0]['index'], ref_data.shape)
-    fc_model.allocate_tensors()
-    fc_model.set_tensor(inputDetails[0]['index'], ref_data.astype(np.float32))
-    fc_model.invoke()
-    fc_layers = fc_model.get_tensor(outputDetails[0]['index']).T
-    output_fc = np.reshape(fc_layers, (3, inshape[1], inshape[2]))
-    # now do the null value swap
-    output_fc[output_fc == inNull] = outNull
-    return output_fc
-
+#     # Run the prediction
+#     inputDetails = fc_model.get_input_details()
+#     outputDetails = fc_model.get_output_details()
+#     fc_model.resize_tensor_input(inputDetails[0]['index'], ref_data.shape)
+#     fc_model.allocate_tensors()
+#     fc_model.set_tensor(inputDetails[0]['index'], ref_data.astype(np.float32))
+#     fc_model.invoke()
+#     fc_layers = fc_model.get_tensor(outputDetails[0]['index']).T
+#     output_fc = np.reshape(fc_layers, (3, inshape[1], inshape[2]))
+#     # now do the null value swap
+#     output_fc[output_fc == inNull] = outNull
+#     return output_fc
 
 def calculate_fractional_cover(ds, band_names, i, correction=True):
     """
@@ -103,7 +105,7 @@ def calculate_fractional_cover(ds, band_names, i, correction=True):
 
     # Loop over each time slice and apply the unmix_fractional_cover function
     for t in range(inref.shape[0]):
-        fractions[t] = unmix_fractional_cover(inref[t], fc_model=get_model(n=i))
+        fractions[t] = unmix_fractional_cover(inref[t], fc_model=data.get_model(n=i))
     
     return fractions
 # # Example usage:

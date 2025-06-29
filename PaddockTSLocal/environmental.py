@@ -177,7 +177,7 @@ def test():
     query = Query(
         lat=-34.3890427,
         lon=148.469499,
-        buffer=0.1,
+        buffer=0.01,
         start_time= date(2020, 1, 1),
         end_time=date(2021, 12, 31),
         collections=[],

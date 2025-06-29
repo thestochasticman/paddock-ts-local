@@ -6,6 +6,7 @@ from argparse import ArgumentParser
 from marshmallow import fields
 from hashlib import sha256
 from typing import Union, Tuple
+from PaddockTSLocal.filter import Filter
 
 def parse_date(s: str) -> date:
     """
@@ -64,24 +65,27 @@ class Query:
     datetime string, and unique stub generation for caching.
 
     Attributes:
-        lat (float): Latitude of the area of interest,                      user input
-        lon (float): Longitude of the area of interest,                     user input
-        buffer (float): Buffer in degrees around (lat, lon),                user input
-        start_time (date): Start date of query (inclusive),                 user input
-        end_time (date): End date of query (inclusive),                     user input
-        collections (list[str]): List of STAC collection IDs,               user input
-        bands (list[str]): List of band names to load,                      user input
-        crs (str): Coordinate reference system (default “EPSG:6933”),       user input
-        groupby (str): ODC groupby key (default “solarday”),                user input
-        resolution (int|tuple): Spatial resolution in metres (default 10),  user input
-        --------------------------------------------------------------------------------------------
-        x (float): Same as `lon`,                                           set in `__post_init__`.
-        y (float): Same as `lat`,                                           set in `__post_init__`.
-        centre (tuple): (x, y) pair,                                        set in `__post_init__`.
-        lon_range (tuple): (min_lon, max_lon),                              set in `__post_init__`.
-        lat_range (tuple): (min_lat, max_lat),                              set in `__post_init__`.
-        datetime (str): “YYYY-MM-DD/YYYY-MM-DD” string,                     set in `__post_init__`.
-        bbox (list): [min_lat, min_lon, max_lat, max_lon],                  set in `__post_init__`.
+    (User Defined)
+        lat (float)             : Latitude of the area of interest,
+        lon (float)             : Longitude of the area of interest,
+        buffer (float)          : Buffer in degrees around (lat, lon),
+        start_time (date)       : Start date of query (inclusive),
+        end_time (date)         : End date of query (inclusive),
+        collections (list[str]) : List of STAC collection IDs,
+        bands (list[str])       : List of band names to load,
+        crs (str)               : Coordinate reference system (default “EPSG:6933”),
+        groupby (str)           : ODC groupby key (default “solarday”),
+        resolution (int|tuple)  : Spatial resolution in metres (default 10),        
+        filter (Filter)         : Expresson to Refine Search                        
+        ---------------------------------------------------------------------------
+    (Set in __post_init__: __post_init__)
+        x (float)               : Same as `lon`,                                           
+        y (float)               : Same as `lat`,                                           
+        centre (tuple)          : (x, y) pair,                                        
+        lon_range (tuple)       : (min_lon, max_lon),                              
+        lat_range (tuple)       : (min_lat, max_lat),                              
+        datetime (str)          : “YYYY-MM-DD/YYYY-MM-DD” string,                     
+        bbox (list)             : [min_lat, min_lon, max_lat, max_lon],                  
     """
     lat         : float     = field(metadata={'help': 'Latitude of the area of interest'})
     lon         : float     = field(metadata={'help': 'Longitude of the area of interest'})
@@ -91,9 +95,13 @@ class Query:
     collections : list[str] = field(metadata={'help': 'Products to use for the query'})
     bands       : list[str] = field(metadata={'help': 'List of band data required'})
 
-    crs        : str                          = 'EPSG:6933'
-    groupby    : str                          = 'solarday'
-    resolution : Union[int, Tuple[int,int]]   = 10
+    filter     : Filter     = field(
+                                default_factory=lambda: Filter.lt("eo:cloud_cover", 10),
+                                metadata={'help': 'Expression to Refine Search'}
+                            )
+    crs        : str        = 'EPSG:6933'
+    groupby    : str        = 'solarday'
+    resolution : int        = 10
 
     x         : float   = field(init=False, metadata={'help': 'Longitude of the area of interest'})
     y         : float   = field(init=False, metadata={'help': 'Latitude of the area of interest'})
@@ -104,18 +112,16 @@ class Query:
     bbox      : list    = field(init=False, metadata={'help': 'Bounding box [min_lat, min_lon, max_lat, max_lon]'})
 
     # Post-init helpers to set derived fields
-    set_x        = lambda s: object.__setattr__(s, 'x', s.lon)
-    set_y        = lambda s: object.__setattr__(s, 'y', s.lat)
-    set_centre   = lambda s: object.__setattr__(s, 'centre', (s.x, s.y))
-    set_lon_range= lambda s: object.__setattr__(s, 'lon_range', (s.x - s.buffer, s.x + s.buffer))
-    set_lat_range= lambda s: object.__setattr__(s, 'lat_range', (s.y - s.buffer, s.y + s.buffer))
-    set_datetime = lambda s: object.__setattr__(s, 'datetime', f"{s.start_time}/{s.end_time}")
-    set_bbox     = lambda s: object.__setattr__(
-                        s, 'bbox',
-                        [s.lat_range[0], s.lon_range[0], s.lat_range[1], s.lon_range[1]]
-                      )
+    set_x           = lambda s: object.__setattr__(s, 'x', s.lon)
+    set_y           = lambda s: object.__setattr__(s, 'y', s.lat)
+    set_centre      = lambda s: object.__setattr__(s, 'centre', (s.x, s.y))
+    set_lat_range   = lambda s: object.__setattr__(s, 'lat_range', (s.x - s.buffer, s.x + s.buffer))
+    set_lon_range   = lambda s: object.__setattr__(s, 'lon_range', (s.y - s.buffer, s.y + s.buffer))
+    set_datetime    = lambda s: object.__setattr__(s, 'datetime', f'{str(s.start_time)}/{str(s.end_time)}')
+    set_bbox        = lambda s: object.__setattr__(s, 'bbox', [s.lat_range[0], s.lon_range[0], s.lat_range[1], s.lon_range[1]])
+    set_resolution  = lambda s: object.__setattr__(s, 'resolution', s.resolution if type(s.resolution) == tuple else (-s.resolution, s.resolution))
 
-    def __post_init__(self) -> None:
+    def __post_init__(self: Self) -> None:
         """
         Populate all derived fields after the dataclass is initialized.
         """
@@ -127,7 +133,7 @@ class Query:
         self.set_datetime()
         self.set_bbox()
 
-    def __str__(self) -> str:
+    def __str__(self: Self) -> str:
         """
         Serialize this Query to a pretty-printed JSON string.
 
@@ -136,7 +142,7 @@ class Query:
         """
         return self.to_json(indent=2)
 
-    def get_stub(self) -> str:
+    def get_stub(self: Self) -> str:
         """
         Compute a SHA-256 hash of this Query’s JSON to use as a cache key.
 
@@ -222,14 +228,14 @@ def test_query_from_cli():
     assert q.x == q.lon
     assert q.y == q.lat
     assert q.centre == (q.lon, q.lat)
-    assert q.lon_range == (q.lon - q.buffer, q.lon + q.buffer)
-    assert q.lat_range == (q.lat - q.buffer, q.lat + q.buffer)
+    assert q.lon_range == (q.y - q.buffer, q.y + q.buffer)
+    assert q.lat_range == (q.x - q.buffer, q.x + q.buffer)
     assert q.datetime == "2020-01-01/2020-06-01"
     assert q.bbox == [
-        q.lat - q.buffer,
-        q.lon - q.buffer,
-        q.lat + q.buffer,
-        q.lon + q.buffer
+        q.lat_range[0],
+        q.lon_range[0],
+        q.lat_range[1],
+        q.lon_range[1]
     ]
 
     # Stub should be a 64‐character SHA256 hex

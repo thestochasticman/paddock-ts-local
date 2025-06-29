@@ -1,5 +1,5 @@
 from PaddockTSLocal.Legend import NDWI_FOURIER_GEOTIFF_DIR
-from PaddockTSLocal.Query import Query
+from PaddockTSLocal.query import Query
 from PaddockTSLocal.utils import load_pickle
 from PaddockTSLocal.Legend import DS2_DIR
 from xarray.core.dataset import Dataset
