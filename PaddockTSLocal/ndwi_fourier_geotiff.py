@@ -89,7 +89,7 @@ def ds2_to_ndwi_geotiff(ds2: Dataset)->xr.DataArray:
 def save_ndwi_geotiff(data_xr: xr.DataArray, path)->None:
     data_xr.transpose('band', 'y', 'x').rio.to_raster(path)
 
-def presegment(stub: str)->xr.DataArray:
+def ds2_to_ndwi_fourier_geotiff(stub: str)->xr.DataArray:
     path_ds2 = f"{DS2_DIR}/{stub}.pkl"
     ds2 = load_pickle(path_ds2)
     ndwi_geotiff = ds2_to_ndwi_geotiff(ds2)
@@ -106,7 +106,7 @@ def test():
     query = get_example_query()
     path = f"{NDWI_FOURIER_GEOTIFF_DIR}/{query.get_stub()}.tif"
     if exists(path): remove(path)
-    presegment(query.get_stub())
+    ds2_to_ndwi_fourier_geotiff(query.get_stub())
     print(path)
     return exists(path)
 
