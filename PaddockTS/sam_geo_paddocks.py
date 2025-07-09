@@ -1,8 +1,8 @@
-from PaddockTSLocal.legend import SAMGEO_FILTERED_OUTPUT_VECTOR_DIR
-from PaddockTSLocal.legend import SAMGEO_OUTPUT_VECTOR_DIR
-from PaddockTSLocal.legend import NDWI_FOURIER_GEOTIFF_DIR
-from PaddockTSLocal.legend import SAMGEO_OUTPUT_MASK_DIR
-from PaddockTSLocal.legend import SAMGEO_MODEL_PATH
+from PaddockTS.legend import SAMGEO_FILTERED_OUTPUT_VECTOR_DIR
+from PaddockTS.legend import SAMGEO_OUTPUT_VECTOR_DIR
+from PaddockTS.legend import NDWI_FOURIER_GEOTIFF_DIR
+from PaddockTS.legend import SAMGEO_OUTPUT_MASK_DIR
+from PaddockTS.legend import SAMGEO_MODEL_PATH
 from geotiff import GeoTiff
 from os.path import dirname
 from os.path import dirname
@@ -62,7 +62,7 @@ def segment(
     filtered_gdf.to_file(path_filtered_output_vector, driver='GPKG')
 
 def test():
-    from PaddockTSLocal.query import get_example_query
+    from PaddockTS.query import get_example_query
 
     query = get_example_query()
     stub = query.get_stub()

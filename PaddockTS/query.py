@@ -6,7 +6,7 @@ from argparse import ArgumentParser
 from marshmallow import fields
 from hashlib import sha256
 from typing import Union, Tuple
-from PaddockTSLocal.filter import Filter
+from PaddockTS.filter import Filter
 
 def parse_date(s: str) -> date:
     """

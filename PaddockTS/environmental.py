@@ -46,8 +46,8 @@ from DAESIM_preprocess.ozwald_8day import ozwald_8day
 from DAESIM_preprocess.ozwald_daily import ozwald_daily
 from DAESIM_preprocess.silo_daily import silo_daily
 from DAESIM_preprocess.daesim_forcing import daesim_forcing, daesim_soils
-from PaddockTSLocal.query import Query
-from PaddockTSLocal.legend import *
+from PaddockTS.query import Query
+from PaddockTS.legend import *
 
 # Adjust logging configuration for the script
 logging.basicConfig(level=logging.INFO)

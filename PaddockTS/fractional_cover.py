@@ -1,10 +1,10 @@
-from PaddockTSLocal.veg_frac import calculate_fractional_cover
-from PaddockTSLocal.veg_frac import add_fractional_cover_to_ds
-from PaddockTSLocal.utils import load_pickle
-from PaddockTSLocal.legend import DS2I_DIR
-from PaddockTSLocal.legend import DS2_DIR
+from PaddockTS.veg_frac import calculate_fractional_cover
+from PaddockTS.veg_frac import add_fractional_cover_to_ds
+from PaddockTS.utils import load_pickle
+from PaddockTS.legend import DS2I_DIR
+from PaddockTS.legend import DS2_DIR
 from typing_extensions import Callable
-from PaddockTSLocal.indices import *
+from PaddockTS.indices import *
 import pickle
 
 def add_fractional_cover_ds2i(
@@ -33,7 +33,7 @@ def add_fractional_cover_ds2i(
         pickle.dump(ds, _file, protocol=pickle.HIGHEST_PROTOCOL)
 
 def test():
-    from PaddockTSLocal.query import get_example_query
+    from PaddockTS.query import get_example_query
     from os.path import exists
     query = get_example_query()
     add_fractional_cover_ds2i(stub=query.get_stub())

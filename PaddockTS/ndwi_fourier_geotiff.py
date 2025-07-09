@@ -1,9 +1,9 @@
-from PaddockTSLocal.legend import NDWI_FOURIER_GEOTIFF_DIR
-from PaddockTSLocal.query import Query
+from PaddockTS.legend import NDWI_FOURIER_GEOTIFF_DIR
+from PaddockTS.query import Query
 from os.path import exists
-from PaddockTSLocal.download_ds2 import download_ds2_from_query
-from PaddockTSLocal.utils import load_pickle
-from PaddockTSLocal.legend import DS2_DIR
+from PaddockTS.download_ds2 import download_ds2_from_query
+from PaddockTS.utils import load_pickle
+from PaddockTS.legend import DS2_DIR
 from xarray.core.dataset import Dataset
 from typing_extensions import Union
 from numpy.typing import NDArray
@@ -106,7 +106,7 @@ def ds2_to_ndwi_fourier_geotiff(stub: str, query: Query=None)->xr.DataArray:
     # save_ndwi_geotiff(ds2_to_ndwi_geotiff(load_pickle(ds2) if isinstance(ds2, str) else ds2), path)
 
 def test():
-    from PaddockTSLocal.query import get_example_query
+    from PaddockTS.query import get_example_query
     from os.path import exists
     from os import remove
 

@@ -1,7 +1,7 @@
-from PaddockTSLocal.legend import SAMGEO_FILTERED_OUTPUT_VECTOR_DIR
-from PaddockTSLocal.legend import PADDOCK_TS_DIR
-from PaddockTSLocal.utils import load_pickle
-from PaddockTSLocal.legend import DS2_DIR
+from PaddockTS.legend import SAMGEO_FILTERED_OUTPUT_VECTOR_DIR
+from PaddockTS.legend import PADDOCK_TS_DIR
+from PaddockTS.utils import load_pickle
+from PaddockTS.legend import DS2_DIR
 import geopandas as gpd
 import numpy as np
 import pickle
@@ -40,7 +40,7 @@ def get_paddock_ts(stub: str):
 
 
 def test():
-    from PaddockTSLocal.query import get_example_query
+    from PaddockTS.query import get_example_query
     from os.path import exists
     query = get_example_query()
     get_paddock_ts(query.get_stub())

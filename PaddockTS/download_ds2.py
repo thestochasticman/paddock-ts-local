@@ -1,7 +1,7 @@
 from dask.distributed import Client as DaskClient
-from PaddockTSLocal.legend import DS2_DIR
+from PaddockTS.legend import DS2_DIR
 from xarray.core.dataset import Dataset
-from PaddockTSLocal.query import Query
+from PaddockTS.query import Query
 from typing_extensions import Union
 from os import makedirs
 import pystac_client
@@ -178,7 +178,7 @@ def test() -> bool:
     Returns:
         bool: True if both path-existence and data-value tests pass.
     """
-    from PaddockTSLocal.query import get_example_query
+    from PaddockTS.query import get_example_query
     from os.path import exists
     from os import remove
 

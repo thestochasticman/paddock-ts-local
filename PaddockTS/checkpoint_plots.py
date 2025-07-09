@@ -3,9 +3,9 @@ import pickle
 import xarray as xr
 import geopandas as gpd
 from dea_tools.plotting import rgb, xr_animation
-import plotting_functions as pf
+import PaddockTS.plotting_functions as pf
 import os
-from PaddockTSLocal.Legend import *
+from PaddockTS.legend import *
 import pickle
 from shapely.geometry import Polygon
 import cv2
@@ -13,9 +13,6 @@ import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, FFMpegWriter
-
-
-
 
 def custom_animator(
     ds: xr.Dataset,
@@ -119,7 +116,7 @@ def plot(stub: str):
     )
 
       # Save the veg fraction image as a TIFF file
-    output_name_vegfrac = os.path.join(OUT_DIR, f'{stub}_thumbs_vegfrac.tif')
+    output_name_vegfrac = os.path.join(OUT_DIR, f"{stub}_thumbs_vegfrac.tif")
     rgb(ds2i, 
         bands=['bg', 'pv', 'npv'],
         col="time", 
@@ -132,7 +129,7 @@ def plot(stub: str):
         ds2i,
         pol,
         ['nbart_red', 'nbart_green', 'nbart_blue'],
-        f"{OUT_DIR}/{stub}+'_manpad_RGB.mp4"
+        f"{OUT_DIR}/{stub}_manpad_RGB.mp4"
     )
 
     # xr_animation(ds2i, 
@@ -147,7 +144,7 @@ def plot(stub: str):
         ds2i,
         pol,
         ['bg', 'pv', 'npv'],
-        f"{OUT_DIR}/{stub}+'_manpad_vegfrac.mp4"
+        f"{OUT_DIR}/{stub}_manpad_vegfrac.mp4"
     )
     # xr_animation(ds2i, 
     #             bands = ['bg', 'pv', 'npv'], 
@@ -159,8 +156,21 @@ def plot(stub: str):
 
 
 def test(): 
-    from PaddockTSLocal.Query import get_example_query
+    from PaddockTS.query import get_example_query, Query
+    from datetime import date
     query = get_example_query()
+
+    query = Query(
+        lat=-33.5040,
+        lon=148.4,
+        buffer=0.01,
+        start_time=date(2020, 1, 1),
+        end_time=date(2020, 6, 1),
+        collections=['ga_s2am_ard_3', 'ga_s2bm_ard_3'],
+        bands=[
+            'nbart_blue', 'nbart_green', 'nbart_red', 'nbart_red_edge_1', 'nbart_red_edge_2', 'nbart_red_edge_3', 'nbart_nir_1', 'nbart_nir_2', 'nbart_swir_2', 'nbart_swir_3'
+        ]
+    )
     stub = query.get_stub()
 
     plot(stub)

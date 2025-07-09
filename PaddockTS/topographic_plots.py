@@ -23,7 +23,7 @@ import argparse
 import logging
 import warnings
 
-from PaddockTSLocal.legend import *
+from PaddockTS.legend import *
 
 # Setting up logging
 logging.basicConfig(level=logging.INFO)
