@@ -1,4 +1,4 @@
-from PaddockTS.utils import *
+
 from PaddockTS.legend import DS2I_DIR
 
 import numpy as np

@@ -1,6 +1,6 @@
 from PaddockTS.legend import SAMGEO_FILTERED_OUTPUT_VECTOR_DIR
 from PaddockTS.legend import PADDOCK_TS_DIR
-from PaddockTS.utils import load_pickle
+import pickle
 from PaddockTS.legend import DS2_DIR
 import geopandas as gpd
 import numpy as np
@@ -34,7 +34,7 @@ def get_paddock_ts(stub: str):
     pol['paddock'] = range(1, len(pol) + 1)
     pol['paddock'] = pol.paddock.astype('category')
 
-    ds2 = load_pickle(f"{DS2_DIR}/{stub}.pkl")
+    ds2 = pickle.load(open(f"{DS2_DIR}/{stub}.pkl", 'rb'))
     keep_vars = drop_oa(ds2)
 
     ts = []

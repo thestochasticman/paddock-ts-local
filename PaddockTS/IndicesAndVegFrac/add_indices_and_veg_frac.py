@@ -1,7 +1,7 @@
 from PaddockTS.IndicesAndVegFrac.veg_frac import calculate_fractional_cover
 from PaddockTS.IndicesAndVegFrac.veg_frac import add_fractional_cover_to_ds
 from PaddockTS.IndicesAndVegFrac.indices import *
-from PaddockTS.utils import load_pickle
+import pickle
 from PaddockTS.legend import DS2I_DIR
 from PaddockTS.legend import DS2_DIR
 from typing_extensions import Callable
@@ -25,7 +25,7 @@ def add_indices_and_veg_frac(
 ):
     path_ds2 = f"{DS2_DIR}/{stub}.pkl"
     path_ds2i = f"{DS2I_DIR}/{stub}.pkl"
-    ds = load_pickle(path_ds2)
+    ds = pickle.load(open(path_ds2, 'rb'))
     fractions = calculate_fractional_cover(ds, band_names, i=4, correction=False)
     ds = add_fractional_cover_to_ds(ds, fractions)
     ds = calculate_indices(ds, indices)

@@ -4,7 +4,7 @@ from os.path import exists
 from PaddockTS.Data.download_ds2 import download_ds2
 from PaddockTS.PaddockSegmentation.utils import fourier_mean
 from PaddockTS.PaddockSegmentation.utils import completion
-from PaddockTS.utils import load_pickle
+import pickle
 from PaddockTS.legend import DS2_DIR
 from xarray.core.dataset import Dataset
 from typing_extensions import Union
@@ -90,7 +90,7 @@ def presegment(stub: str)->xr.DataArray:
     if not exists(path_ds2):
         raise FileNotFoundError(f"You have not downloaded ds2 data for the given stub yet.")
     
-    ds2 = load_pickle(path_ds2)
+    ds2 = pickle.load(open(path_ds2, 'rb'))
     ndwi_geotiff = ds2_to_ndwi_geotiff(ds2)
     path = f"{NDWI_FOURIER_GEOTIFF_DIR}/{stub}.tif"
     save_ndwi_geotiff(ndwi_geotiff, path)
