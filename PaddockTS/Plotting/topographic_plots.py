@@ -187,6 +187,3 @@ def plot_topography(stub: str):
     # -
 
     
-
-if __name__ == '__main__':
-    test()
