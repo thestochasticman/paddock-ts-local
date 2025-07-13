@@ -193,77 +193,6 @@ def plot_paddock_map_auto_rgb(ds, pol, out_dir, stub):
 
 def animate_paddock_map_auto_rgb(
     ds: xr.Dataset,
-    pol: Polygon,
-    bands: list[str],
-    out_dir: str,
-    stub: str,
-    width_pixels: int = 600,
-    fps: int = 10,
-    dpi: int = 100
-):
-    # 1. Compute figure size & aspect ratio
-    ny, nx = ds.sizes['y'], ds.sizes['x']
-    aspect = ny / nx
-    fig_w, fig_h = width_pixels / dpi, (width_pixels * aspect) / dpi
-    fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=dpi)
-    ax.axis('off')
-
-    left   = float(ds.x.min().values)
-    right  = float(ds.x.max().values)
-    bottom = float(ds.y.min().values)
-    top    = float(ds.y.max().values)
-    
-    # 2. Compute the median composite reference and its max
-    #    to serve as our fixed normalizer.
-    red_med   = ds['nbart_red'  ].median(dim='time').values.astype(float)
-    green_med = ds['nbart_green'].median(dim='time').values.astype(float)
-    blue_med  = ds['nbart_blue' ].median(dim='time').values.astype(float)
-
-    ref_rgb = np.dstack((red_med, green_med, blue_med))
-    normalizer = np.nanmax(ref_rgb)
-    if normalizer == 0 or np.isnan(normalizer):
-        raise ValueError("Reference composite max is zero or NaN; cannot normalize.")
-
-    print(f"Normalizing all frames by reference max = {normalizer:.3f}")
-
-    # 3. Helper to build and normalize one frame
-    def make_frame(idx: int) -> np.ndarray:
-        layers = []
-        for band in bands:
-            arr = ds[band].isel(time=idx).values.astype(float)
-            # Normalize by the reference composite max
-            arr = arr / normalizer
-            arr = np.nan_to_num(arr, nan=0.0, posinf=1.0, neginf=0.0)
-            arr = np.clip(arr, 0.0, 1.0)
-            # to uint8
-            layers.append((arr * 255).astype(np.uint8))
-        return np.stack(layers, axis=-1)
-    
-   
-    # 4. Initialize the first frame
-    pol.plot(ax=ax, facecolor='none', edgecolor='red', linewidth=1)
-    im = ax.imshow(make_frame(0), origin='upper', aspect='equal', extent=(left, right, bottom, top))
-    if 'crs' in ds.attrs:
-        pol = pol.to_crs(ds.attrs['crs'])
-    
-
-
-    list_coords_pol = [tuple(polygon.exterior.coords) for polygon in pol.geometry]
-    # print(list_coords_pol[0])
-
-    def _update(frame_idx: int):
-        im.set_data(make_frame(frame_idx))
-        
-        return (im,)
-
-    
-    anim = FuncAnimation(fig, _update, frames=ds.sizes['time'], blit=True)
-    output_path = f"{out_dir}/{stub}_manpad_RGB.mp4"
-    anim.save(output_path, writer=FFMpegWriter(fps=fps))
-    plt.close(fig)
-
-def animate_paddock_map_auto_manpad_vegfrac(
-    ds: xr.Dataset,
     pol,
     bands: list[str],
     out_dir: str,
@@ -273,14 +202,14 @@ def animate_paddock_map_auto_manpad_vegfrac(
     dpi: int = 100
 ):
     """
-    Animate vegetation fractional cover (manpad vegfrac) bands over time,
+    Animate RGB composite from nbart bands over time,
     overlay paddock outlines and timestamps (date only) from the dataset in the upper-right corner.
 
     Parameters:
-        ds (xarray.Dataset): Dataset with dims 'time', 'y', 'x' and fractional cover bands,
+        ds (xarray.Dataset): Dataset with dims 'time', 'y', 'x', nbart_red/green/blue bands,
                              containing a 'timestamp' variable aligned to 'time'.
         pol (GeoDataFrame): GeoDataFrame containing paddock polygons and a 'paddock' column for labels.
-        bands (list[str]): List of 1 or 3 band names to animate.
+        bands (list[str]): List of three band names (e.g. ['nbart_red','nbart_green','nbart_blue']).
         out_dir (str): Directory path where the output video will be saved.
         stub (str): String to append to the output filename.
         width_pixels (int): Width of the output video in pixels.
@@ -303,12 +232,13 @@ def animate_paddock_map_auto_manpad_vegfrac(
     bottom, top = float(ds.y.min()), float(ds.y.max())
 
     # 3. Reference composite for normalization
-    arrs = [ds[band].median(dim='time').values.astype(float) for band in bands]
-    ref_stack = np.stack(arrs, axis=-1)
-    normalizer = np.nanmax(ref_stack)
+    red_med   = ds[bands[0]].median(dim='time').values.astype(float)
+    green_med = ds[bands[1]].median(dim='time').values.astype(float)
+    blue_med  = ds[bands[2]].median(dim='time').values.astype(float)
+    ref_rgb = np.dstack((red_med, green_med, blue_med))
+    normalizer = np.nanmax(ref_rgb)
     if normalizer == 0 or np.isnan(normalizer):
         raise ValueError("Reference composite max is zero or NaN; cannot normalize.")
-    print(f"Normalizing all frames by reference max = {normalizer:.3f}")
 
     # 4. Build each frame
     def make_frame(idx: int) -> np.ndarray:
@@ -326,7 +256,7 @@ def animate_paddock_map_auto_manpad_vegfrac(
         pol = pol.to_crs(ds.attrs['crs'])
 
     # 6. Extract dates for timestamp display
-    dates = ds['timestamp'].values  # aligned to time dim
+    dates = ds['time'].values
 
     # 7. Draw paddock outlines
     for poly in pol.geometry:
@@ -361,195 +291,10 @@ def animate_paddock_map_auto_manpad_vegfrac(
         return (im, timestamp_txt)
 
     # 12. Create and save
-    from matplotlib.animation import FuncAnimation, FFMpegWriter
     anim = FuncAnimation(fig, _update, frames=ds.sizes['time'], blit=True)
     output_path = f"{out_dir}/{stub}_manpad_RGB.mp4"
     anim.save(output_path, writer=FFMpegWriter(fps=fps))
     plt.close(fig)
-
-
-def animate_paddock_map_auto_manpad_vegfrac(
-    ds: xr.Dataset,
-    pol,
-    bands: list[str],
-    out_dir: str,
-    stub: str,
-    width_pixels: int = 600,
-    fps: int = 10,
-    dpi: int = 100
-):
-    """
-    Animate vegetation fractional cover (manpad vegfrac) bands over time.
-
-    Parameters:
-        ds (xarray.Dataset): Dataset with dimensions 'time', 'y', 'x' and fractional cover bands.
-        pol (GeoDataFrame): GeoDataFrame containing paddock polygons and a 'paddock' column for labels.
-        bands (list[str]): List of 1 or 3 band names to animate.
-        out_dir (str): Directory path where the output video will be saved.
-        stub (str): String to append to the output filename.
-        width_pixels (int): Width of the output video in pixels.
-        fps (int): Frames per second for the animation.
-        dpi (int): Resolution in dots per inch.
-    """
-    import numpy as np
-    import matplotlib.pyplot as plt
-    from matplotlib.animation import FuncAnimation, FFMpegWriter
-
-    # 1. Figure size & aspect ratio
-    ny, nx = ds.sizes['y'], ds.sizes['x']
-    aspect = ny / nx
-    fig_w, fig_h = width_pixels / dpi, (width_pixels * aspect) / dpi
-    fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=dpi)
-    ax.axis('off')
-
-    # 2. Spatial extent
-    left = float(ds.x.min().values)
-    right = float(ds.x.max().values)
-    bottom = float(ds.y.min().values)
-    top = float(ds.y.max().values)
-
-    # 3. Compute reference median composite for normalization
-    arrs = [ds[band].median(dim='time').values.astype(float) for band in bands]
-    ref_stack = np.stack(arrs, axis=-1)
-    normalizer = np.nanmax(ref_stack)
-    if normalizer == 0 or np.isnan(normalizer):
-        raise ValueError("Reference composite max is zero or NaN; cannot normalize.")
-    print(f"Normalizing all frames by reference max = {normalizer:.3f}")
-
-
-    # 4. Frame builder
-    def make_frame(idx: int) -> np.ndarray:
-        layers = []
-        for band in bands:
-            arr = ds[band].isel(time=idx).values.astype(float)
-            arr = arr / normalizer
-            arr = np.nan_to_num(arr, nan=0.0, posinf=1.0, neginf=0.0)
-            arr = np.clip(arr, 0.0, 1.0)
-            layers.append((arr * 255).astype(np.uint8))
-        if len(bands) == 3:
-            # RGB composite from three bands
-            return np.stack(layers, axis=-1)
-        elif len(bands) == 1:
-            # Single-band grayscale -> RGB via viridis colormap
-            cmap = plt.cm.viridis(layers[0] / 255)
-            return (cmap[:, :, :3] * 255).astype(np.uint8)
-        else:
-            raise ValueError("Manpad vegfrac animation supports only 1 or 3 bands.")
-
-    # 5. Reproject paddock polygons if needed
-    if 'crs' in ds.attrs:
-        pol = pol.to_crs(ds.attrs['crs'])
-
-    # 6. Draw polygon outlines
-    for poly in pol.geometry:
-        x, y = poly.exterior.xy
-        ax.plot(x, y, color='red', linewidth=1)
-
-    # 7. Initialize with first frame
-    im = ax.imshow(
-        make_frame(0), origin='upper', aspect='equal',
-        extent=(left, right, bottom, top)
-    )
-
-    # 8. Add paddock labels
-    for _, row in pol.iterrows():
-        centroid = row.geometry.centroid
-        ax.text(
-            centroid.x, centroid.y, row['paddock'],
-            fontsize=12, ha='center', va='center', color='yellow'
-        )
-
-    # 9. Animation update function
-    def _update(frame_idx: int):
-        im.set_data(make_frame(frame_idx))
-        return (im,)
-
-    # 10. Create and save animation
-    anim = FuncAnimation(fig, _update, frames=ds.sizes['time'], blit=True)
-    output_path = f"{out_dir}/{stub}_manpad_vegfrac.mp4"
-    anim.save(output_path, writer=FFMpegWriter(fps=fps))
-    plt.close(fig)
-
-
-def plot_silo_daily(silo, ds, out_dir, stub):
-    """
-    Create a figure with three panels showing:
-      1. Daily Rain Time Series as a bar plot with downward pointing arrows indicating "Sentinel-2 observation".
-      2. Daily Temperature Range (legend shows only the min and max temperatures).
-      3. Actual vs. Potential Evapotranspiration.
-    
-    In the top panel, a downward pointing arrow is plotted at each time point from ds.
-    Each arrow spans 1/8 of the y-axis range at the top of the panel.
-    
-    The figure is saved as:
-        out_dir + stub + '_silo_daily.tif'
-    
-    Parameters:
-        silo (xarray.Dataset): SILO daily data containing variables 'daily_rain', 
-                               'min_temp', 'max_temp', 'et_morton_actual', 
-                               'et_morton_potential', and 'time'.
-        ds (xarray.Dataset): Dataset whose time coordinate provides the dates to mark with arrows.
-        out_dir (str): Directory path where the output figure will be saved.
-        stub (str): String to be included in the output filename.
-    """
-    import matplotlib.pyplot as plt
-    from matplotlib.lines import Line2D
-
-    # Extract the time and variable values from the SILO dataset.
-    time = silo['time'].values
-    daily_rain = silo['daily_rain'].values
-    min_temp = silo['min_temp'].values
-    max_temp = silo['max_temp'].values
-    et_actual = silo['et_morton_actual'].values
-    et_potential = silo['et_morton_potential'].values
-
-    # Create a figure with three vertically stacked subplots sharing the same x-axis.
-    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 6), sharex=True)
-
-    # Top panel: Daily Rain Time Series as a bar plot (without a label).
-    ax1.bar(time, daily_rain, color='blue')
-    ax1.set_ylabel('Daily Rain (mm)')
-    ax1.set_title('Daily Rain Time Series')
-
-    # Force drawing of the figure to ensure correct axis limits for arrow placement.
-    fig.canvas.draw()
-    ymin, ymax = ax1.get_ylim()
-    segment_height = (ymax - ymin) / 8
-
-    # Plot a downward pointing arrow at each time point from ds on the top panel.
-    for t in ds['time'].values:
-        ax1.annotate('',
-                     xy=(t, ymax),
-                     xytext=(t, ymax - segment_height),
-                     arrowprops=dict(facecolor='grey', edgecolor='grey', arrowstyle='<|-', lw=1))
-    
-    # Create a proxy artist for the arrow to include in the legend.
-    arrow_proxy = Line2D([0], [0], marker=r'$\downarrow$', color='grey', linestyle='None',
-                           markersize=10, label='Sentinel-2 observation')
-    # Set the legend with a modified position (upper right but slightly lower).
-    ax1.legend(handles=[arrow_proxy], labels=['Sentinel-2 observation'], 
-               loc='upper right', bbox_to_anchor=(1, 0.9))
-
-    # Middle panel: Daily Temperature Range.
-    ax2.fill_between(time, min_temp, max_temp, color='lightblue', alpha=0.5)
-    ax2.plot(time, min_temp, color='blue', label='Min Temperature')
-    ax2.plot(time, max_temp, color='red', label='Max Temperature')
-    ax2.set_ylabel('Temperature (°C)')
-    ax2.set_title('Daily Temperature Range')
-    ax2.legend()
-
-    # Bottom panel: Actual vs. Potential Evapotranspiration.
-    ax3.plot(time, et_actual, color='green', label='Actual ET')
-    ax3.plot(time, et_potential, color='orange', label='Potential ET')
-    ax3.set_xlabel('Time')
-    ax3.set_ylabel('ET (mm/day)')
-    ax3.set_title('Actual vs. Potential Evapotranspiration')
-    ax3.legend()
-
-    plt.tight_layout()
-    output_filename = f"{out_dir}{stub}_silo_daily.tif"
-    plt.savefig(output_filename, dpi=300, bbox_inches='tight')
-    plt.show()
 
 def animate_paddock_map_auto_manpad_vegfrac(
     ds: xr.Dataset,
@@ -664,6 +409,85 @@ def animate_paddock_map_auto_manpad_vegfrac(
     anim.save(output_path, writer=FFMpegWriter(fps=fps))
     plt.close(fig)
 
+def plot_silo_daily(silo, ds, out_dir, stub):
+    """
+    Create a figure with three panels showing:
+      1. Daily Rain Time Series as a bar plot with downward pointing arrows indicating "Sentinel-2 observation".
+      2. Daily Temperature Range (legend shows only the min and max temperatures).
+      3. Actual vs. Potential Evapotranspiration.
+    
+    In the top panel, a downward pointing arrow is plotted at each time point from ds.
+    Each arrow spans 1/8 of the y-axis range at the top of the panel.
+    
+    The figure is saved as:
+        out_dir + stub + '_silo_daily.tif'
+    
+    Parameters:
+        silo (xarray.Dataset): SILO daily data containing variables 'daily_rain', 
+                               'min_temp', 'max_temp', 'et_morton_actual', 
+                               'et_morton_potential', and 'time'.
+        ds (xarray.Dataset): Dataset whose time coordinate provides the dates to mark with arrows.
+        out_dir (str): Directory path where the output figure will be saved.
+        stub (str): String to be included in the output filename.
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.lines import Line2D
+
+    # Extract the time and variable values from the SILO dataset.
+    time = silo['time'].values
+    daily_rain = silo['daily_rain'].values
+    min_temp = silo['min_temp'].values
+    max_temp = silo['max_temp'].values
+    et_actual = silo['et_morton_actual'].values
+    et_potential = silo['et_morton_potential'].values
+
+    # Create a figure with three vertically stacked subplots sharing the same x-axis.
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 6), sharex=True)
+
+    # Top panel: Daily Rain Time Series as a bar plot (without a label).
+    ax1.bar(time, daily_rain, color='blue')
+    ax1.set_ylabel('Daily Rain (mm)')
+    ax1.set_title('Daily Rain Time Series')
+
+    # Force drawing of the figure to ensure correct axis limits for arrow placement.
+    fig.canvas.draw()
+    ymin, ymax = ax1.get_ylim()
+    segment_height = (ymax - ymin) / 8
+
+    # Plot a downward pointing arrow at each time point from ds on the top panel.
+    for t in ds['time'].values:
+        ax1.annotate('',
+                     xy=(t, ymax),
+                     xytext=(t, ymax - segment_height),
+                     arrowprops=dict(facecolor='grey', edgecolor='grey', arrowstyle='<|-', lw=1))
+    
+    # Create a proxy artist for the arrow to include in the legend.
+    arrow_proxy = Line2D([0], [0], marker=r'$\downarrow$', color='grey', linestyle='None',
+                           markersize=10, label='Sentinel-2 observation')
+    # Set the legend with a modified position (upper right but slightly lower).
+    ax1.legend(handles=[arrow_proxy], labels=['Sentinel-2 observation'], 
+               loc='upper right', bbox_to_anchor=(1, 0.9))
+
+    # Middle panel: Daily Temperature Range.
+    ax2.fill_between(time, min_temp, max_temp, color='lightblue', alpha=0.5)
+    ax2.plot(time, min_temp, color='blue', label='Min Temperature')
+    ax2.plot(time, max_temp, color='red', label='Max Temperature')
+    ax2.set_ylabel('Temperature (°C)')
+    ax2.set_title('Daily Temperature Range')
+    ax2.legend()
+
+    # Bottom panel: Actual vs. Potential Evapotranspiration.
+    ax3.plot(time, et_actual, color='green', label='Actual ET')
+    ax3.plot(time, et_potential, color='orange', label='Potential ET')
+    ax3.set_xlabel('Time')
+    ax3.set_ylabel('ET (mm/day)')
+    ax3.set_title('Actual vs. Potential Evapotranspiration')
+    ax3.legend()
+
+    plt.tight_layout()
+    output_filename = f"{out_dir}{stub}_silo_daily.tif"
+    plt.savefig(output_filename, dpi=300, bbox_inches='tight')
+    plt.show()
 
 ### This is basically replacing the above:
 def plot_env_ts(silo, ds, Ssoil, out_dir, stub):
@@ -755,110 +579,3 @@ def plot_env_ts(silo, ds, Ssoil, out_dir, stub):
     output_filename = f"{out_dir}{stub}_env_ts.tif"
     plt.savefig(output_filename, dpi=300, bbox_inches='tight')
     plt.show()
-
-
-
-def animate_paddock_map_auto_rgb(
-    ds: xr.Dataset,
-    pol,
-    bands: list[str],
-    out_dir: str,
-    stub: str,
-    width_pixels: int = 600,
-    fps: int = 10,
-    dpi: int = 100
-):
-    """
-    Animate RGB composite from nbart bands over time,
-    overlay paddock outlines and timestamps (date only) from the dataset in the upper-right corner.
-
-    Parameters:
-        ds (xarray.Dataset): Dataset with dims 'time', 'y', 'x', nbart_red/green/blue bands,
-                             containing a 'timestamp' variable aligned to 'time'.
-        pol (GeoDataFrame): GeoDataFrame containing paddock polygons and a 'paddock' column for labels.
-        bands (list[str]): List of three band names (e.g. ['nbart_red','nbart_green','nbart_blue']).
-        out_dir (str): Directory path where the output video will be saved.
-        stub (str): String to append to the output filename.
-        width_pixels (int): Width of the output video in pixels.
-        fps (int): Frames per second for the animation.
-        dpi (int): Resolution in dots per inch.
-    """
-    import numpy as np
-    import matplotlib.pyplot as plt
-    from matplotlib.animation import FuncAnimation, FFMpegWriter
-
-    # 1. Compute figure size & aspect ratio
-    ny, nx = ds.sizes['y'], ds.sizes['x']
-    aspect = ny / nx
-    fig_w, fig_h = width_pixels / dpi, (width_pixels * aspect) / dpi
-    fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=dpi)
-    ax.axis('off')
-
-    # 2. Spatial extent
-    left, right = float(ds.x.min()), float(ds.x.max())
-    bottom, top = float(ds.y.min()), float(ds.y.max())
-
-    # 3. Reference composite for normalization
-    red_med   = ds[bands[0]].median(dim='time').values.astype(float)
-    green_med = ds[bands[1]].median(dim='time').values.astype(float)
-    blue_med  = ds[bands[2]].median(dim='time').values.astype(float)
-    ref_rgb = np.dstack((red_med, green_med, blue_med))
-    normalizer = np.nanmax(ref_rgb)
-    if normalizer == 0 or np.isnan(normalizer):
-        raise ValueError("Reference composite max is zero or NaN; cannot normalize.")
-
-    # 4. Build each frame
-    def make_frame(idx: int) -> np.ndarray:
-        layers = []
-        for band in bands:
-            arr = ds[band].isel(time=idx).values.astype(float)
-            arr = arr / normalizer
-            arr = np.nan_to_num(arr, nan=0.0, posinf=1.0, neginf=0.0)
-            arr = np.clip(arr, 0.0, 1.0)
-            layers.append((arr * 255).astype(np.uint8))
-        return np.stack(layers, axis=-1)
-
-    # 5. Reproject paddocks if CRS available
-    if 'crs' in ds.attrs:
-        pol = pol.to_crs(ds.attrs['crs'])
-
-    # 6. Extract dates for timestamp display
-    dates = ds['time'].values
-
-    # 7. Draw paddock outlines
-    for poly in pol.geometry:
-        x, y = poly.exterior.xy
-        ax.plot(x, y, color='red', linewidth=1)
-
-    # 8. Initialize first frame
-    im = ax.imshow(
-        make_frame(0), origin='upper', aspect='equal',
-        extent=(left, right, bottom, top)
-    )
-
-    # 9. Add paddock labels
-    for _, row in pol.iterrows():
-        centroid = row.geometry.centroid
-        ax.text(
-            centroid.x, centroid.y, row['paddock'],
-            fontsize=12, ha='center', va='center', color='yellow'
-        )
-
-    # 10. Timestamp text in upper-right
-    timestamp_txt = ax.text(
-        0.98, 0.98, '', color='white', ha='right', va='top',
-        fontsize=12, transform=ax.transAxes
-    )
-
-    # 11. Update function for animation
-    def _update(frame_idx: int):
-        im.set_data(make_frame(frame_idx))
-        ts = dates[frame_idx]
-        timestamp_txt.set_text(str(ts)[:10])
-        return (im, timestamp_txt)
-
-    # 12. Create and save
-    anim = FuncAnimation(fig, _update, frames=ds.sizes['time'], blit=True)
-    output_path = f"{out_dir}/{stub}_manpad_RGB.mp4"
-    anim.save(output_path, writer=FFMpegWriter(fps=fps))
-    plt.close(fig)
