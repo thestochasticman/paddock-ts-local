@@ -1,0 +1,7 @@
+README.md
+pyproject.toml
+PaddockTS.egg-info/PKG-INFO
+PaddockTS.egg-info/SOURCES.txt
+PaddockTS.egg-info/dependency_links.txt
+PaddockTS.egg-info/requires.txt
+PaddockTS.egg-info/top_level.txt

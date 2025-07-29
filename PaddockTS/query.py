@@ -1,3 +1,4 @@
+
 from dataclasses_json import dataclass_json, config
 from typing_extensions import Self
 from dataclasses import dataclass, field
@@ -7,6 +8,7 @@ from marshmallow import fields
 from hashlib import sha256
 from typing import Union, Tuple
 from PaddockTS.filter import Filter
+import json
 
 def parse_date(s: str) -> date:
     """
@@ -177,6 +179,14 @@ class Query:
         grp.add_argument("--bands",       nargs='+', required=True, help=flds['bands'].metadata['help'])
 
         args, _ = parser.parse_known_args()
+
+        if args.filter:
+            try:
+                filter_obj = Filter.from_string(args.filter)
+            except Exception as e:
+                raise ValueError(f"Invalid --filter value: {e}")
+        else:
+            filter_obj = Filter.lt("eo:cloud_cover", 10)
         return cls(
             lat=args.lat,
             lon=args.lon,
@@ -185,6 +195,7 @@ class Query:
             end_time=args.end_time,
             collections=args.collections,
             bands=args.bands,
+            filter=filter_obj
         )
 
 def test_query_from_cli():
@@ -203,6 +214,7 @@ def test_query_from_cli():
         "--end_time", "2020-06-01",
         "--collections", "ga_s2am_ard_3", "ga_s2bm_ard_3",
         "--bands", "nbart_blue", "nbart_green", "nbart_red"
+        "--filer", "'eo:cloud_cover < 10'"
     ]
 
     try:
@@ -270,5 +282,6 @@ def get_example_query() -> Query:
 
 
 if __name__ == '__main__':
+
     test_query_from_cli()
     print('passed')
