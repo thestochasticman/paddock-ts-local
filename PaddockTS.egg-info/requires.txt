@@ -1,0 +1,9 @@
+numpy<2
+dataclasses-json
+typing_extensions
+
+[:sys_platform != "darwin"]
+tflite_runtime
+
+[:sys_platform == "darwin"]
+tensorflow
