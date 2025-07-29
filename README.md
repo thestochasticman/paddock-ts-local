@@ -8,6 +8,7 @@ A Python toolkit for paddock-level remote sensing workflows. Features include qu
 ```
 ├── env.yml                             # Conda environment specification
 ├── pyproject.toml                      # Package metadata & dependencies
+│
 ├── PaddockTS/                          # Core library modules
 │   ├── Data/                           # Data acquisition utilities (download, environmental)
 │   │   ├── download_ds2.py               # Download Sentinel 2 data

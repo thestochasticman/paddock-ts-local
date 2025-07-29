@@ -134,3 +134,9 @@ def test_filter_basic_and_logical():
 
 if __name__ == '__main__':
     test_filter_basic_and_logical()
+
+
+f1 = Filter.lt('en:cloudcover', 10)
+f2 = Filter.lt('rain', 10)
+
+f3 = Filter.AND(f1, f2)

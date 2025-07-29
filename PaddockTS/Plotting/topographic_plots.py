@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 from matplotlib.font_manager import FontProperties
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
+from PaddockTS.legend import *
 
 import argparse
 import logging
@@ -48,17 +49,39 @@ def add_tiff_band(ds, variable, resampling_method, outdir, stub):
 def plot_topography(stub: str):
     outdir = OUT_DIR
     tmpdir = TMP_DIR
+    ds2_dir = DS2_DIR
+    polygon_dir = SAMGEO_FILTERED_OUTPUT_VECTOR_DIR
+
 
     # Load the imagery stack
-    filename = os.path.join(outdir, f"{stub}_ds2.pkl")
+    filename = os.path.join(ds2_dir, f"{stub}.pkl")
     with open(filename, 'rb') as file:
         ds_original = pickle.load(file)
     ds = ds_original
 
     # Load the paddocks
-    pol = gpd.read_file(outdir+stub+'_filt.gpkg')
+    pol = gpd.read_file(f"{SAMGEO_FILTERED_OUTPUT_VECTOR_DIR}/{stub}.gpkg")
     pol['paddock'] = range(1,len(pol)+1)
     pol['paddock'] = pol.paddock.astype('category')
+
+
+    filename = os.path.join(outdir, f"{stub}_terrain.tif")
+    with rasterio.open(filename) as src:
+        dem = src.read(1)  
+        transform = src.transform  
+        crs = src.crs
+        nodata = src.nodata 
+        width = src.width 
+        height = src.height 
+
+    sigma = 10
+    dem_smooth = gaussian_filter(dem.astype(float), sigma=sigma)
+    filename = os.path.join(tmpdir, f"{stub}_terrain_smoothed.tif")
+    with rasterio.open(filename, 'w', driver='GTiff', height=height, width=width,
+                    count=1, dtype=dem_smooth.dtype, crs=crs, transform=transform,
+                    nodata=nodata) as dst:
+        dst.write(dem_smooth, 1) 
+    print(f"Smoothed DEM saved to {filename}")
 
     # Load the terrain and calculate topographic variables
     filename = os.path.join(tmpdir, f"{stub}_terrain_smoothed.tif")
@@ -97,9 +120,10 @@ def plot_topography(stub: str):
     filepath = os.path.join(tmpdir, stub + "_aspect_QGIS.tif")
     ds['aspect'].rio.to_raster(
         filepath,
-        dtype="int8", 
+        dtype="int64", 
         nodata=-1, 
     )
+  
     print(filepath)
 
     filepath = os.path.join(tmpdir, stub + "_slope_QGIS.tif")
@@ -187,3 +211,13 @@ def plot_topography(stub: str):
     # -
 
     
+def test():
+    from PaddockTS.query import get_example_query
+
+    query = get_example_query()
+    stub = query.get_stub()
+
+    plot_topography(stub)
+
+if __name__ == '__main__':
+    test()
