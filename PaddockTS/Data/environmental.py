@@ -171,19 +171,18 @@ def download_environmental_data(stub: str, query: Query):
 
 def test():
     from datetime import date
-
-    # query = get_example_query()
-    query = Query(
-        lat=-34.3890427,
-        lon=148.469499,
-        buffer=0.01,
-        start_time= date(2020, 1, 1),
-        end_time=date(2021, 12, 31),
-        collections=[],
-        bands=[]
-    )
+    from PaddockTS.query import get_example_query
+    query = get_example_query()
+    # query = Query(
+    #     lat=-34.3890427,
+    #     lon=148.469499,
+    #     buffer=0.01,
+    #     start_time= date(2020, 1, 1),
+    #     end_time=date(2021, 12, 31),
+    #     collections=[],
+    #     bands=[]
+    # )
     stub = query.get_stub()
-
     download_environmental_data(stub, query)
     
 if __name__ == "__main__":
