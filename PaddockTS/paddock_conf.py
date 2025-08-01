@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing_extensions import Union
 
 @dataclass
 class PaddockConf:
@@ -6,3 +7,4 @@ class PaddockConf:
     max_area_ha         : float = 1500
     max_perim_area_ratio: float = 30
     device              : str = 'cpu'
+

@@ -84,7 +84,7 @@ def test():
     from PaddockTS.query import get_example_query
 
     query = get_example_query()
-    stub = query.get_stub()
+    stub = 'test_example_query'
     segment(stub, device='cpu')
 
 if __name__ == '__main__':

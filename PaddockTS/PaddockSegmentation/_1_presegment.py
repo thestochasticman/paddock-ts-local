@@ -94,6 +94,7 @@ def presegment(stub: str)->xr.DataArray:
     ndwi_geotiff = ds2_to_ndwi_geotiff(ds2)
     path = f"{NDWI_FOURIER_GEOTIFF_DIR}/{stub}.tif"
     save_ndwi_geotiff(ndwi_geotiff, path)
+    print(path)
     return ndwi_geotiff
     # save_ndwi_geotiff(ds2_to_ndwi_geotiff(load_pickle(ds2) if isinstance(ds2, str) else ds2), path)
 
@@ -102,10 +103,11 @@ def test():
     from os.path import exists
     from os import remove
 
+    stub = 'test_example_query'
     query = get_example_query()
-    path = f"{NDWI_FOURIER_GEOTIFF_DIR}/{query.get_stub()}.tif"
+    path = f"{NDWI_FOURIER_GEOTIFF_DIR}/{stub}.tif"
     if exists(path): remove(path)
-    presegment(query.get_stub())
+    presegment(stub)
     print(path)
     return exists(path)
 
