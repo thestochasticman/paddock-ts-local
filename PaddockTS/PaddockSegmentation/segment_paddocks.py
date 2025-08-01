@@ -16,7 +16,7 @@ def test():
     
     query = get_example_query()
     stub = query.get_stub()
-    segment(stub, device='cpu')
+    segment('test_example_query', device='cpu')
 
 if __name__ == '__main__':
     test()

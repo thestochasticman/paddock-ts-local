@@ -214,7 +214,7 @@ def test_query_from_cli():
         "--end_time", "2020-06-01",
         "--collections", "ga_s2am_ard_3", "ga_s2bm_ard_3",
         "--bands", "nbart_blue", "nbart_green", "nbart_red"
-        "--filer", "'eo:cloud_cover < 10'"
+        "--filter", "'eo:cloud_cover < 10'"
     ]
 
     try:
