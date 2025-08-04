@@ -65,7 +65,7 @@ def segment(
     '''
     path_preseg_image = f"{NDWI_FOURIER_GEOTIFF_DIR}/{stub}.tif"
     path_output_mask = f"{SAMGEO_OUTPUT_MASK_DIR}/{stub}.tif"
-    path_output_vector = f"{SAMGEO_OUTPUT_VECTOR_DIR}.gpkg"
+    path_output_vector = f"{SAMGEO_OUTPUT_VECTOR_DIR}/{stub}.gpkg"
     path_filtered_output_vector = f"{SAMGEO_FILTERED_OUTPUT_VECTOR_DIR}/{stub}.gpkg"
     model = load_model(SAMGEO_MODEL_PATH, device)
     model.generate(
@@ -79,7 +79,7 @@ def segment(
     model.tiff_to_gpkg(path_output_mask, path_output_vector)
     filtered_gdf = filter_polygons(path_output_vector, min_area_ha, max_area_ha, max_perim_area_ratio)
     filtered_gdf.to_file(path_filtered_output_vector, driver='GPKG')
-
+    
 def test():
     from PaddockTS.query import get_example_query
 
