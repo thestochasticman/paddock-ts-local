@@ -6,7 +6,7 @@ many other criteria based on which the user might want to select data.
 
 Some common properties are
 
-en: cloud_cover           : Estimated cloud coverage percentage (0–100)
+eo:cloud_cover           : Estimated cloud coverage percentage (0–100)
 datetime                  : Day-Start/Month-Start/Year-Start/Day-end/Month-end/Year-end
 platform                  : one of landsat-8, 'sentinel-2a, etc
 gsd                       : ground sampling distance(meters)
@@ -21,9 +21,9 @@ There are many more properties, we will try to add example usage for all soon.
 """
 
 ### The filter object to create a filter where we want the
-### en:cloud_cover to be les than 10 can be created as follows
+### eo:cloud_cover to be les than 10 can be created as follows
 
-f1 = Filter.lt('en: cloud_cover', 10)
+f1 = Filter.lt('eo:cloud_cover', 10)
 f2 = Filter.from_string('eo:cloud_cover < 10')
 
 ### The filter object to choose sentinel-2a data can selected as follows
@@ -35,9 +35,8 @@ f5 = Filter.from_string('platform == "sentinel-2a"')
 
 
 ### To combine a filter object which uses landsat platform and contains
-### records with en:cloud_cover < 10
+### records with eo:cloud_cover < 10
 
 f6 = Filter.AND(f1, f3)
 f7 = f1.AND(f3)
-
 ### Hope this is clear now
