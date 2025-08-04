@@ -177,7 +177,7 @@ class Query:
         grp.add_argument("--end_time",    type=parse_date, required=False, help=flds['end_time'].metadata['help'])
         grp.add_argument("--collections", nargs='+', required=False, help=flds['collections'].metadata['help'])
         grp.add_argument("--bands",       nargs='+', required=False, help=flds['bands'].metadata['help'])
-        grp.add_argument("--filter",      type='+', required=False, help=flds['filter'].metadata['help'])
+        grp.add_argument("--filter",      type=str, required=False, help=flds['filter'].metadata['help'])
 
         args, _ = parser.parse_known_args()
 
@@ -215,7 +215,7 @@ def test_query_from_cli():
         "--end_time", "2020-06-01",
         "--collections", "ga_s2am_ard_3", "ga_s2bm_ard_3",
         "--bands", "nbart_blue", "nbart_green", "nbart_red",
-        "--filter", "'eo:cloud_cover < 10'"
+        "--filter", "eo:cloud_cover < 10"
     ]
 
     try:
