@@ -83,6 +83,7 @@ def ds2_to_ndwi_geotiff(ds2: Dataset)->xr.DataArray:
     return convert_to_geotiff(ds2, rescale(compute_ndwi_fourier(ds2)))
 
 def save_ndwi_geotiff(data_xr: xr.DataArray, path)->None:
+    print(path, '----------')
     data_xr.transpose('band', 'y', 'x').rio.to_raster(path)
 
 def presegment(stub: str)->xr.DataArray:
@@ -94,7 +95,7 @@ def presegment(stub: str)->xr.DataArray:
     ndwi_geotiff = ds2_to_ndwi_geotiff(ds2)
     path = f"{NDWI_FOURIER_GEOTIFF_DIR}/{stub}.tif"
     save_ndwi_geotiff(ndwi_geotiff, path)
-    print(path)
+    print(path, '-------------')
     return ndwi_geotiff
     # save_ndwi_geotiff(ds2_to_ndwi_geotiff(load_pickle(ds2) if isinstance(ds2, str) else ds2), path)
 
