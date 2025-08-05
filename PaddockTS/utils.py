@@ -53,5 +53,3 @@ date_config = config(
     decoder=decode_date,
     mm_field=fields.Date
 )
-
-makedirs = lambda x: [_makedirs(x, exist_ok=True), x][1]
