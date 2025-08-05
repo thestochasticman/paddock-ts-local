@@ -1,5 +1,4 @@
 from PaddockTS.query import Query
-from PaddockTS.paddock_conf import PaddockConf
 from PaddockTS.ds2_conf import DS2Conf
 
 from PaddockTS.Data.download_ds2 import download_ds2
