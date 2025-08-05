@@ -5,7 +5,6 @@ from PaddockTS.Data.download_ds2 import download_ds2
 from PaddockTS.PaddockSegmentation.utils import fourier_mean
 from PaddockTS.PaddockSegmentation.utils import completion
 import pickle
-from PaddockTS.legend import DS2_DIR
 from xarray.core.dataset import Dataset
 from typing_extensions import Union
 from numpy.typing import NDArray
@@ -87,29 +86,22 @@ def save_ndwi_geotiff(data_xr: xr.DataArray, path)->None:
     data_xr.transpose('band', 'y', 'x').rio.to_raster(path)
 
 def presegment(query: Query)->xr.DataArray:
-    stub = query.stub
     if not exists(query.path_ds2):
         raise FileNotFoundError(f"You have not downloaded ds2 data for the given stub yet.")
-    
     ds2 = pickle.load(open(query.path_ds2, 'rb'))
     ndwi_geotiff = ds2_to_ndwi_geotiff(ds2)
-    path = f"{NDWI_FOURIER_GEOTIFF_DIR}/{stub}.tif"
-    save_ndwi_geotiff(ndwi_geotiff, path)
+    save_ndwi_geotiff(ndwi_geotiff, query.path_preseg_tif)
     return ndwi_geotiff
-    # save_ndwi_geotiff(ds2_to_ndwi_geotiff(load_pickle(ds2) if isinstance(ds2, str) else ds2), path)
 
 def test():
     from PaddockTS.query import get_example_query
     from os.path import exists
     from os import remove
 
-    stub = 'test_example_query'
     query = get_example_query()
-    path = f"{NDWI_FOURIER_GEOTIFF_DIR}/{stub}.tif"
-    if exists(path): remove(path)
-    presegment(stub)
-    print(path)
-    return exists(path)
+    if exists(query.path_preseg_tif): remove(query.path_preseg_tif)
+    presegment(query)
+    return exists(query.path_preseg_tif)
 
 if __name__ == '__main__':
     print(test())

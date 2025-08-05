@@ -62,8 +62,8 @@ class Query:
     groupby     : str               = 'solar_day'
     resolution  : int               = 10
     stub        : Union[str, None]  = None
-    out_dir     : str               = '~/Documents/PaddockTSLocal'
-    tmp_dir     : str               = '~/Downloads/PaddockTSLocal'
+    out_dir     : str               = expanduser('~/Documents/PaddockTSLocal')
+    tmp_dir     : str               = expanduser('~/Downloads/PaddockTSLocal')
 
     x           : float = field(init=False)
     y           : float = field(init=False)
@@ -76,23 +76,25 @@ class Query:
     stub_tmp_dir    : str = field(init=False)
     stub_out_dir    : str = field(init=False)
     path_ds2        : str = field(init=False)
-    # preseg_dir          : str = field(init=False)
-    # path_preseg_tif : str = field(init=False)
+    path_preseg_tif : str = field(init=False)
+    path_polygons   : str = field(init=False)
 
     # Post-init helpers to set derived fields
-    set_start_time  = lambda s: object.__setattr__(s, 'start_time', parse_date(s.start_time))
-    set_end_time    = lambda s: object.__setattr__(s, 'end_time', parse_date(s.end_time))
-    set_x           = lambda s: object.__setattr__(s, 'x', s.lon)
-    set_y           = lambda s: object.__setattr__(s, 'y', s.lat)
-    set_centre      = lambda s: object.__setattr__(s, 'centre', (s.x, s.y))
-    set_lat_range   = lambda s: object.__setattr__(s, 'lat_range', (s.x - s.buffer, s.x + s.buffer))
-    set_lon_range   = lambda s: object.__setattr__(s, 'lon_range', (s.y - s.buffer, s.y + s.buffer))
-    set_datetime    = lambda s: object.__setattr__(s, 'datetime', f'{str(s.start_time)}/{str(s.end_time)}')
-    set_bbox        = lambda s: object.__setattr__(s, 'bbox', [s.lat_range[0], s.lon_range[0], s.lat_range[1], s.lon_range[1]])
-    set_stub        = lambda s: object.__setattr__(s, 'stub', s.stub if s.stub is not None else s.get_stub())
-    set_stub_tmp_dir= lambda s: object.__setattr__(s, 'stub_tmp_dir', f"{s.tmp_dir}/{s.stub}")
-    set_stub_out_dir= lambda s: object.__setattr__(s, 'stub_out_dir', f"{s.out_dir}{s.stub}")
-    set_path_ds2    = lambda s: object.__setattr__(s, 'path_ds2', f"{s.stub_tmp_dir}/ds2.pkl")
+    set_start_time      = lambda s: object.__setattr__(s, 'start_time', parse_date(s.start_time))
+    set_end_time        = lambda s: object.__setattr__(s, 'end_time', parse_date(s.end_time))
+    set_x               = lambda s: object.__setattr__(s, 'x', s.lon)
+    set_y               = lambda s: object.__setattr__(s, 'y', s.lat)
+    set_centre          = lambda s: object.__setattr__(s, 'centre', (s.x, s.y))
+    set_lat_range       = lambda s: object.__setattr__(s, 'lat_range', (s.x - s.buffer, s.x + s.buffer))
+    set_lon_range       = lambda s: object.__setattr__(s, 'lon_range', (s.y - s.buffer, s.y + s.buffer))
+    set_datetime        = lambda s: object.__setattr__(s, 'datetime', f'{str(s.start_time)}/{str(s.end_time)}')
+    set_bbox            = lambda s: object.__setattr__(s, 'bbox', [s.lat_range[0], s.lon_range[0], s.lat_range[1], s.lon_range[1]])
+    set_stub            = lambda s: object.__setattr__(s, 'stub', s.stub if s.stub is not None else s.get_stub())
+    set_stub_tmp_dir    = lambda s: object.__setattr__(s, 'stub_tmp_dir', f"{s.tmp_dir}/{s.stub}")
+    set_stub_out_dir    = lambda s: object.__setattr__(s, 'stub_out_dir', f"{s.out_dir}{s.stub}")
+    set_path_ds2        = lambda s: object.__setattr__(s, 'path_ds2', f"{s.stub_tmp_dir}/ds2.pkl")
+    set_path_preseg_tif = lambda s: object.__setattr__(s, 'path_preseg_tif', f"{s.stub_tmp_dir}/preseg.tif")
+    set_path_polygons   = lambda s: object.__setattr__(s, 'path_polygons', f"{s.stub_tmp_dir}/polygons.gpkg")
 
     def __post_init__(s: Self) -> None:
         """
@@ -113,6 +115,8 @@ class Query:
         s.set_stub_out_dir()
         if not exists(s.stub_out_dir): mkdir(s.stub_out_dir)
         s.set_path_ds2()
+        s.set_path_preseg_tif()
+        s.set_path_polygons()
         s.set_x()
         s.set_y()
         s.set_centre()
@@ -122,7 +126,6 @@ class Query:
         s.set_bbox()
 
     
-
     def __str__(self: Self) -> str:
         """
         Serialize this Query to a pretty-printed JSON string.

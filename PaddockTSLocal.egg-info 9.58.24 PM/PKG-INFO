@@ -1,0 +1,14 @@
+Metadata-Version: 2.4
+Name: PaddockTSLocal
+Version: 0.1.0
+Summary: Vegetation fractional cover estimates via a TensorFlow-trained MLP model
+Author: Borevitz Labs Australian National University
+Author-email: Yasar Adeel Ansari <u6737670@anu.edu.au>
+License: MIT
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: numpy<2
+Requires-Dist: tensorflow; sys_platform == "darwin"
+Requires-Dist: tflite_runtime; sys_platform != "darwin"
+Requires-Dist: dataclasses-json
+Requires-Dist: typing_extensions
