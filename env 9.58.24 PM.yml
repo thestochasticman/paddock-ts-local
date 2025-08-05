@@ -1,0 +1,4 @@
+name: PaddockTSLocalEnv2
+dependencies:
+  - python=3.9
+  - pip            # optional, if you’ll use pip

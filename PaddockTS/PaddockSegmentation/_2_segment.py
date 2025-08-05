@@ -3,6 +3,7 @@ from PaddockTS.legend import SAMGEO_OUTPUT_VECTOR_DIR
 from PaddockTS.legend import NDWI_FOURIER_GEOTIFF_DIR
 from PaddockTS.legend import SAMGEO_OUTPUT_MASK_DIR
 from PaddockTS.legend import SAMGEO_MODEL_PATH
+from PaddockTS.query import Query
 from geotiff import GeoTiff
 from os.path import dirname
 from os.path import dirname
@@ -51,7 +52,7 @@ def filter_polygons(vector, min_area_ha, max_area_ha, max_perim_area_ratio):
     return pol_filt
 
 def segment(
-        stub: str,
+        query: Query,
         min_area_ha: int = 10,
         max_area_ha: int = 1500,
         max_perim_area_ratio: int = 30,
@@ -63,11 +64,12 @@ def segment(
     3. Converts mask to vector format (GeoPackage).
     4. Filters polygons by size/shape and saves filtered output.
     '''
-    path_preseg_image = f"{NDWI_FOURIER_GEOTIFF_DIR}/{stub}.tif"
-    path_output_mask = f"{SAMGEO_OUTPUT_MASK_DIR}/{stub}.tif"
-    path_output_vector = f"{SAMGEO_OUTPUT_VECTOR_DIR}/{stub}.gpkg"
-    path_filtered_output_vector = f"{SAMGEO_FILTERED_OUTPUT_VECTOR_DIR}/{stub}.gpkg"
-    model = load_model(SAMGEO_MODEL_PATH, device)
+    path_preseg_image = query.path_preseg_tif
+    path_output_mask = f"{query.stub_tmp_dir}/mask.tif"
+    path_output_vector = f"{query.stub_tmp_dir}/vector.gpkg"
+    path_filtered_output_vector = query.path_polygons
+    samgeo_model_path = f"{query.stub_tmp_dir}/sam_vit_h_4b8939.pth"
+    model = load_model(samgeo_model_path, device)
     model.generate(
         path_preseg_image,
         path_output_mask,
@@ -82,10 +84,8 @@ def segment(
     
 def test():
     from PaddockTS.query import get_example_query
-
     query = get_example_query()
-    stub = 'test_example_query'
-    segment(stub, device='cpu')
+    segment(query, device='cpu')
 
 if __name__ == '__main__':
     test()

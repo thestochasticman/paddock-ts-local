@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "PaddockTSLocal"
+version = "0.1.0"
+description = "Vegetation fractional cover estimates via a TensorFlow-trained MLP model"
+readme = "README.md"
+authors = [
+  { name = "Borevitz Labs Australian National University" },
+  { name = "Yasar Adeel Ansari", email = "u6737670@anu.edu.au" },
+]
+license = { text = "MIT" }
+requires-python = ">=3.8"
+dependencies = [
+  "numpy<2",
+  'tensorflow; sys_platform == "darwin"',
+  'tflite_runtime; sys_platform != "darwin"',
+  "dataclasses-json",
+  "typing_extensions",
+]
+
+[tool.setuptools.packages.find]
+include = ["PaddockTSLocal", "PaddockTSLocal.*"]

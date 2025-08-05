@@ -92,7 +92,7 @@ def test_returned_dataset_values(query: Query) -> bool:
         return False
     if not all(band in dataset.data_vars for band in query.bands):
         return False
-
+    print(query.path_ds2)
     return True
 
 def test() -> bool:
