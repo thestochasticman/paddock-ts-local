@@ -8,56 +8,13 @@ from marshmallow import fields
 from hashlib import sha256
 from typing import Union, Tuple
 from PaddockTS.filter import Filter
+from os.path import expanduser
+from os.path import exists
+from PaddockTS.utils import makedirs
+from PaddockTS.utils import *
+from os.path import join
 import json
 
-def parse_date(s: str) -> date:
-    """
-    Parse an ISO date string into a `date` object.
-
-    Args:
-        s (str): A date string in “YYYY-MM-DD” format.
-
-    Returns:
-        date: The corresponding `datetime.date` object.
-
-    Raises:
-        ValueError: If the string does not match the expected format.
-    """
-    return datetime.strptime(s, "%Y-%m-%d").date()
-
-
-def encode_date(d: date) -> str:
-    """
-    Encode a `date` object as an ISO date string.
-
-    Args:
-        d (date): The date to encode.
-
-    Returns:
-        str: The ISO-format date string (YYYY-MM-DD).
-    """
-    return d.isoformat()
-
-
-def decode_date(s: str) -> date:
-    """
-    Decode an ISO date string into a `date` object.
-
-    Args:
-        s (str): A date string in “YYYY-MM-DD” format.
-
-    Returns:
-        date: The corresponding `datetime.date` object.
-    """
-    return date.fromisoformat(s)
-
-
-# JSON (de)serialization config for date fields
-date_config = config(
-    encoder=encode_date,
-    decoder=decode_date,
-    mm_field=fields.Date
-)
 
 @dataclass_json
 @dataclass(frozen=True)
@@ -68,6 +25,7 @@ class Query:
 
     Attributes:
     (User Defined)
+        stub (str)              : Name of the directory where the results of the query are stored
         lat (float)             : Latitude of the area of interest,
         lon (float)             : Longitude of the area of interest,
         buffer (float)          : Buffer in degrees around (lat, lon),
@@ -89,31 +47,37 @@ class Query:
         datetime (str)          : “YYYY-MM-DD/YYYY-MM-DD” string,                     
         bbox (list)             : [min_lat, min_lon, max_lat, max_lon],                  
     """
-    lat         : float     = field(metadata={'help': 'Latitude of the area of interest'})
-    lon         : float     = field(metadata={'help': 'Longitude of the area of interest'})
-    buffer      : float     = field(metadata={'help': 'Buffer in degrees around lat/lon'})
-    start_time  : date      = field(metadata={'help': 'Start date (YYYY-MM-DD)'} | date_config)
-    end_time    : date      = field(metadata={'help': 'End date (YYYY-MM-DD)'} | date_config)
-    collections : list[str] = field(metadata={'help': 'Products to use for the query'})
-    bands       : list[str] = field(metadata={'help': 'List of band data required'})
 
-    filter     : Filter     = field(
-                                default_factory=lambda: Filter.lt("eo:cloud_cover", 10),
-                                metadata={'help': 'Expression to Refine Search'}
-                            )
-    crs        : str        = 'EPSG:6933'
-    groupby    : str        = 'solar_day'
-    resolution : int        = 10
+    lat         : float             
+    lon         : float           
+    buffer      : float            
+    start_time  : Union[str, date]
+    end_time    : Union[str, date]
+    collections : list[str]         
+    bands       : list[str]      
 
-    x         : float   = field(init=False, metadata={'help': 'Longitude of the area of interest'})
-    y         : float   = field(init=False, metadata={'help': 'Latitude of the area of interest'})
-    centre    : Tuple   = field(init=False, metadata={'help': 'Centre coordinate (x, y)'})
-    lon_range : Tuple   = field(init=False, metadata={'help': 'Longitude range (min, max)'})
-    lat_range : Tuple   = field(init=False, metadata={'help': 'Latitude range (min, max)'})
-    datetime  : str     = field(init=False, metadata={'help': 'Time range string'})
-    bbox      : list    = field(init=False, metadata={'help': 'Bounding box [min_lat, min_lon, max_lat, max_lon]'})
+    filter      : Filter            = Filter.lt("eo:cloud_cover", 10)  
+    crs         : str               = 'EPSG:6933'
+    groupby     : str               = 'solar_day'
+    resolution  : int               = 10
+    stub        : Union[str, None]  = None
+    out_dir     : str               = '~/Documents/PaddockTSLocal'
+    tmp_dir     : str               = '~/Downloads/PaddockTSLocal'
+
+    x           : float = field(init=False)
+    y           : float = field(init=False)
+    centre      : Tuple = field(init=False)
+    lon_range   : Tuple = field(init=False)
+    lat_range   : Tuple = field(init=False)
+    datetime    : str   = field(init=False)
+    bbox        : list  = field(init=False)
+
+    ds2_dir     : str = field(init=False)
+    path_ds2    : str = field(init=False)
 
     # Post-init helpers to set derived fields
+    set_start_time  = lambda s: object.__setattr__(s, 'start_time', parse_date(s.start_time))
+    set_end_time    = lambda s: object.__setattr__(s, 'end_time', parse_date(s.end_time))
     set_x           = lambda s: object.__setattr__(s, 'x', s.lon)
     set_y           = lambda s: object.__setattr__(s, 'y', s.lat)
     set_centre      = lambda s: object.__setattr__(s, 'centre', (s.x, s.y))
@@ -121,19 +85,36 @@ class Query:
     set_lon_range   = lambda s: object.__setattr__(s, 'lon_range', (s.y - s.buffer, s.y + s.buffer))
     set_datetime    = lambda s: object.__setattr__(s, 'datetime', f'{str(s.start_time)}/{str(s.end_time)}')
     set_bbox        = lambda s: object.__setattr__(s, 'bbox', [s.lat_range[0], s.lon_range[0], s.lat_range[1], s.lon_range[1]])
-    set_resolution  = lambda s: object.__setattr__(s, 'resolution', s.resolution if type(s.resolution) == tuple else (-s.resolution, s.resolution))
+    set_stub        = lambda s: object.__setattr__(s, 'stub', s.stub if s.stub is not None else s.get_stub())
+    set_ds2_dir     = lambda s: object.__setattr__(s, 'ds2_dir', makedirs(f"{s.tmp_dir}/DS2"))
+    set_path_ds2    = lambda s: object.__setattr__(s, 'path_ds2', f"{s.ds2_dir}/{s.stub}.pkl")
 
-    def __post_init__(self: Self) -> None:
+
+    def __post_init__(s: Self) -> None:
         """
         Populate all derived fields after the dataclass is initialized.
         """
-        self.set_x()
-        self.set_y()
-        self.set_centre()
-        self.set_lon_range()
-        self.set_lat_range()
-        self.set_datetime()
-        self.set_bbox()
+        if not exists(s.out_dir): makedirs(s.out_dir, exist_ok=True)
+        if not exists(s.tmp_dir): makedirs(s.tmp_dir, exist_ok=True)
+
+        if isinstance(s.start_time, str):
+            object.__setattr__(s, 'start_time', parse_date(s.start_time))
+        
+        if isinstance(s.end_time, str):
+            object.__setattr__(s, 'end_time', parse_date(s.end_time))
+
+        s.set_stub()
+        s.set_ds2_dir()
+        s.set_path_ds2()
+        s.set_x()
+        s.set_y()
+        s.set_centre()
+        s.set_lon_range()
+        s.set_lat_range()
+        s.set_datetime()
+        s.set_bbox()
+
+    
 
     def __str__(self: Self) -> str:
         """
@@ -142,7 +123,21 @@ class Query:
         Returns:
             str: The JSON representation.
         """
-        return self.to_json(indent=2)
+
+        def default(o):
+            if isinstance(o, date):
+                return o.isoformat()
+            if isinstance(o, Filter):
+                return o.to_dict()
+            raise TypeError(f"Object of type {o.__class__.__name__} is not JSON serializable")
+        
+        init_fields = {
+            f.name: getattr(self, f.name)
+            for f in self.__dataclass_fields__.values()
+            if f.init
+        }
+        return json.dumps(init_fields, indent=2, default=default)
+    
 
     def get_stub(self: Self) -> str:
         """
@@ -170,14 +165,15 @@ class Query:
         grp = parser.add_argument_group("query")
         flds = cls.__dataclass_fields__
 
-        grp.add_argument("--lat",         type=float, required=False, help=flds['lat'].metadata['help'])
-        grp.add_argument("--lon",         type=float, required=False, help=flds['lon'].metadata['help'])
-        grp.add_argument("--buffer",      type=float, required=False, help=flds['buffer'].metadata['help'])
-        grp.add_argument("--start_time",  type=parse_date, required=False, help=flds['start_time'].metadata['help'])
-        grp.add_argument("--end_time",    type=parse_date, required=False, help=flds['end_time'].metadata['help'])
-        grp.add_argument("--collections", nargs='+', required=False, help=flds['collections'].metadata['help'])
-        grp.add_argument("--bands",       nargs='+', required=False, help=flds['bands'].metadata['help'])
-        grp.add_argument("--filter",      type=str, required=False, help=flds['filter'].metadata['help'])
+        grp.add_argument("--stub",        type=str, required=True)
+        grp.add_argument("--lat",         type=float, required=True)
+        grp.add_argument("--lon",         type=float, required=True)
+        grp.add_argument("--buffer",      type=float, required=True)
+        grp.add_argument("--start_time",  type=parse_date, required=True)
+        grp.add_argument("--end_time",    type=parse_date, required=True)
+        grp.add_argument("--collections", nargs='+', required=True)
+        grp.add_argument("--bands",       nargs='+', required=True)
+        grp.add_argument("--filter",      type=str, required=True)
 
         args, _ = parser.parse_known_args()
 
@@ -189,6 +185,7 @@ class Query:
         else:
             filter_obj = Filter.lt("eo:cloud_cover", 10)
         return cls(
+            stub=args.stub,
             lat=args.lat,
             lon=args.lon,
             buffer=args.buffer,
@@ -208,6 +205,7 @@ def test_query_from_cli():
     # Build the fake argv list
     sys.argv = [
         "prog",
+        "--stub", "test_example_query",
         "--lat", "-33.5040",
         "--lon", "148.4",
         "--buffer", "0.01",
@@ -261,6 +259,7 @@ def get_example_query() -> Query:
         Query: A preset Query covering mid-2020 Sentinel-2 data.
     """
     return Query(
+        stub='test_example_query',
         lat=-33.5040,
         lon=148.4,
         buffer=0.01,
@@ -278,11 +277,13 @@ def get_example_query() -> Query:
             'nbart_nir_2',
             'nbart_swir_2',
             'nbart_swir_3'
-        ]
+        ],
     )
 
 
 if __name__ == '__main__':
 
     test_query_from_cli()
+    q = get_example_query()
+    print(q.filter)
     print('passed')
