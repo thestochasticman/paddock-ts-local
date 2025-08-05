@@ -18,7 +18,8 @@ sys.argv = [
     "--filter", "eo:cloud_cover < 10"
 ]
 
-### The above args are the equivalent of
+### The above args are the equivalent of putting args while running script
+### in the following way
 ### python demo/query.py 
 ### --lat -33.5040 --lon 148.04 --buffer 0.01 \
 ### --start_time  2020-01-01
@@ -32,7 +33,7 @@ q1 = Query.from_cli()
 
 ## You can instantiate the same quary programatically
 
-Query(
+q2 = Query(
     lat=-33.5040,
     lon=148.4,
     buffer=0.01,
@@ -46,3 +47,4 @@ Query(
     ],
     filter=Filter.lt('eo:cloud_cover', 10)
 )
+
