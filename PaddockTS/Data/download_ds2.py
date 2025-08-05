@@ -1,15 +1,10 @@
 from dask.distributed import Client as DaskClient
 from xarray.core.dataset import Dataset
-from PaddockTS.legend import DS2_DIR
-from typing_extensions import Union
 from PaddockTS.query import Query
-from os import makedirs
 import pystac_client
 import odc.stac
 import pickle
 import rioxarray
-import sys
-import platform
 
 def download_ds2(
     query: Query,
@@ -72,12 +67,10 @@ def download_ds2(
     ds2: Dataset = future.result()
     dask_client.close()
     ds2 = ds2.rio.write_crs(query.crs)
-    print(query.path_ds2, query.stub)
+
     with open(query.path_ds2, 'wb') as handle:
         pickle.dump(ds2, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
     return ds2
-
 
 def test_returned_dataset_values(query: Query) -> bool:
     """

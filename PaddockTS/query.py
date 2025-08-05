@@ -10,9 +10,10 @@ from typing import Union, Tuple
 from PaddockTS.filter import Filter
 from os.path import expanduser
 from os.path import exists
-from PaddockTS.utils import makedirs
+from os import makedirs
 from PaddockTS.utils import *
 from os.path import join
+from os import mkdir
 import json
 
 
@@ -71,9 +72,12 @@ class Query:
     lat_range   : Tuple = field(init=False)
     datetime    : str   = field(init=False)
     bbox        : list  = field(init=False)
-
-    ds2_dir     : str = field(init=False)
-    path_ds2    : str = field(init=False)
+    
+    stub_tmp_dir    : str = field(init=False)
+    stub_out_dir    : str = field(init=False)
+    path_ds2        : str = field(init=False)
+    # preseg_dir          : str = field(init=False)
+    # path_preseg_tif : str = field(init=False)
 
     # Post-init helpers to set derived fields
     set_start_time  = lambda s: object.__setattr__(s, 'start_time', parse_date(s.start_time))
@@ -86,16 +90,16 @@ class Query:
     set_datetime    = lambda s: object.__setattr__(s, 'datetime', f'{str(s.start_time)}/{str(s.end_time)}')
     set_bbox        = lambda s: object.__setattr__(s, 'bbox', [s.lat_range[0], s.lon_range[0], s.lat_range[1], s.lon_range[1]])
     set_stub        = lambda s: object.__setattr__(s, 'stub', s.stub if s.stub is not None else s.get_stub())
-    set_ds2_dir     = lambda s: object.__setattr__(s, 'ds2_dir', makedirs(f"{s.tmp_dir}/DS2"))
-    set_path_ds2    = lambda s: object.__setattr__(s, 'path_ds2', f"{s.ds2_dir}/{s.stub}.pkl")
-
+    set_stub_tmp_dir= lambda s: object.__setattr__(s, 'stub_tmp_dir', f"{s.tmp_dir}/{s.stub}")
+    set_stub_out_dir= lambda s: object.__setattr__(s, 'stub_out_dir', f"{s.out_dir}{s.stub}")
+    set_path_ds2    = lambda s: object.__setattr__(s, 'path_ds2', f"{s.stub_tmp_dir}/ds2.pkl")
 
     def __post_init__(s: Self) -> None:
         """
         Populate all derived fields after the dataclass is initialized.
         """
-        if not exists(s.out_dir): makedirs(s.out_dir, exist_ok=True)
-        if not exists(s.tmp_dir): makedirs(s.tmp_dir, exist_ok=True)
+        makedirs(s.out_dir, exist_ok=True)
+        makedirs(s.tmp_dir, exist_ok=True)
 
         if isinstance(s.start_time, str):
             object.__setattr__(s, 'start_time', parse_date(s.start_time))
@@ -104,7 +108,10 @@ class Query:
             object.__setattr__(s, 'end_time', parse_date(s.end_time))
 
         s.set_stub()
-        s.set_ds2_dir()
+        s.set_stub_tmp_dir()
+        if not exists(s.stub_tmp_dir): mkdir(s.stub_tmp_dir)
+        s.set_stub_out_dir()
+        if not exists(s.stub_out_dir): mkdir(s.stub_out_dir)
         s.set_path_ds2()
         s.set_x()
         s.set_y()
