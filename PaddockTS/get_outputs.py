@@ -1,5 +1,4 @@
 from PaddockTS.query import Query
-
 from PaddockTS.Data.download_ds2 import download_ds2
 from PaddockTS.Data.environmental import download_environmental_data
 from PaddockTS.PaddockSegmentation.segment_paddocks import get_paddocks

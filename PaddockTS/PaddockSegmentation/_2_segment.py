@@ -1,6 +1,5 @@
 
 from PaddockTS.query import Query
-from geotiff import GeoTiff
 from os.path import dirname
 from os.path import dirname
 from os.path import exists
