@@ -1,6 +1,8 @@
 from PaddockTS.filter import Filter
 
 """
+PaddockTS/filter.py
+
 Apart from datetime, geographical coordinates and collections, there are 
 many other criteria based on which the user might want to select data.
 
