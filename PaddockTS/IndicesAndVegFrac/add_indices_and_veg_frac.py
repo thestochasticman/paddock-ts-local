@@ -2,13 +2,12 @@ from PaddockTS.IndicesAndVegFrac.veg_frac import calculate_fractional_cover
 from PaddockTS.IndicesAndVegFrac.veg_frac import add_fractional_cover_to_ds
 from PaddockTS.IndicesAndVegFrac.indices import *
 import pickle
-from PaddockTS.legend import DS2I_DIR
-from PaddockTS.legend import DS2_DIR
 from typing_extensions import Callable
+from PaddockTS.query import Query
 import pickle
 
 def add_indices_and_veg_frac(
-    stub: str,
+    query: Query,
     band_names: list[str] = [
         'nbart_blue',
         'nbart_green',
@@ -23,8 +22,9 @@ def add_indices_and_veg_frac(
         'NIRv': calculate_nirv
     }
 ):
-    path_ds2 = f"{DS2_DIR}/{stub}.pkl"
-    path_ds2i = f"{DS2I_DIR}/{stub}.pkl"
+    stub = query.stub
+    path_ds2 = query.path_ds2
+    path_ds2i = f"{query.stub_tmp_dir}/DS2I.pkl"
     ds = pickle.load(open(path_ds2, 'rb'))
     fractions = calculate_fractional_cover(ds, band_names, i=4, correction=False)
     ds = add_fractional_cover_to_ds(ds, fractions)
@@ -36,8 +36,8 @@ def test():
     from PaddockTS.query import get_example_query
     from os.path import exists
     query = get_example_query()
-    add_indices_and_veg_frac(stub=query.get_stub())
-    return exists(f"{DS2I_DIR}/{query.get_stub()}.pkl")
+    add_indices_and_veg_frac(query)
+    return exists(f"{query.stub_tmp_dir}/DS2I.pkl")
     
 if __name__ == '__main__':
     print(test())

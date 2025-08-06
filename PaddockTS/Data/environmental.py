@@ -126,7 +126,7 @@ def main(args):
     terrain_tiles(lat, lon, buffer, outdir, stub, tmpdir)
 
 
-def download_environmental_data(stub: str, query: Query):
+def download_environmental_data(query: Query):
     print('Starting 04_environmental.py')
     silo_folder = SILO_DIR
 
@@ -135,9 +135,10 @@ def download_environmental_data(stub: str, query: Query):
     buffer = query.buffer
     start_year = str(query.start_time)[:4]
     end_year = str(query.end_time)[:4]
-    outdir = OUT_DIR
-    tmpdir = TMP_DIR
-
+    outdir = f"{query.stub_out_dir}/environmental"
+    if not exists(outdir): mkdir(outdir)
+    tmpdir = query.stub_tmp_dir
+    stub = ''
     thredds = True
 
     # Download from OzWald wind and vapour pressure at 5km resolution, rainfall at 4km, and temperature at 250m resolution
