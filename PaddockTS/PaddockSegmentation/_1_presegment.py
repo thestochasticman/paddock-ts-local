@@ -98,9 +98,11 @@ def test():
     from os.path import exists
     from os import remove
 
+
     query = get_example_query()
     if exists(query.path_preseg_tif): remove(query.path_preseg_tif)
     presegment(query)
+    print(query.path_preseg_tif)
     return exists(query.path_preseg_tif)
 
 if __name__ == '__main__':

@@ -1,10 +1,9 @@
 
-from dataclasses_json import dataclass_json, config
+from dataclasses_json import dataclass_json
 from typing_extensions import Self
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date
 from argparse import ArgumentParser
-from marshmallow import fields
 from hashlib import sha256
 from typing import Union, Tuple
 from PaddockTS.filter import Filter
@@ -12,7 +11,6 @@ from os.path import expanduser
 from os.path import exists
 from os import makedirs
 from PaddockTS.utils import *
-from os.path import join
 from os import mkdir
 import json
 
