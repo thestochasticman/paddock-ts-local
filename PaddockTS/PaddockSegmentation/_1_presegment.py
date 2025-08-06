@@ -1,4 +1,3 @@
-from PaddockTS.legend import NDWI_FOURIER_GEOTIFF_DIR
 from PaddockTS.query import Query
 from os.path import exists
 from PaddockTS.Data.download_ds2 import download_ds2

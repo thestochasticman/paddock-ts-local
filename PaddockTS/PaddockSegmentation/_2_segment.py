@@ -1,8 +1,4 @@
-from PaddockTS.legend import SAMGEO_FILTERED_OUTPUT_VECTOR_DIR
-from PaddockTS.legend import SAMGEO_OUTPUT_VECTOR_DIR
-from PaddockTS.legend import NDWI_FOURIER_GEOTIFF_DIR
-from PaddockTS.legend import SAMGEO_OUTPUT_MASK_DIR
-from PaddockTS.legend import SAMGEO_MODEL_PATH
+
 from PaddockTS.query import Query
 from geotiff import GeoTiff
 from os.path import dirname

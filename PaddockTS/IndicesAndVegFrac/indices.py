@@ -1,6 +1,4 @@
 
-from PaddockTS.legend import DS2I_DIR
-
 import numpy as np
 import xarray as xr
 
