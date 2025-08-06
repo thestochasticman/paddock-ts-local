@@ -89,7 +89,7 @@ class Query:
     set_bbox            = lambda s: object.__setattr__(s, 'bbox', [s.lat_range[0], s.lon_range[0], s.lat_range[1], s.lon_range[1]])
     set_stub            = lambda s: object.__setattr__(s, 'stub', s.stub if s.stub is not None else s.get_stub())
     set_stub_tmp_dir    = lambda s: object.__setattr__(s, 'stub_tmp_dir', f"{s.tmp_dir}/{s.stub}")
-    set_stub_out_dir    = lambda s: object.__setattr__(s, 'stub_out_dir', f"{s.out_dir}{s.stub}")
+    set_stub_out_dir    = lambda s: object.__setattr__(s, 'stub_out_dir', f"{s.out_dir}/{s.stub}")
     set_path_ds2        = lambda s: object.__setattr__(s, 'path_ds2', f"{s.stub_tmp_dir}/ds2.pkl")
     set_path_preseg_tif = lambda s: object.__setattr__(s, 'path_preseg_tif', f"{s.stub_tmp_dir}/preseg.tif")
     set_path_polygons   = lambda s: object.__setattr__(s, 'path_polygons', f"{s.stub_tmp_dir}/polygons.gpkg")
