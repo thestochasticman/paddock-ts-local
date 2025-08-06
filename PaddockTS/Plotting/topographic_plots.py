@@ -201,6 +201,7 @@ def plot_topography(query: Query):
     # Save combined figure
     plt.tight_layout()
     filepath = os.path.join(outdir, query.stub + "_topography.png")
+
     plt.savefig(filepath, dpi=300)
     print(filepath)
 
