@@ -15,7 +15,7 @@ def test():
     from PaddockTS.query import get_example_query
     
     query = get_example_query()
-    segment(query, device='cpu')
+    get_paddocks(query, device='cpu')
 
 if __name__ == '__main__':
     test()
