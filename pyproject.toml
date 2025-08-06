@@ -22,4 +22,4 @@ dependencies = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["PaddockTSLocal", "PaddockTSLocal.*"]
+include = ["PaddockTS", "PaddockTS.*"]
