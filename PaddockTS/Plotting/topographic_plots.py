@@ -18,13 +18,11 @@ import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 from matplotlib.font_manager import FontProperties
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
-from PaddockTS.legend import *
 
 import argparse
 import logging
 import warnings
-
-from PaddockTS.legend import *
+from PaddockTS.query import Query
 
 # Setting up logging
 logging.basicConfig(level=logging.INFO)
@@ -46,26 +44,24 @@ def add_tiff_band(ds, variable, resampling_method, outdir, stub):
     ds[variable] = reprojected.isel(band=0).drop_vars('band')
     return ds
 
-def plot_topography(stub: str):
-    outdir = OUT_DIR
-    tmpdir = TMP_DIR
-    ds2_dir = DS2_DIR
-    polygon_dir = SAMGEO_FILTERED_OUTPUT_VECTOR_DIR
+def plot_topography(query: Query):
+    outdir = query.stub_out_dir + '/environmental'
+    tmpdir = query.stub_tmp_dir + '/environmental'
 
 
     # Load the imagery stack
-    filename = os.path.join(ds2_dir, f"{stub}.pkl")
+    filename = os.path.join(query.path_ds2)
     with open(filename, 'rb') as file:
         ds_original = pickle.load(file)
     ds = ds_original
 
     # Load the paddocks
-    pol = gpd.read_file(f"{SAMGEO_FILTERED_OUTPUT_VECTOR_DIR}/{stub}.gpkg")
+    pol = gpd.read_file(query.path_polygons)
     pol['paddock'] = range(1,len(pol)+1)
     pol['paddock'] = pol.paddock.astype('category')
 
 
-    filename = os.path.join(outdir, f"{stub}_terrain.tif")
+    filename = os.path.join(outdir, f"{query.stub}_terrain.tif")
     with rasterio.open(filename) as src:
         dem = src.read(1)  
         transform = src.transform  
@@ -76,7 +72,7 @@ def plot_topography(stub: str):
 
     sigma = 10
     dem_smooth = gaussian_filter(dem.astype(float), sigma=sigma)
-    filename = os.path.join(tmpdir, f"{stub}_terrain_smoothed.tif")
+    filename = os.path.join(tmpdir, f"{query.stub}_terrain_smoothed.tif")
     with rasterio.open(filename, 'w', driver='GTiff', height=height, width=width,
                     count=1, dtype=dem_smooth.dtype, crs=crs, transform=transform,
                     nodata=nodata) as dst:
@@ -84,7 +80,7 @@ def plot_topography(stub: str):
     print(f"Smoothed DEM saved to {filename}")
 
     # Load the terrain and calculate topographic variables
-    filename = os.path.join(tmpdir, f"{stub}_terrain_smoothed.tif")
+    filename = os.path.join(tmpdir, f"{query.stub}_terrain_smoothed.tif")
     grid, dem, fdir, acc = pysheds_accumulation(filename)
     slope = calculate_slope(filename)
 
@@ -108,16 +104,16 @@ def plot_topography(stub: str):
     )
 
     # Save the layers as tiff files for viewing in QGIS
-    filepath = os.path.join(tmpdir, stub + "_elevation_QGIS.tif")
+    filepath = os.path.join(tmpdir, query.stub + "_elevation_QGIS.tif")
     ds['terrain'].rio.to_raster(filepath)
     print(filepath)
 
-    filepath = os.path.join(tmpdir, stub + "_topographic_index_QGIS.tif")
+    filepath = os.path.join(tmpdir, query.stub + "_topographic_index_QGIS.tif")
     ds['topographic_index'].rio.to_raster(filepath)
     print(filepath)
 
     # Need to specify the datatype for the aspect to save correctly
-    filepath = os.path.join(tmpdir, stub + "_aspect_QGIS.tif")
+    filepath = os.path.join(tmpdir, query.stub + "_aspect_QGIS.tif")
     ds['aspect'].rio.to_raster(
         filepath,
         dtype="int64", 
@@ -126,7 +122,7 @@ def plot_topography(stub: str):
   
     print(filepath)
 
-    filepath = os.path.join(tmpdir, stub + "_slope_QGIS.tif")
+    filepath = os.path.join(tmpdir, query.stub + "_slope_QGIS.tif")
     ds['slope'].rio.to_raster(filepath)
     print(filepath)
 
@@ -204,7 +200,7 @@ def plot_topography(stub: str):
 
     # Save combined figure
     plt.tight_layout()
-    filepath = os.path.join(outdir, stub + "_topography.png")
+    filepath = os.path.join(outdir, query.stub + "_topography.png")
     plt.savefig(filepath, dpi=300)
     print(filepath)
 
@@ -215,9 +211,8 @@ def test():
     from PaddockTS.query import get_example_query
 
     query = get_example_query()
-    stub = query.get_stub()
 
-    plot_topography(stub)
+    plot_topography(query)
 
 if __name__ == '__main__':
     test()
