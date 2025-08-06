@@ -81,7 +81,7 @@ def test():
         ]
     )
     stub = query.get_stub()
-    plot(stub)
+    plot(query)
 
 if __name__ == '__main__':
     test()
