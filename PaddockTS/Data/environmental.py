@@ -47,11 +47,14 @@ from DAESIM_preprocess.ozwald_daily import ozwald_daily
 from DAESIM_preprocess.silo_daily import silo_daily
 from DAESIM_preprocess.daesim_forcing import daesim_forcing, daesim_soils
 from PaddockTS.query import Query
-from PaddockTS.legend import *
+from os.path import exists
+from os import mkdir
 
 def download_environmental_data(query: Query):
     print('Starting 04_environmental.py')
-    silo_folder = SILO_DIR
+    silo_folder = f"{query.tmp_dir}/SILO"
+    if not exists(silo_folder):
+        mkdir(silo_folder)
 
     lat = query.lat
     lon = query.lon
