@@ -1,4 +1,3 @@
-
 from dataclasses_json import dataclass_json
 from typing_extensions import Self
 from dataclasses import dataclass, field
@@ -13,7 +12,6 @@ from os import makedirs
 from PaddockTS.utils import *
 from os import mkdir
 import json
-
 
 @dataclass_json
 @dataclass(frozen=True)
@@ -36,7 +34,7 @@ class Query:
         groupby (str)           : ODC groupby key (default “solarday”),
         resolution (int|tuple)  : Spatial resolution in metres (default 10),        
         filter (Filter)         : Expresson to Refine Search                        
-        ---------------------------------------------------------------------------
+        -------------------------------------------------------------------------
     (Set in __post_init__: __post_init__)
         x (float)               : Same as `lon`,                                           
         y (float)               : Same as `lat`,                                           
@@ -71,11 +69,13 @@ class Query:
     datetime    : str   = field(init=False)
     bbox        : list  = field(init=False)
     
-    stub_tmp_dir    : str = field(init=False)
-    stub_out_dir    : str = field(init=False)
-    path_ds2        : str = field(init=False)
-    path_preseg_tif : str = field(init=False)
-    path_polygons   : str = field(init=False)
+    stub_tmp_dir        : str = field(init=False)
+    stub_out_dir        : str = field(init=False)
+    path_ds2            : str = field(init=False)
+    path_preseg_tif     : str = field(init=False)
+    path_polygons       : str = field(init=False)
+
+    dir_checkpoint_plots: str = field(init=False)
 
     # Post-init helpers to set derived fields
     set_start_time      = lambda s: object.__setattr__(s, 'start_time', parse_date(s.start_time))
@@ -93,6 +93,7 @@ class Query:
     set_path_ds2        = lambda s: object.__setattr__(s, 'path_ds2', f"{s.stub_tmp_dir}/ds2.pkl")
     set_path_preseg_tif = lambda s: object.__setattr__(s, 'path_preseg_tif', f"{s.stub_tmp_dir}/preseg.tif")
     set_path_polygons   = lambda s: object.__setattr__(s, 'path_polygons', f"{s.stub_tmp_dir}/polygons.gpkg")
+    set_dir_checkpoint_plots = lambda s: object.__setattr__(s, 'dir_checkpoint_plots', f"{s.stub_out_dir}/checkpoints")
 
     def __post_init__(s: Self) -> None:
         """
@@ -115,6 +116,8 @@ class Query:
         s.set_path_ds2()
         s.set_path_preseg_tif()
         s.set_path_polygons()
+        s.set_dir_checkpoint_plots()
+        if not exists(s.dir_checkpoint_plots): mkdir(s.dir_checkpoint_plots)
         s.set_x()
         s.set_y()
         s.set_centre()
@@ -155,6 +158,8 @@ class Query:
             str: The hex digest stub.
         """
         return sha256(str(self).encode()).hexdigest()
+    
+
 
     @classmethod
     def from_cli(cls) -> "Query":
@@ -273,7 +278,10 @@ def get_example_query() -> Query:
         buffer=0.01,
         start_time=date(2020, 1, 1),
         end_time=date(2020, 6, 1),
-        collections=['ga_s2am_ard_3', 'ga_s2bm_ard_3'],
+        collections=[
+            'ga_s2am_ard_3',
+            'ga_s2bm_ard_3'
+        ],
         bands=[
             'nbart_blue',
             'nbart_green',
@@ -288,10 +296,7 @@ def get_example_query() -> Query:
         ],
     )
 
-
 if __name__ == '__main__':
-
     test_query_from_cli()
     q = get_example_query()
-    print(q.filter)
     print('passed')

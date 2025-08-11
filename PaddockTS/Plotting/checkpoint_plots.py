@@ -26,12 +26,13 @@ def plot(query: Query):
 
     # Load the Fourier Transform image
     raster_path = query.path_preseg_tif
-
-    pf.plot_paddock_map_auto_rgb(ds2i, pol, query.out_dir, query.stub)
-    pf.plot_paddock_map_auto_fourier(raster_path, pol, query.out_dir, query.stub)
+    out_dir = query.dir_checkpoint_plots
+    pf.plot_paddock_map_auto_rgb(ds2i, pol, out_dir, query.stub)
+    pf.plot_paddock_map_auto_fourier(raster_path, pol, out_dir, query.stub)
 
      # Save the RGB image as a TIFF file
-    output_name_rgb = os.path.join(query.out_dir, f"{query.out_dir}_thumbs_rgb.tif")
+    # output_name_rgb = os.path.join(out_dir, f"{query.stub}_thumbs_rgb.tif")
+    output_name_rgb=f"{out_dir}/{query.stub}_thumbs_rgb.tif"
     rgb(ds2i, 
         bands=['nbart_red', 'nbart_green', 'nbart_blue'], 
         col="time", 
@@ -40,7 +41,8 @@ def plot(query: Query):
     )
 
       # Save the veg fraction image as a TIFF file
-    output_name_vegfrac = os.path.join(query.out_dir, f"{query.stub}_thumbs_vegfrac.tif")
+    # output_name_vegfrac = os.path.join(out_dir, f"{query.stub}_thumbs_vegfrac.tif")
+    output_name_vegfrac = f"{out_dir}/{query.stub}_thumbs_vegfrac.tif"
     rgb(ds2i, 
         bands=['bg', 'pv', 'npv'],
         col="time", 
@@ -52,7 +54,7 @@ def plot(query: Query):
         ds2i,
         pol,
         ['nbart_red', 'nbart_green', 'nbart_blue'],
-        out_dir=query.out_dir,
+        out_dir=out_dir,
         stub=query.stub
     )
     
@@ -60,7 +62,7 @@ def plot(query: Query):
         ds2i,
         pol,
         ['bg', 'pv', 'npv'],
-        out_dir=query.out_dir,
+        out_dir=out_dir,
         stub=query.stub
     )
 
