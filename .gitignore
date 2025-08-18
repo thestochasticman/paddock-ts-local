@@ -1,0 +1,5 @@
+# JTB first pass at gitignore list:
+PaddockTS/Data/*
+PaddockTS/*/*pycache*
+PaddockTS/*pycache*
+PaddockTS.egg-info/*
