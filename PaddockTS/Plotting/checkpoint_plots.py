@@ -32,7 +32,7 @@ def plot(query: Query):
 
      # Save the RGB image as a TIFF file
     # output_name_rgb = os.path.join(out_dir, f"{query.stub}_thumbs_rgb.tif")
-    output_name_rgb=f"{out_dir}/{query.stub}_thumbs_rgb.tif"
+    output_name_rgb=f"{out_dir}/{query.stub}_thumbs_rgb.png"
     rgb(ds2i, 
         bands=['nbart_red', 'nbart_green', 'nbart_blue'], 
         col="time", 
@@ -42,7 +42,7 @@ def plot(query: Query):
 
       # Save the veg fraction image as a TIFF file
     # output_name_vegfrac = os.path.join(out_dir, f"{query.stub}_thumbs_vegfrac.tif")
-    output_name_vegfrac = f"{out_dir}/{query.stub}_thumbs_vegfrac.tif"
+    output_name_vegfrac = f"{out_dir}/{query.stub}_thumbs_vegfrac.png"
     rgb(ds2i, 
         bands=['bg', 'pv', 'npv'],
         col="time", 
