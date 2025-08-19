@@ -121,7 +121,7 @@ def plot_paddock_map_auto_fourier(raster_path, pol, out_dir, stub):
                 fontsize=12, ha='center', va='center', color='yellow')
 
     # Save the figure to file.
-    output_filename = f"{out_dir}/{stub}_paddock_map_auto_fourier.tif"
+    output_filename = f"{out_dir}/{stub}_paddock_map_auto_fourier.png"
     plt.savefig(output_filename, dpi=300, bbox_inches='tight')
 
     # Remove axis and show the figure.
@@ -184,7 +184,7 @@ def plot_paddock_map_auto_rgb(ds, pol, out_dir, stub):
                 fontsize=12, ha='center', va='center', color='yellow')
 
     # Save the figure.
-    output_filename = f"{out_dir}/{stub}_paddock_map_auto_rgb.tif"
+    output_filename = f"{out_dir}/{stub}_paddock_map_auto_rgb.png"
     plt.savefig(output_filename, dpi=300, bbox_inches='tight')
 
     # Hide axes and display the figure.
@@ -485,7 +485,7 @@ def plot_silo_daily(silo, ds, out_dir, stub):
     ax3.legend()
 
     plt.tight_layout()
-    output_filename = f"{out_dir}{stub}_silo_daily.tif"
+    output_filename = f"{out_dir}{stub}_silo_daily.png"
     plt.savefig(output_filename, dpi=300, bbox_inches='tight')
     # plt.show()
 
@@ -576,6 +576,6 @@ def plot_env_ts(silo, ds, Ssoil, out_dir, stub):
     ax1.set_xlim(time_daily[0], time_daily[-1])
 
     plt.tight_layout()
-    output_filename = f"{out_dir}{stub}_env_ts.tif"
+    output_filename = f"{out_dir}{stub}_env_ts.png"
     plt.savefig(output_filename, dpi=300, bbox_inches='tight')
     # plt.show()
