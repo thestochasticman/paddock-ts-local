@@ -1,2 +1,6 @@
 PaddockTS/**/__pycache__/
 PaddockTS.egg-info/
+
+gdalwmscache/
+dist/
+terrain_tiles.xml

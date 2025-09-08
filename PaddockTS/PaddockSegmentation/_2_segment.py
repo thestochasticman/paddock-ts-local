@@ -63,7 +63,7 @@ def segment(
     path_output_mask = f"{query.stub_tmp_dir}/mask.tif"
     path_output_vector = f"{query.stub_tmp_dir}/vector.gpkg"
     path_filtered_output_vector = query.path_polygons
-    samgeo_model_path = f"{query.stub_tmp_dir}/sam_vit_h_4b8939.pth"
+    samgeo_model_path = f"{query.tmp_dir}/sam_vit_h_4b8939.pth"
     model = load_model(samgeo_model_path, device)
     model.generate(
         path_preseg_image,

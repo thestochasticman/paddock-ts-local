@@ -1,6 +1,5 @@
 from PaddockTS.get_outputs import get_outputs
 from PaddockTS.query import Query
-from PaddockTS.query import get_example_query
 from datetime import date
 
 if __name__ == '__main__':
@@ -26,3 +25,4 @@ if __name__ == '__main__':
         ],
     )
     get_outputs(query)
+    
