@@ -1,14 +1,14 @@
 from PaddockTS.query import Query
 from PaddockTS.Data.download_ds2 import download_ds2
 from PaddockTS.Data.environmental import download_environmental_data
-from PaddockTS.PaddockSegmentation.segment_paddocks import get_paddocks
+from PaddockTS.PaddockSegmentation.get_paddocks import get_paddocks
 from PaddockTS.IndicesAndVegFrac.add_indices_and_veg_frac import add_indices_and_veg_frac
 from PaddockTS.PaddockTS.get_paddock_ts import get_paddock_ts
 from PaddockTS.Plotting.checkpoint_plots import plot as plot_checkpoints
 from PaddockTS.Plotting.topographic_plots import plot_topography
 
 def get_outputs( 
-    query: Query
+    query: Query,
 ):
     download_ds2(query)
     download_environmental_data(query)
