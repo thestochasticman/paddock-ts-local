@@ -13,6 +13,8 @@ from PaddockTS.utils import *
 from os import mkdir
 import json
 
+
+
 @dataclass_json
 @dataclass(frozen=True)
 class Query:
@@ -50,9 +52,27 @@ class Query:
     buffer      : float            
     start_time  : Union[str, date]
     end_time    : Union[str, date]
-    collections : list[str]         
-    bands       : list[str]      
 
+    collections : list[str] = field(default_factory=lambda: 
+                    [
+                        'ga_s2am_ard_3',
+                        'ga_s2bm_ard_3'
+                    ]
+                )
+    bands       : list[str]  = field(default_factory=lambda:
+                    [
+                        'nbart_blue',
+                        'nbart_green',
+                        'nbart_red',
+                        'nbart_red_edge_1',
+                        'nbart_red_edge_2',
+                        'nbart_red_edge_3',
+                        'nbart_nir_1',
+                        'nbart_nir_2',
+                        'nbart_swir_2',
+                        'nbart_swir_3'
+                    ]
+                )
     filter      : Filter            = Filter.lt("eo:cloud_cover", 10)  
     crs         : str               = 'EPSG:6933'
     groupby     : str               = 'solar_day'
@@ -278,22 +298,6 @@ def get_example_query() -> Query:
         buffer=0.01,
         start_time=date(2020, 1, 1),
         end_time=date(2020, 6, 1),
-        collections=[
-            'ga_s2am_ard_3',
-            'ga_s2bm_ard_3'
-        ],
-        bands=[
-            'nbart_blue',
-            'nbart_green',
-            'nbart_red',
-            'nbart_red_edge_1',
-            'nbart_red_edge_2',
-            'nbart_red_edge_3',
-            'nbart_nir_1',
-            'nbart_nir_2',
-            'nbart_swir_2',
-            'nbart_swir_3'
-        ],
     )
 
 if __name__ == '__main__':
