@@ -35,6 +35,7 @@ pip install -e .
 
 ```python
 from PaddockTS.query import Query
+from PaddockTS.filter import Filter
 from PaddockTS.get_outputs import get_outputs
 
 
