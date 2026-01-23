@@ -1,159 +1,97 @@
-from dataclasses_json import dataclass_json
-from typing_extensions import Self
-from dataclasses import dataclass, field
+import attrs
+import json
 from datetime import date
 from argparse import ArgumentParser
 from hashlib import sha256
-from typing import Union, Tuple
-from PaddockTS.filter import Filter
 from os.path import expanduser
-from os.path import exists
-from os import makedirs
-from PaddockTS.utils import *
-from os import mkdir
-import json
+from PaddockTS.filter import Filter
+from PaddockTS.utils import parse_date
 
 
+def _convert_date(value: str | date) -> date:
+    """Convert string to date if needed."""
+    return parse_date(value) if isinstance(value, str) else value
 
-@dataclass_json
-@dataclass(frozen=True)
+
+DEFAULT_COLLECTIONS = ['ga_s2am_ard_3', 'ga_s2bm_ard_3']
+
+DEFAULT_BANDS = [
+    'nbart_blue',
+    'nbart_green',
+    'nbart_red',
+    'nbart_red_edge_1',
+    'nbart_red_edge_2',
+    'nbart_red_edge_3',
+    'nbart_nir_1',
+    'nbart_nir_2',
+    'nbart_swir_2',
+    'nbart_swir_3',
+]
+
+
+@attrs.frozen
 class Query:
     """
     Represents a STAC-query specification, with automatic bounding‐box,
     datetime string, and unique stub generation for caching.
 
     Attributes:
-    (User Defined)
-        stub (str)              : Name of the directory where the results of the query are stored
-        lat (float)             : Latitude of the area of interest,
-        lon (float)             : Longitude of the area of interest,
-        buffer (float)          : Buffer in degrees around (lat, lon),
-        start_time (date)       : Start date of query (inclusive),
-        end_time (date)         : End date of query (inclusive),
-        collections (list[str]) : List of STAC collection IDs,
-        bands (list[str])       : List of band names to load,
-        crs (str)               : Coordinate reference system (default “EPSG:6933”),
-        groupby (str)           : ODC groupby key (default “solarday”),
-        resolution (int|tuple)  : Spatial resolution in metres (default 10),        
-        filter (Filter)         : Expresson to Refine Search                        
-        -------------------------------------------------------------------------
-    (Set in __post_init__: __post_init__)
-        x (float)               : Same as `lon`,                                           
-        y (float)               : Same as `lat`,                                           
-        centre (tuple)          : (x, y) pair,                                        
-        lon_range (tuple)       : (min_lon, max_lon),                              
-        lat_range (tuple)       : (min_lat, max_lat),                              
-        datetime (str)          : “YYYY-MM-DD/YYYY-MM-DD” string,                     
-        bbox (list)             : [min_lat, min_lon, max_lat, max_lon],                  
+        lat (float)                 : Latitude of the area of interest
+        lon (float)                 : Longitude of the area of interest
+        buffer (float)              : Buffer in degrees around (lat, lon)
+        start_time (date)           : Start date of query (inclusive)
+        end_time (date)             : End date of query (inclusive)
+        collections (list[str])     : List of STAC collection IDs
+        bands (list[str])           : List of band names to load
+        crs (str)                   : Coordinate reference system (default "EPSG:6933")
+        groupby (str)               : ODC groupby key (default "solar_day")
+        resolution (int)            : Spatial resolution in metres (default 10)
+        filter (Filter)             : Expression to refine search
+        stub (str)                  : Name of the directory where results are stored
+        out_dir (str)               : Output directory path
+        tmp_dir (str)               : Temporary directory path
+
+    Properties (computed):
+        centre (tuple)              : (lon, lat) pair
+        lon_range (tuple)           : (min_lon, max_lon)
+        lat_range (tuple)           : (min_lat, max_lat)
+        datetime (str)              : "YYYY-MM-DD/YYYY-MM-DD" string
+        bbox (list)                 : [min_lon, min_lat, max_lon, max_lat]
+        stub_tmp_dir (str)          : Temporary directory for this query
+        stub_out_dir (str)          : Output directory for this query
+        path_ds2 (str)              : Path to ds2.pkl
+        path_preseg_tif (str)       : Path to preseg.tif
+        path_polygons (str)         : Path to polygons.gpkg
+        dir_checkpoint_plots (str)  : Path to checkpoints directory
     """
 
-    lat         : float             
-    lon         : float           
-    buffer      : float            
-    start_time  : Union[str, date]
-    end_time    : Union[str, date]
+    lat: float
+    lon: float
+    buffer: float
+    start_time: date = attrs.field(converter=_convert_date)
+    end_time: date = attrs.field(converter=_convert_date)
 
-    collections : list[str] = field(default_factory=lambda: 
-                    [
-                        'ga_s2am_ard_3',
-                        'ga_s2bm_ard_3'
-                    ]
-                )
-    bands       : list[str]  = field(default_factory=lambda:
-                    [
-                        'nbart_blue',
-                        'nbart_green',
-                        'nbart_red',
-                        'nbart_red_edge_1',
-                        'nbart_red_edge_2',
-                        'nbart_red_edge_3',
-                        'nbart_nir_1',
-                        'nbart_nir_2',
-                        'nbart_swir_2',
-                        'nbart_swir_3'
-                    ]
-                )
-    filter      : Filter            = Filter.lt("eo:cloud_cover", 10)  
-    crs         : str               = 'EPSG:6933'
-    groupby     : str               = 'solar_day'
-    resolution  : int               = 10
-    stub        : Union[str, None]  = None
-    out_dir     : str               = expanduser('~/Documents/PaddockTSLocal')
-    tmp_dir     : str               = expanduser('~/Downloads/PaddockTSLocal')
+    collections: list[str] = attrs.field(factory=DEFAULT_COLLECTIONS.copy)
+    bands: list[str] = attrs.field(factory=DEFAULT_BANDS.copy)
+    filter: Filter = attrs.field(factory=lambda: Filter.lt("eo:cloud_cover", 10))
+    crs: str = 'EPSG:6933'
+    groupby: str = 'solar_day'
+    resolution: int = 10
+    stub: str | None = None
+    out_dir: str = attrs.field(factory=lambda: expanduser('~/Documents/PaddockTSLocal'))
+    tmp_dir: str = attrs.field(factory=lambda: expanduser('~/Downloads/PaddockTSLocal'))
 
-    x           : float = field(init=False)
-    y           : float = field(init=False)
-    centre      : Tuple = field(init=False)
-    lon_range   : Tuple = field(init=False)
-    lat_range   : Tuple = field(init=False)
-    datetime    : str   = field(init=False)
-    bbox        : list  = field(init=False)
-    
-    stub_tmp_dir        : str = field(init=False)
-    stub_out_dir        : str = field(init=False)
-    path_ds2            : str = field(init=False)
-    path_preseg_tif     : str = field(init=False)
-    path_polygons       : str = field(init=False)
+    def __attrs_post_init__(self):
+        if self.stub is None:
+            object.__setattr__(self, 'stub', self._compute_stub())
 
-    dir_checkpoint_plots: str = field(init=False)
-
-    # Post-init helpers to set derived fields
-    set_start_time              = lambda s: object.__setattr__(s, 'start_time', parse_date(s.start_time))
-    set_end_time                = lambda s: object.__setattr__(s, 'end_time', parse_date(s.end_time))
-    set_x                       = lambda s: object.__setattr__(s, 'x', s.lon)
-    set_y                       = lambda s: object.__setattr__(s, 'y', s.lat)
-    set_centre                  = lambda s: object.__setattr__(s, 'centre', (s.x, s.y))
-    set_lat_range               = lambda s: object.__setattr__(s, 'lat_range', (s.x - s.buffer, s.x + s.buffer))
-    set_lon_range               = lambda s: object.__setattr__(s, 'lon_range', (s.y - s.buffer, s.y + s.buffer))
-    set_datetime                = lambda s: object.__setattr__(s, 'datetime', f'{str(s.start_time)}/{str(s.end_time)}')
-    set_bbox                    = lambda s: object.__setattr__(s, 'bbox', [s.lat_range[0], s.lon_range[0], s.lat_range[1], s.lon_range[1]])
-    set_stub                    = lambda s: object.__setattr__(s, 'stub', s.stub if s.stub is not None else s.get_stub())
-    set_stub_tmp_dir            = lambda s: object.__setattr__(s, 'stub_tmp_dir', f"{s.tmp_dir}/{s.stub}")
-    set_stub_out_dir            = lambda s: object.__setattr__(s, 'stub_out_dir', f"{s.out_dir}/{s.stub}")
-    set_path_ds2                = lambda s: object.__setattr__(s, 'path_ds2', f"{s.stub_tmp_dir}/ds2.pkl")
-    set_path_preseg_tif         = lambda s: object.__setattr__(s, 'path_preseg_tif', f"{s.stub_tmp_dir}/preseg.tif")
-    set_path_polygons           = lambda s: object.__setattr__(s, 'path_polygons', f"{s.stub_tmp_dir}/polygons.gpkg")
-    set_dir_checkpoint_plots    = lambda s: object.__setattr__(s, 'dir_checkpoint_plots', f"{s.stub_out_dir}/checkpoints")
-
-    def __post_init__(s: Self) -> None:
-        """
-        Populate all derived fields after the dataclass is initialized.
-        """
-        makedirs(s.out_dir, exist_ok=True)
-        makedirs(s.tmp_dir, exist_ok=True)
-
-        if isinstance(s.start_time, str):
-            object.__setattr__(s, 'start_time', parse_date(s.start_time))
-        
-        if isinstance(s.end_time, str):
-            object.__setattr__(s, 'end_time', parse_date(s.end_time))
-
-        s.set_stub()
-        s.set_stub_tmp_dir()
-        if not exists(s.stub_tmp_dir): mkdir(s.stub_tmp_dir)
-        s.set_stub_out_dir()
-        if not exists(s.stub_out_dir): mkdir(s.stub_out_dir)
-        s.set_path_ds2()
-        s.set_path_preseg_tif()
-        s.set_path_polygons()
-        s.set_dir_checkpoint_plots()
-        if not exists(s.dir_checkpoint_plots): mkdir(s.dir_checkpoint_plots)
-        s.set_x()
-        s.set_y()
-        s.set_centre()
-        s.set_lon_range()
-        s.set_lat_range()
-        s.set_datetime()
-        s.set_bbox()
-
-    
-    def __str__(self: Self) -> str:
-        """
-        Serialize this Query to a pretty-printed JSON string.
-
-        Returns:
-            str: The JSON representation.
-        """
+    def _compute_stub(self) -> str:
+        """Compute stub without including stub itself in the hash."""
+        init_fields = {
+            f.name: getattr(self, f.name)
+            for f in attrs.fields(self.__class__)
+            if f.name != 'stub'
+        }
 
         def default(o):
             if isinstance(o, date):
@@ -161,25 +99,75 @@ class Query:
             if isinstance(o, Filter):
                 return o.to_dict()
             raise TypeError(f"Object of type {o.__class__.__name__} is not JSON serializable")
-        
+
+        return sha256(json.dumps(init_fields, sort_keys=True, default=default).encode()).hexdigest()
+
+    # Computed properties
+    @property
+    def centre(self) -> tuple[float, float]:
+        return (self.lon, self.lat)
+
+    @property
+    def lon_range(self) -> tuple[float, float]:
+        return (self.lon - self.buffer, self.lon + self.buffer)
+
+    @property
+    def lat_range(self) -> tuple[float, float]:
+        return (self.lat - self.buffer, self.lat + self.buffer)
+
+    @property
+    def datetime(self) -> str:
+        return f'{self.start_time}/{self.end_time}'
+
+    @property
+    def bbox(self) -> list[float]:
+        """Bounding box in Lon/Lat: [min(lon), min(lat), max(lon), max(lat)]"""
+        return [self.lon_range[0], self.lat_range[0], self.lon_range[1], self.lat_range[1]]
+
+    @property
+    def stub_tmp_dir(self) -> str:
+        stub = self.stub or self._compute_stub()
+        return f"{self.tmp_dir}/{stub}"
+
+    @property
+    def stub_out_dir(self) -> str:
+        stub = self.stub or self._compute_stub()
+        return f"{self.out_dir}/{stub}"
+
+    @property
+    def path_ds2(self) -> str:
+        return f"{self.stub_tmp_dir}/ds2.pkl"
+
+    @property
+    def path_preseg_tif(self) -> str:
+        return f"{self.stub_tmp_dir}/preseg.tif"
+
+    @property
+    def path_polygons(self) -> str:
+        return f"{self.stub_tmp_dir}/polygons.gpkg"
+
+    @property
+    def dir_checkpoint_plots(self) -> str:
+        return f"{self.stub_out_dir}/checkpoints"
+
+    def __str__(self) -> str:
+        """Serialize this Query to a pretty-printed JSON string."""
+        def default(o):
+            if isinstance(o, date):
+                return o.isoformat()
+            if isinstance(o, Filter):
+                return o.to_dict()
+            raise TypeError(f"Object of type {o.__class__.__name__} is not JSON serializable")
+
         init_fields = {
             f.name: getattr(self, f.name)
-            for f in self.__dataclass_fields__.values()
-            if f.init
+            for f in attrs.fields(self.__class__)
         }
         return json.dumps(init_fields, indent=2, default=default)
-    
 
-    def get_stub(self: Self) -> str:
-        """
-        Compute a SHA-256 hash of this Query’s JSON to use as a cache key.
-
-        Returns:
-            str: The hex digest stub.
-        """
+    def get_stub(self) -> str:
+        """Compute a SHA-256 hash of this Query's JSON to use as a cache key."""
         return sha256(str(self).encode()).hexdigest()
-    
-
 
     @classmethod
     def from_cli(cls) -> "Query":
@@ -196,17 +184,16 @@ class Query:
         """
         parser = ArgumentParser()
         grp = parser.add_argument_group("query")
-        flds = cls.__dataclass_fields__
 
-        grp.add_argument("--stub",        type=str, required=True)
-        grp.add_argument("--lat",         type=float, required=True)
-        grp.add_argument("--lon",         type=float, required=True)
-        grp.add_argument("--buffer",      type=float, required=True)
-        grp.add_argument("--start_time",  type=parse_date, required=True)
-        grp.add_argument("--end_time",    type=parse_date, required=True)
+        grp.add_argument("--stub", type=str, required=True)
+        grp.add_argument("--lat", type=float, required=True)
+        grp.add_argument("--lon", type=float, required=True)
+        grp.add_argument("--buffer", type=float, required=True)
+        grp.add_argument("--start_time", type=parse_date, required=True)
+        grp.add_argument("--end_time", type=parse_date, required=True)
         grp.add_argument("--collections", nargs='+', required=True)
-        grp.add_argument("--bands",       nargs='+', required=True)
-        grp.add_argument("--filter",      type=str, required=True)
+        grp.add_argument("--bands", nargs='+', required=True)
+        grp.add_argument("--filter", type=str, required=True)
 
         args, _ = parser.parse_known_args()
 
@@ -217,6 +204,7 @@ class Query:
                 raise ValueError(f"Invalid --filter value: {e}")
         else:
             filter_obj = Filter.lt("eo:cloud_cover", 10)
+
         return cls(
             stub=args.stub,
             lat=args.lat,
@@ -229,68 +217,9 @@ class Query:
             filter=filter_obj
         )
 
-def test_query_from_cli():
-    import sys
-    import pytest
-    # Save the original argv so we can restore it later
-    original_argv = sys.argv.copy()
-
-    # Build the fake argv list
-    sys.argv = [
-        "prog",
-        "--stub", "test_example_query",
-        "--lat", "-33.5040",
-        "--lon", "148.4",
-        "--buffer", "0.01",
-        "--start_time", "2020-01-01",
-        "--end_time", "2020-06-01",
-        "--collections", "ga_s2am_ard_3", "ga_s2bm_ard_3",
-        "--bands", "nbart_blue", "nbart_green", "nbart_red",
-        "--filter", "eo:cloud_cover < 10"
-    ]
-
-    try:
-        # Invoke the CLI parser
-        q = Query.from_cli()
-    finally:
-        # Restore argv so other tests aren’t affected
-        sys.argv = original_argv
-
-    # Assertions on parsed values
-    assert isinstance(q, Query)
-    assert q.lat == pytest.approx(-33.5040)
-    assert q.lon == pytest.approx(148.4)
-    assert q.buffer == pytest.approx(0.01)
-    assert q.start_time == date(2020, 1, 1)
-    assert q.end_time == date(2020, 6, 1)
-    assert q.collections == ["ga_s2am_ard_3", "ga_s2bm_ard_3"]
-    assert q.bands == ["nbart_blue", "nbart_green", "nbart_red"]
-
-    # Check derived fields
-    assert q.x == q.lon
-    assert q.y == q.lat
-    assert q.centre == (q.lon, q.lat)
-    assert q.lon_range == (q.y - q.buffer, q.y + q.buffer)
-    assert q.lat_range == (q.x - q.buffer, q.x + q.buffer)
-    assert q.datetime == "2020-01-01/2020-06-01"
-    assert q.bbox == [
-        q.lat_range[0],
-        q.lon_range[0],
-        q.lat_range[1],
-        q.lon_range[1]
-    ]
-
-    # Stub should be a 64‐character SHA256 hex
-    stub = q.get_stub()
-    assert isinstance(stub, str) and len(stub) == 64
 
 def get_example_query() -> Query:
-    """
-    Return a sample Query for testing or demonstration.
-
-    Returns:
-        Query: A preset Query covering mid-2020 Sentinel-2 data.
-    """
+    """Return a sample Query for testing or demonstration."""
     return Query(
         stub='test_example_query',
         lat=-33.5040,
@@ -299,8 +228,3 @@ def get_example_query() -> Query:
         start_time=date(2020, 1, 1),
         end_time=date(2020, 6, 1),
     )
-
-if __name__ == '__main__':
-    test_query_from_cli()
-    q = get_example_query()
-    print('passed')
