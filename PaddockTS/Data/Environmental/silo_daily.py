@@ -6,6 +6,8 @@ Documentation: https://www.longpaddock.qld.gov.au/silo/gridded-data
 import os
 import shutil
 import json
+import threading
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import requests
@@ -13,6 +15,32 @@ import xarray as xr
 import numpy as np
 
 from PaddockTS.query import Query
+
+# Global lock for netCDF4 operations (library has global state that's not thread-safe)
+_NETCDF_LOCK = threading.Lock()
+
+# Cache staleness threshold for current year (in hours)
+CURRENT_YEAR_CACHE_MAX_AGE_HOURS = 24
+
+
+def _is_cache_stale(zarr_path: str, year: str) -> bool:
+    """Check if cache needs refreshing.
+
+    Past years: never stale (data is static)
+    Current year: stale if cache is older than CURRENT_YEAR_CACHE_MAX_AGE_HOURS
+    """
+    current_year = str(datetime.now().year)
+
+    if year != current_year:
+        return False  # Past years are static, never stale
+
+    if not os.path.exists(zarr_path):
+        return True  # No cache = stale
+
+    # Check cache age for current year
+    cache_mtime = datetime.fromtimestamp(os.path.getmtime(zarr_path))
+    age = datetime.now() - cache_mtime
+    return age > timedelta(hours=CURRENT_YEAR_CACHE_MAX_AGE_HOURS)
 
 
 
@@ -39,6 +67,62 @@ SILO_VARIABLES = {
 }
 
 
+def update_silo_cache(silo_folder: str, variables: list[str] = None, years: list[str] = None, verbose=True):
+    """Update SILO cache for specified variables and years.
+
+    This function is designed to be called by a background updater service.
+    It downloads/refreshes the cache for the specified variables and years.
+
+    Parameters
+    ----------
+    silo_folder : str
+        Directory for SILO cache files
+    variables : list[str], optional
+        Variables to update. Defaults to common variables.
+    years : list[str], optional
+        Years to update. Defaults to current year only.
+    verbose : bool
+        Print progress messages
+    """
+    if variables is None:
+        variables = ["radiation", "vp", "max_temp", "min_temp", "daily_rain",
+                     "et_morton_actual", "et_morton_potential"]
+
+    if years is None:
+        years = [str(datetime.now().year)]
+
+    os.makedirs(silo_folder, exist_ok=True)
+
+    for year in years:
+        for var in variables:
+            zarr_path = os.path.join(silo_folder, f"{year}.{var}.zarr")
+            nc_filename = os.path.join(silo_folder, f"{year}.{var}.nc")
+
+            # Check if update needed
+            if os.path.exists(zarr_path) and not _is_cache_stale(zarr_path, year):
+                if verbose:
+                    print(f"Cache fresh: {year}.{var}")
+                continue
+
+            if verbose:
+                print(f"Updating cache: {year}.{var}")
+
+            with _NETCDF_LOCK:
+                # Remove stale cache
+                if os.path.exists(zarr_path):
+                    shutil.rmtree(zarr_path)
+
+                # Download and convert
+                _download_from_silo(var, year, silo_folder, verbose=verbose)
+                if os.path.exists(nc_filename):
+                    ds = xr.open_dataset(nc_filename, engine='netcdf4')
+                    ds.to_zarr(zarr_path, mode='w')
+                    ds.close()
+                    os.remove(nc_filename)
+                    if verbose:
+                        print(f"Converted to Zarr: {zarr_path}")
+
+
 def _download_from_silo(var, year, silo_folder, verbose=True):
     """Download a NetCDF for the whole of Australia for a given year and variable."""
     silo_baseurl = "https://s3-ap-southeast-2.amazonaws.com/silo-open-data/Official/annual/"
@@ -58,12 +142,37 @@ def _download_from_silo(var, year, silo_folder, verbose=True):
 
 def _singleyear(var, latitude, longitude, buffer, year, silo_folder, verbose=True):
     """Select the region of interest from the Australia wide NetCDF file."""
-    filename = os.path.join(silo_folder, f"{year}.{var}.nc")
+    nc_filename = os.path.join(silo_folder, f"{year}.{var}.nc")
+    zarr_path = os.path.join(silo_folder, f"{year}.{var}.zarr")
 
-    if not os.path.exists(filename):
-        _download_from_silo(var, year, silo_folder, verbose=verbose)
+    # Use Zarr cache if available and fresh (thread-safe reads)
+    if os.path.exists(zarr_path) and not _is_cache_stale(zarr_path, year):
+        ds = xr.open_zarr(zarr_path)
+    else:
+        # netCDF4 has global state that's not thread-safe, so serialize all conversions
+        with _NETCDF_LOCK:
+            # Check again after acquiring lock (another thread may have converted)
+            if os.path.exists(zarr_path) and not _is_cache_stale(zarr_path, year):
+                ds = xr.open_zarr(zarr_path)
+            else:
+                # Remove stale cache if it exists
+                if os.path.exists(zarr_path):
+                    shutil.rmtree(zarr_path)
+                    if verbose:
+                        print(f"Removing stale cache: {zarr_path}")
 
-    ds = xr.open_dataset(filename, engine='netcdf4')
+                if not os.path.exists(nc_filename):
+                    _download_from_silo(var, year, silo_folder, verbose=verbose)
+                # Convert to Zarr for thread-safe caching
+                ds = xr.open_dataset(nc_filename, engine='netcdf4')
+                ds.to_zarr(zarr_path, mode='w')
+                ds.close()
+                # Remove netCDF to save space (Zarr is the cache now)
+                if os.path.exists(nc_filename):
+                    os.remove(nc_filename)
+                if verbose:
+                    print(f"Converted to Zarr: {zarr_path}")
+                ds = xr.open_zarr(zarr_path)
 
     if 'crs' in list(ds.data_vars):
         ds = ds.drop_vars('crs')
@@ -79,14 +188,34 @@ def _singleyear(var, latitude, longitude, buffer, year, silo_folder, verbose=Tru
 
 
 def _multiyear(var, latitude, longitude, buffer, years, silo_folder, verbose=True, parallel=True):
-    # SILO uses large shared cache files (~400MB each).
-    # netCDF4/HDF5 is not thread-safe for concurrent file access, so SILO
-    # year downloads are sequential. Task-level parallelism still applies.
-    dss = []
-    for year in years:
-        ds_year = _singleyear(var, latitude, longitude, buffer, year, silo_folder, verbose=verbose)
-        if ds_year is not None:
-            dss.append(ds_year)
+    """Fetch multiple years of SILO data, optionally in parallel.
+
+    With Zarr caching, parallel reads are thread-safe. The conversion step
+    (download + convert to Zarr) uses file locking to prevent race conditions.
+    """
+    if parallel and len(years) > 1:
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        def fetch_year(year):
+            return year, _singleyear(var, latitude, longitude, buffer, year, silo_folder, verbose=verbose)
+
+        results = {}
+        with ThreadPoolExecutor(max_workers=min(len(years), 4)) as executor:
+            futures = {executor.submit(fetch_year, year): year for year in years}
+            for future in as_completed(futures):
+                year, ds_year = future.result()
+                if ds_year is not None:
+                    results[year] = ds_year
+
+        # Concatenate in chronological order
+        dss = [results[year] for year in years if year in results]
+    else:
+        # Sequential fallback
+        dss = []
+        for year in years:
+            ds_year = _singleyear(var, latitude, longitude, buffer, year, silo_folder, verbose=verbose)
+            if ds_year is not None:
+                dss.append(ds_year)
 
     ds_concat = xr.concat(dss, dim='time')
     return ds_concat
