@@ -15,19 +15,6 @@ import numpy as np
 from PaddockTS.query import Query
 
 
-import threading
-
-# Lock to prevent concurrent downloads of the same SILO file
-_download_locks = {}
-_locks_lock = threading.Lock()
-
-
-def _get_download_lock(filename):
-    """Get or create a lock for a specific file to prevent concurrent downloads."""
-    with _locks_lock:
-        if filename not in _download_locks:
-            _download_locks[filename] = threading.Lock()
-        return _download_locks[filename]
 
 
 SILO_VARIABLES = {
@@ -73,11 +60,8 @@ def _singleyear(var, latitude, longitude, buffer, year, silo_folder, verbose=Tru
     """Select the region of interest from the Australia wide NetCDF file."""
     filename = os.path.join(silo_folder, f"{year}.{var}.nc")
 
-    # Use lock to prevent concurrent downloads of the same file
-    lock = _get_download_lock(filename)
-    with lock:
-        if not os.path.exists(filename):
-            _download_from_silo(var, year, silo_folder, verbose=verbose)
+    if not os.path.exists(filename):
+        _download_from_silo(var, year, silo_folder, verbose=verbose)
 
     ds = xr.open_dataset(filename, engine='netcdf4')
 
@@ -94,22 +78,16 @@ def _singleyear(var, latitude, longitude, buffer, year, silo_folder, verbose=Tru
     return ds_region
 
 
-def _multiyear(var, latitude, longitude, buffer, years, silo_folder, verbose=True):
-    from concurrent.futures import ThreadPoolExecutor, as_completed
+def _multiyear(var, latitude, longitude, buffer, years, silo_folder, verbose=True, parallel=True):
+    # SILO uses large shared cache files (~400MB each).
+    # netCDF4/HDF5 is not thread-safe for concurrent file access, so SILO
+    # year downloads are sequential. Task-level parallelism still applies.
+    dss = []
+    for year in years:
+        ds_year = _singleyear(var, latitude, longitude, buffer, year, silo_folder, verbose=verbose)
+        if ds_year is not None:
+            dss.append(ds_year)
 
-    def fetch_year(year):
-        return year, _singleyear(var, latitude, longitude, buffer, year, silo_folder, verbose=verbose)
-
-    results = {}
-    with ThreadPoolExecutor(max_workers=min(len(years), 4)) as executor:
-        futures = {executor.submit(fetch_year, year): year for year in years}
-        for future in as_completed(futures):
-            year, ds_year = future.result()
-            if ds_year is not None:
-                results[year] = ds_year
-
-    # Concatenate in chronological order
-    dss = [results[year] for year in years if year in results]
     ds_concat = xr.concat(dss, dim='time')
     return ds_concat
 
@@ -164,7 +142,8 @@ def silo_daily(
     save_json=True,
     plot=False,
     reducer='median',
-    verbose=True
+    verbose=True,
+    parallel=True
 ):
     """Download daily variables from SILO at 5km resolution for the region/time of interest.
 
@@ -207,7 +186,7 @@ def silo_daily(
     dss = []
     years = [str(year) for year in range(int(start_year), int(end_year) + 1)]
     for variable in variables:
-        ds = _multiyear(variable, lat, lon, buffer, years, silo_folder, verbose=verbose)
+        ds = _multiyear(variable, lat, lon, buffer, years, silo_folder, verbose=verbose, parallel=parallel)
         dss.append(ds)
     ds_concat = xr.merge(dss)
 

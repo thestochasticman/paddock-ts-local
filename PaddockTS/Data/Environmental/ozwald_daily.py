@@ -71,25 +71,37 @@ def _singleyear_gdata(var, latitude, longitude, buffer, year):
     return ds_region
 
 
-def _multiyear(var, latitude, longitude, buffer, years, stub, tmpdir, thredds=True, verbose=True):
-    from concurrent.futures import ThreadPoolExecutor, as_completed
+def _multiyear(var, latitude, longitude, buffer, years, stub, tmpdir, thredds=True, verbose=True, parallel=True):
+    if parallel and len(years) > 1:
+        from concurrent.futures import ThreadPoolExecutor, as_completed
 
-    def fetch_year(year):
-        if thredds:
-            return year, _singleyear_thredds(var, latitude, longitude, buffer, year, stub, tmpdir, verbose=verbose)
-        else:
-            return year, _singleyear_gdata(var, latitude, longitude, buffer, year)
+        def fetch_year(year):
+            if thredds:
+                return year, _singleyear_thredds(var, latitude, longitude, buffer, year, stub, tmpdir, verbose=verbose)
+            else:
+                return year, _singleyear_gdata(var, latitude, longitude, buffer, year)
 
-    results = {}
-    with ThreadPoolExecutor(max_workers=min(len(years), 4)) as executor:
-        futures = {executor.submit(fetch_year, year): year for year in years}
-        for future in as_completed(futures):
-            year, ds_year = future.result()
+        results = {}
+        with ThreadPoolExecutor(max_workers=min(len(years), 4)) as executor:
+            futures = {executor.submit(fetch_year, year): year for year in years}
+            for future in as_completed(futures):
+                year, ds_year = future.result()
+                if ds_year is not None:
+                    results[year] = ds_year
+
+        # Concatenate in chronological order
+        dss = [results[year] for year in years if year in results]
+    else:
+        # Sequential fallback (used when called from subprocess to avoid fork+thread issues)
+        dss = []
+        for year in years:
+            if thredds:
+                ds_year = _singleyear_thredds(var, latitude, longitude, buffer, year, stub, tmpdir, verbose=verbose)
+            else:
+                ds_year = _singleyear_gdata(var, latitude, longitude, buffer, year)
             if ds_year is not None:
-                results[year] = ds_year
+                dss.append(ds_year)
 
-    # Concatenate in chronological order
-    dss = [results[year] for year in years if year in results]
     ds_concat = xr.concat(dss, dim='time')
     return ds_concat
 
@@ -144,7 +156,8 @@ def ozwald_daily(
     save_json=True,
     plot=False,
     reducer='median',
-    verbose=True
+    verbose=True,
+    parallel=True
 ):
     """Download daily variables from OzWald at varying resolutions for the region/time of interest.
 
@@ -181,7 +194,7 @@ def ozwald_daily(
     dss = []
     years = [str(year) for year in range(int(start_year), int(end_year) + 1)]
     for variable in variables:
-        ds_variable = _multiyear(variable, lat, lon, buffer, years, stub, tmpdir, thredds, verbose=verbose)
+        ds_variable = _multiyear(variable, lat, lon, buffer, years, stub, tmpdir, thredds, verbose=verbose, parallel=parallel)
         dss.append(ds_variable)
     ds_concat = xr.merge(dss)
 

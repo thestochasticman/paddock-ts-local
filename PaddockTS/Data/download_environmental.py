@@ -1,8 +1,10 @@
 """
 Download all environmental data in parallel using multiprocessing.
 
-Note: Uses ProcessPoolExecutor instead of ThreadPoolExecutor because
-GDAL, HDF5, and netCDF4 libraries are not thread-safe.
+Note: Uses ProcessPoolExecutor for task-level parallelism. This avoids
+netCDF4/HDF5 thread-safety issues by using separate processes.
+Year-level parallelism is disabled when called from here to avoid
+nested parallelism issues.
 """
 import os
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -26,25 +28,26 @@ def _run_slga_soils(query: Query, verbose: bool):
 
 def _run_ozwald_daily_pg(query: Query, verbose: bool):
     from PaddockTS.Data.Environmental.ozwald_daily import ozwald_daily
-    ozwald_daily(query, variables=['Pg'], save_netcdf=True, save_json=False, verbose=verbose)
+    # Disable year-level parallelism to avoid netCDF4 thread-safety issues
+    ozwald_daily(query, variables=['Pg'], save_netcdf=True, save_json=False, verbose=verbose, parallel=False)
     return 'ozwald_daily_Pg'
 
 
 def _run_ozwald_daily_tmax(query: Query, verbose: bool):
     from PaddockTS.Data.Environmental.ozwald_daily import ozwald_daily
-    ozwald_daily(query, variables=['Tmax', 'Tmin'], save_netcdf=True, save_json=False, verbose=verbose)
+    ozwald_daily(query, variables=['Tmax', 'Tmin'], save_netcdf=True, save_json=False, verbose=verbose, parallel=False)
     return 'ozwald_daily_Tmax'
 
 
 def _run_ozwald_daily_uavg(query: Query, verbose: bool):
     from PaddockTS.Data.Environmental.ozwald_daily import ozwald_daily
-    ozwald_daily(query, variables=['Uavg', 'VPeff'], save_netcdf=True, save_json=False, verbose=verbose)
+    ozwald_daily(query, variables=['Uavg', 'VPeff'], save_netcdf=True, save_json=False, verbose=verbose, parallel=False)
     return 'ozwald_daily_Uavg'
 
 
 def _run_ozwald_8day(query: Query, verbose: bool):
     from PaddockTS.Data.Environmental.ozwald_8day import ozwald_8day
-    ozwald_8day(query, variables=['Ssoil', 'Qtot', 'LAI', 'GPP'], save_netcdf=True, save_json=False, verbose=verbose)
+    ozwald_8day(query, variables=['Ssoil', 'Qtot', 'LAI', 'GPP'], save_netcdf=True, save_json=False, verbose=verbose, parallel=False)
     return 'ozwald_8day'
 
 
