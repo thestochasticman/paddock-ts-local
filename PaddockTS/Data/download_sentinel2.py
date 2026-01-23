@@ -1,6 +1,8 @@
 from dask.distributed import Client as DaskClient
 from xarray.core.dataset import Dataset
 from PaddockTS.query import Query
+from os.path import exists
+from os import makedirs
 import pystac_client
 import odc.stac
 import pickle
@@ -44,6 +46,36 @@ def apply_cloud_mask(ds: Dataset, cloud_band: str = 'oa_fmask') -> Dataset:
     return masked_ds
 
 
+def drop_bad_frames(ds: Dataset, max_nan_fraction: float = 0.20) -> Dataset:
+    """
+    Drop time steps where NaN fraction exceeds threshold.
+
+    Args:
+        ds: xarray Dataset with time dimension
+        max_nan_fraction: Maximum allowed NaN fraction (0-1). Default 0.20 = 20%.
+            Frames with more NaNs than this are dropped.
+
+    Returns:
+        Dataset with bad frames removed
+    """
+    # Use first data variable to check NaN fraction
+    first_var = list(ds.data_vars)[0]
+    data = ds[first_var].values  # (time, y, x)
+
+    good_times = []
+    for t in range(len(ds.time)):
+        frame = data[t]
+        nan_fraction = np.isnan(frame).sum() / frame.size
+        if nan_fraction < max_nan_fraction:
+            good_times.append(t)
+
+    n_dropped = len(ds.time) - len(good_times)
+    if n_dropped > 0:
+        print(f"Dropped {n_dropped} frames with >{max_nan_fraction*100:.0f}% NaN")
+
+    return ds.isel(time=good_times)
+
+
 def download_sentinel2(
     query: Query,
     num_workers: int = 4,
@@ -70,6 +102,9 @@ def download_sentinel2(
         Dataset: The loaded xarray Dataset (also saved to `{DS2_DIR}/{stub}.pkl`).
     """
 
+    makedirs(query.stub_tmp_dir, exist_ok=True)
+    # makedirs(query.stub_out_dir, exist_ok=True)
+    
     dask_client = DaskClient(
         n_workers=num_workers,
         threads_per_worker=threads_per_worker
@@ -114,6 +149,7 @@ def download_sentinel2(
     # Apply cloud masking if requested
     if apply_cloud_masking:
         ds2 = apply_cloud_mask(ds2)
+        ds2 = drop_bad_frames(ds2, max_nan_fraction=0.20)
 
     with open(query.path_ds2, 'wb') as handle:
         pickle.dump(ds2, handle, protocol=pickle.HIGHEST_PROTOCOL)

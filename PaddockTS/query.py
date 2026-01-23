@@ -74,7 +74,7 @@ class Query:
 
     collections: list[str] = attrs.field(factory=DEFAULT_COLLECTIONS.copy)
     bands: list[str] = attrs.field(factory=DEFAULT_BANDS.copy)
-    filter: Filter = attrs.field(factory=lambda: Filter.lt("eo:cloud_cover", 10))
+    filter: Filter = attrs.field(factory=lambda: Filter.lt("eo:cloud_cover", 0.10))
     crs: str = 'EPSG:6933'
     groupby: str = 'solar_day'
     resolution: int = 10
@@ -223,9 +223,11 @@ def get_example_query() -> Query:
     """Return a sample Query for testing or demonstration."""
     return Query(
         stub='test_example_query',
-        lat=-33.5040,
-        lon=148.4,
+        lat=-33.51606,
+        lon= 148.37265,
         buffer=0.01,
         start_time=date(2020, 1, 1),
-        end_time=date(2020, 6, 1),
+        end_time=date(2020, 12, 31),
     )
+
+
