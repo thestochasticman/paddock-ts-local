@@ -31,7 +31,7 @@ def download_weights(path: str, model_type: str = 'vit_b')->None:
     wget.download(url, out=path)
     
 
-def load_model(path: str, device='cpu', model_type='vit_b')->SamGeo:
+def load_model(path: str, device='cpu', model_type='vit_h')->SamGeo:
     '''
     Load the SamGeo model from checkpoint at 'path', on the given device.
     Downloads weights if missing.
