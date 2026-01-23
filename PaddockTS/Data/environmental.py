@@ -68,19 +68,40 @@ def download_environmental_data(query: Query):
     stub = query.stub
     thredds = True
 
-    # Download from OzWald wind and vapour pressure at 5km resolution, rainfall at 4km, and temperature at 250m resolution
-    ozwald_daily(["Uavg", "VPeff"], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
-    ozwald_daily(["Tmax", "Tmin"], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
-    ozwald_daily(["Pg"], lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
+    # Download from OzWald all daily variables
+    # We need to call ozwald_daily separately for Pg, Tmax, and Uavg to create the separate NetCDF files that daesim_forcing expects
+    # Variables: wind (5km), vapour pressure (5km), rainfall (4km), temperature (250m), and coefficients (5km)
+
+    # Call for Pg (rainfall) - creates {stub}_ozwald_daily_Pg.nc
+    ozwald_daily(["Pg"],
+                 lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds,
+                 save_netcdf=True, save_json=False, plot=False, reducer='median')
+
+    # Call for Tmax and Tmin (temperature) - creates {stub}_ozwald_daily_Tmax.nc
+    ozwald_daily(["Tmax", "Tmin"],
+                 lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds,
+                 save_netcdf=True, save_json=False, plot=False, reducer='median')
+
+    # Call for Uavg, Ueff, VPeff (wind and vapour pressure) - creates {stub}_ozwald_daily_Uavg.nc
+    ozwald_daily(["Uavg", "Ueff", "VPeff"],
+                 lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds,
+                 save_netcdf=True, save_json=False, plot=False, reducer='median')
+
+    # Call once more with all variables to create the JSON for frontend (no NetCDF needed)
+    ozwald_daily(["Pg", "Tmax", "Tmin", "Uavg", "Ueff", "VPeff", "kTavg", "kTeff"],
+                 lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds,
+                 save_netcdf=False, save_json=True, plot=False, reducer='median')
 
     # Download from OzWald soil moisture, runoff, leaf area index and gross primary productivity at 500m resolution
     variables = ["Ssoil", "Qtot", "LAI", "GPP"]
-    ozwald_8day(variables, lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds)
+    ozwald_8day(variables, lat, lon, buffer, start_year, end_year, outdir, stub, tmpdir, thredds,
+                save_netcdf=True, save_json=True, plot=False, reducer='median')
 
     # Download from SILO radiation, vapour pressure, temperature, rainfall, and evapotranspiration at 5km resolution
     # Note this requires downloading an Australia wide file of ~400MB per variables per year, so takes a long time if not predownloaded
     variables = ["radiation", "vp", "max_temp", "min_temp", "daily_rain", "et_morton_actual", "et_morton_potential"]
-    ds_silo_daily = silo_daily(variables, lat, lon, buffer, start_year, end_year, outdir, stub, silo_folder)
+    ds_silo_daily = silo_daily(variables, lat, lon, buffer, start_year, end_year, outdir, stub, silo_folder,
+                                save_netcdf=True, save_json=True, plot=False, reducer='median')
 
     # Merge the SILO and OzWald climate data into DAESim_forcing.csv
     # By default, for variables available in both datasets (vapour pressure, temperature, rainfall), the OzWald variables get used for consistency with the 8day variables
