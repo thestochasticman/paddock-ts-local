@@ -72,14 +72,24 @@ def _singleyear_gdata(var, latitude, longitude, buffer, year):
 
 
 def _multiyear(var, latitude, longitude, buffer, years, stub, tmpdir, thredds=True, verbose=True):
-    dss = []
-    for year in years:
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    def fetch_year(year):
         if thredds:
-            ds_year = _singleyear_thredds(var, latitude, longitude, buffer, year, stub, tmpdir, verbose=verbose)
+            return year, _singleyear_thredds(var, latitude, longitude, buffer, year, stub, tmpdir, verbose=verbose)
         else:
-            ds_year = _singleyear_gdata(var, latitude, longitude, buffer, year)
-        if ds_year:
-            dss.append(ds_year)
+            return year, _singleyear_gdata(var, latitude, longitude, buffer, year)
+
+    results = {}
+    with ThreadPoolExecutor(max_workers=min(len(years), 4)) as executor:
+        futures = {executor.submit(fetch_year, year): year for year in years}
+        for future in as_completed(futures):
+            year, ds_year = future.result()
+            if ds_year is not None:
+                results[year] = ds_year
+
+    # Concatenate in chronological order
+    dss = [results[year] for year in years if year in results]
     ds_concat = xr.concat(dss, dim='time')
     return ds_concat
 

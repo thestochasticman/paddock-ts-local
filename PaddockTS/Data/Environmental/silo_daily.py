@@ -15,6 +15,21 @@ import numpy as np
 from PaddockTS.query import Query
 
 
+import threading
+
+# Lock to prevent concurrent downloads of the same SILO file
+_download_locks = {}
+_locks_lock = threading.Lock()
+
+
+def _get_download_lock(filename):
+    """Get or create a lock for a specific file to prevent concurrent downloads."""
+    with _locks_lock:
+        if filename not in _download_locks:
+            _download_locks[filename] = threading.Lock()
+        return _download_locks[filename]
+
+
 SILO_VARIABLES = {
     "daily_rain": "Daily rainfall, mm",
     "monthly_rain": "Monthly rainfall, mm",
@@ -58,8 +73,11 @@ def _singleyear(var, latitude, longitude, buffer, year, silo_folder, verbose=Tru
     """Select the region of interest from the Australia wide NetCDF file."""
     filename = os.path.join(silo_folder, f"{year}.{var}.nc")
 
-    if not os.path.exists(filename):
-        _download_from_silo(var, year, silo_folder, verbose=verbose)
+    # Use lock to prevent concurrent downloads of the same file
+    lock = _get_download_lock(filename)
+    with lock:
+        if not os.path.exists(filename):
+            _download_from_silo(var, year, silo_folder, verbose=verbose)
 
     ds = xr.open_dataset(filename, engine='netcdf4')
 
@@ -77,11 +95,21 @@ def _singleyear(var, latitude, longitude, buffer, year, silo_folder, verbose=Tru
 
 
 def _multiyear(var, latitude, longitude, buffer, years, silo_folder, verbose=True):
-    dss = []
-    for year in years:
-        ds = _singleyear(var, latitude, longitude, buffer, year, silo_folder, verbose=verbose)
-        if ds:
-            dss.append(ds)
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    def fetch_year(year):
+        return year, _singleyear(var, latitude, longitude, buffer, year, silo_folder, verbose=verbose)
+
+    results = {}
+    with ThreadPoolExecutor(max_workers=min(len(years), 4)) as executor:
+        futures = {executor.submit(fetch_year, year): year for year in years}
+        for future in as_completed(futures):
+            year, ds_year = future.result()
+            if ds_year is not None:
+                results[year] = ds_year
+
+    # Concatenate in chronological order
+    dss = [results[year] for year in years if year in results]
     ds_concat = xr.concat(dss, dim='time')
     return ds_concat
 
