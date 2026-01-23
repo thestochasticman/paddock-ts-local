@@ -95,9 +95,10 @@ def find_optimal_clusters(
     max_area_ha: float = 1500,
     min_compactness: float = 0.1,
     marker_percentile: float = 25,
+    scoring: str = 'coverage',
 ) -> dict:
     """
-    Find optimal number of clusters by maximizing valid paddock coverage.
+    Find optimal number of clusters using specified scoring method.
 
     For each k, runs the full pipeline and measures output quality.
 
@@ -105,11 +106,12 @@ def find_optimal_clusters(
         ndvi: Gap-filled NDVI time series (H, W, T)
         transform: Affine transform for georeferencing
         crs: Coordinate reference system
-        k_range: Range of k values to test (default 4-15)
+        k_range: Range of k values to test (default 2-15)
         min_area_ha: Minimum paddock area for filtering
         max_area_ha: Maximum paddock area for filtering
         min_compactness: Minimum compactness for filtering
         marker_percentile: Percentile for watershed markers
+        scoring: Scoring method - 'coverage', 'silhouette', or 'combined'
 
     Returns:
         dict with 'optimal_k', 'results' (metrics per k), 'total_area_ha'
@@ -124,13 +126,30 @@ def find_optimal_clusters(
     pixel_area = abs(transform.a * transform.e)
     total_area_ha = (h * w * pixel_area) / 10000
 
-    print(f"\n--- Finding optimal clusters (k={k_range.start}-{k_range.stop-1}) ---")
+    # Flatten pixels for silhouette scoring
+    pixels_flat = ndvi.reshape(-1, t)
+    pixels_flat = np.nan_to_num(pixels_flat, nan=0.0)
+
+    print(f"\n--- Finding optimal clusters (k={k_range.start}-{k_range.stop-1}, scoring={scoring}) ---")
 
     results = []
 
     for k in k_range:
         # Run clustering
         labels = timeseries_kmeans(ndvi, n_clusters=k, verbose=False)
+        labels_flat = labels.reshape(-1)
+
+        # Compute silhouette score (subsample for speed if large)
+        silhouette = 0.0
+        if scoring in ('silhouette', 'combined'):
+            from sklearn.metrics import silhouette_score
+            n_samples = len(labels_flat)
+            if n_samples > 10000:
+                # Subsample for speed
+                idx = np.random.choice(n_samples, 10000, replace=False)
+                silhouette = silhouette_score(pixels_flat[idx], labels_flat[idx])
+            else:
+                silhouette = silhouette_score(pixels_flat, labels_flat)
 
         # Compute cluster edges
         edges = compute_cluster_edges(labels)
@@ -145,8 +164,11 @@ def find_optimal_clusters(
         markers_labeled, n_markers = ndimage.label(markers)
 
         if n_markers == 0:
-            results.append({'k': k, 'n_paddocks': 0, 'coverage_pct': 0})
-            print(f"k={k}: 0 paddocks, 0.0% coverage")
+            results.append({
+                'k': k, 'n_paddocks': 0, 'coverage_pct': 0,
+                'silhouette': silhouette, 'score': 0,
+            })
+            print(f"k={k}: 0 paddocks, 0.0% coverage, silhouette={silhouette:.3f}")
             continue
 
         segments = segmentation.watershed(edges_norm, markers_labeled)
@@ -160,8 +182,11 @@ def find_optimal_clusters(
             records.append({'geometry': shape(geom), 'segment_id': int(value)})
 
         if not records:
-            results.append({'k': k, 'n_paddocks': 0, 'coverage_pct': 0})
-            print(f"k={k}: 0 paddocks, 0.0% coverage")
+            results.append({
+                'k': k, 'n_paddocks': 0, 'coverage_pct': 0,
+                'silhouette': silhouette, 'score': 0,
+            })
+            print(f"k={k}: 0 paddocks, 0.0% coverage, silhouette={silhouette:.3f}")
             continue
 
         gdf = gpd.GeoDataFrame(records, crs=crs)
@@ -181,20 +206,37 @@ def find_optimal_clusters(
         paddock_area = gdf_filtered['area_ha'].sum() if n_paddocks > 0 else 0
         coverage_pct = (paddock_area / total_area_ha) * 100
 
+        # Compute score based on method
+        if scoring == 'coverage':
+            score = coverage_pct
+        elif scoring == 'silhouette':
+            score = silhouette
+        elif scoring == 'combined':
+            # Normalize coverage to 0-1 and combine with silhouette
+            coverage_norm = coverage_pct / 100
+            # Silhouette is already -1 to 1, shift to 0-1
+            silhouette_norm = (silhouette + 1) / 2
+            score = 0.5 * coverage_norm + 0.5 * silhouette_norm
+        else:
+            score = coverage_pct
+
         results.append({
             'k': k,
             'n_paddocks': n_paddocks,
             'paddock_area_ha': paddock_area,
             'coverage_pct': coverage_pct,
+            'silhouette': silhouette,
+            'score': score,
         })
 
-        print(f"k={k}: {n_paddocks} paddocks, {coverage_pct:.1f}% coverage")
+        print(f"k={k}: {n_paddocks} paddocks, {coverage_pct:.1f}% coverage, "
+              f"silhouette={silhouette:.3f}, score={score:.3f}")
 
-    # Find optimal k (maximize coverage)
-    optimal_idx = max(range(len(results)), key=lambda i: results[i]['coverage_pct'])
+    # Find optimal k (maximize score)
+    optimal_idx = max(range(len(results)), key=lambda i: results[i]['score'])
     optimal_k = results[optimal_idx]['k']
 
-    print(f"\nOptimal k={optimal_k} ({results[optimal_idx]['coverage_pct']:.1f}% coverage)")
+    print(f"\nOptimal k={optimal_k} (score={results[optimal_idx]['score']:.3f})")
 
     return {
         'optimal_k': optimal_k,
@@ -210,6 +252,7 @@ def compute_preseg_features(
     max_area_ha: float = 1500,
     min_compactness: float = 0.1,
     k_range: range = range(4, 16),
+    scoring: str = 'coverage',
 ) -> NDArray[np.float32]:
     """
     Compute time series K-means labels and cluster edges.
@@ -221,11 +264,13 @@ def compute_preseg_features(
         max_area_ha: Max paddock area (used when n_clusters='auto')
         min_compactness: Min compactness (used when n_clusters='auto')
         k_range: Range of k values to try (used when n_clusters='auto')
+        scoring: Scoring method - 'coverage', 'silhouette', or 'combined'
 
     Returns:
-        Feature array (H, W, 2):
+        Feature array (H, W, 3):
         - Band 0: Normalized cluster labels
         - Band 1: Cluster edge magnitude
+        - Band 2: Median NDVI (for visualization)
     """
     # Compute and gap-fill NDVI
     ndvi = compute_ndvi(ds)
@@ -243,6 +288,7 @@ def compute_preseg_features(
             min_area_ha=min_area_ha,
             max_area_ha=max_area_ha,
             min_compactness=min_compactness,
+            scoring=scoring,
         )
         n_clusters = opt_result['optimal_k']
 
@@ -252,11 +298,15 @@ def compute_preseg_features(
     # Compute edges at cluster boundaries
     edges = compute_cluster_edges(labels)
 
-    # Normalize labels to [0, 1] for uint8 storage
-    labels_norm = normalize(labels.astype(np.float32))
+    # Compute median NDVI for visualization (3rd band)
+    ndvi_median = np.nanmedian(ndvi_filled, axis=2)
 
-    # Stack features
-    features = np.stack([labels_norm, edges], axis=-1)
+    # Normalize all to [0, 1] for uint8 storage
+    labels_norm = normalize(labels.astype(np.float32))
+    ndvi_median_norm = normalize(ndvi_median)
+
+    # Stack features: labels, edges, median NDVI (3 bands for RGB plotting)
+    features = np.stack([labels_norm, edges, ndvi_median_norm], axis=-1)
 
     return features.astype(np.float32)
 
@@ -325,6 +375,7 @@ def presegment(
     max_area_ha: float = 1500,
     min_compactness: float = 0.1,
     k_range: range = range(4, 16),
+    scoring: str = 'coverage',
 ) -> xr.DataArray:
     """
     Main entry point for Stage 1 presegmentation.
@@ -338,6 +389,7 @@ def presegment(
         max_area_ha: Max paddock area (used when n_clusters='auto')
         min_compactness: Min compactness (used when n_clusters='auto')
         k_range: Range of k values to try (used when n_clusters='auto')
+        scoring: Scoring method - 'coverage', 'silhouette', or 'combined'
 
     Returns:
         Georeferenced DataArray with preseg features
@@ -360,6 +412,7 @@ def presegment(
         max_area_ha=max_area_ha,
         min_compactness=min_compactness,
         k_range=k_range,
+        scoring=scoring,
     )
     u8 = rescale_uint8(features)
     preseg_geotiff = convert_to_geotiff(ds2, u8)
