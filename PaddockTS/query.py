@@ -6,6 +6,7 @@ from hashlib import sha256
 from os.path import expanduser
 from PaddockTS.filter import Filter
 from PaddockTS.utils import parse_date
+from PaddockTS.config import config
 
 
 def _convert_date(value: str | date) -> date:
@@ -78,8 +79,8 @@ class Query:
     groupby: str = 'solar_day'
     resolution: int = 10
     stub: str | None = None
-    out_dir: str = attrs.field(factory=lambda: expanduser('~/Documents/PaddockTSLocal'))
-    tmp_dir: str = attrs.field(factory=lambda: expanduser('~/Downloads/PaddockTSLocal'))
+    out_dir: str = attrs.field(factory=lambda: config.out_dir)
+    tmp_dir: str = attrs.field(factory=lambda: config.tmp_dir)
 
     def __attrs_post_init__(self):
         if self.stub is None:
