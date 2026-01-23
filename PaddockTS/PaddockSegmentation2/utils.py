@@ -74,8 +74,8 @@ def compute_edge_magnitude(arr: NDArray[np.float32]) -> NDArray[np.float32]:
     """
     from scipy import ndimage
 
-    # Smooth first to reduce noise (sigma=1.5 for 10m resolution)
-    smoothed = ndimage.gaussian_filter(arr, sigma=1.5)
+    # Smooth first to reduce noise (sigma=3.5 for 10m resolution)
+    smoothed = ndimage.gaussian_filter(arr, sigma=4)
 
     # Sobel filters for x and y gradients
     sobel_x = ndimage.sobel(smoothed, axis=1)
@@ -85,21 +85,83 @@ def compute_edge_magnitude(arr: NDArray[np.float32]) -> NDArray[np.float32]:
     magnitude = np.sqrt(sobel_x**2 + sobel_y**2)
 
     # Enhance edges: apply non-linear scaling to boost weak edges
-    magnitude = np.power(magnitude, 0.7)  # Gamma correction to boost
+    magnitude = np.power(magnitude, 0.6)  # Gamma correction to boost
 
     return magnitude
+
+
+def get_season(month: int) -> int:
+    """
+    Map month to Southern Hemisphere season index.
+
+    Returns:
+        0=Summer (Dec-Feb), 1=Autumn (Mar-May), 2=Winter (Jun-Aug), 3=Spring (Sep-Nov)
+    """
+    if month in (12, 1, 2):
+        return 0  # Summer
+    elif month in (3, 4, 5):
+        return 1  # Autumn
+    elif month in (6, 7, 8):
+        return 2  # Winter
+    else:
+        return 3  # Spring
+
+
+def seasonal_composite(
+    arr: NDArray[np.float32],
+    times: NDArray,
+) -> NDArray[np.float32]:
+    """
+    Compute seasonal composites then aggregate.
+
+    Ensures each season contributes equally regardless of observation count.
+    This prevents bias from uneven temporal sampling (e.g., missing winter).
+
+    Args:
+        arr: Time series with shape (H, W, T)
+        times: Array of datetime64 timestamps with length T
+
+    Returns:
+        Seasonal median array with shape (H, W, 4) - one per season
+    """
+    import pandas as pd
+
+    h, w, t = arr.shape
+
+    # Extract months from timestamps
+    months = pd.to_datetime(times).month
+
+    # Assign each timestep to a season
+    seasons = np.array([get_season(m) for m in months])
+
+    # Compute median for each season
+    seasonal_medians = []
+    for s in range(4):
+        mask = seasons == s
+        if mask.sum() > 0:
+            seasonal_medians.append(np.nanmedian(arr[:, :, mask], axis=2))
+        else:
+            seasonal_medians.append(np.full((h, w), np.nan))
+
+    return np.stack(seasonal_medians, axis=-1)
 
 
 def compute_temporal_features(
     ndvi: NDArray[np.float32],
     ndwi: NDArray[np.float32] | None = None,
+    times: NDArray | None = None,
 ) -> NDArray[np.float32]:
     """
     Compute temporal statistics from spectral index time series.
 
+    Uses seasonal compositing when timestamps provided to ensure equal
+    contribution from each season, preventing bias from uneven sampling.
+
     Args:
         ndvi: NDVI time series with shape (H, W, T)
         ndwi: Optional NDWI time series with shape (H, W, T)
+        times: Optional array of datetime64 timestamps. If provided,
+            uses seasonal compositing for unbiased annual statistics.
 
     Returns:
         Feature array with shape (H, W, C) containing:
@@ -109,8 +171,16 @@ def compute_temporal_features(
         If ndwi provided:
         - Band 3: Median NDWI (normalized) - water/moisture content
     """
-    ndvi_median = np.nanmedian(ndvi, axis=2)
-    ndvi_std = np.nanstd(ndvi, axis=2)
+    if times is not None:
+        # Seasonal compositing: compute seasonal medians first
+        ndvi_seasonal = seasonal_composite(ndvi, times)
+        # Then compute overall median/std from the 4 seasonal values
+        ndvi_median = np.nanmedian(ndvi_seasonal, axis=2)
+        ndvi_std = np.nanstd(ndvi_seasonal, axis=2)
+    else:
+        # Fallback: simple temporal statistics (may be biased)
+        ndvi_median = np.nanmedian(ndvi, axis=2)
+        ndvi_std = np.nanstd(ndvi, axis=2)
 
     # Compute edge magnitude on median NDVI
     ndvi_edges = compute_edge_magnitude(ndvi_median)
@@ -128,7 +198,11 @@ def compute_temporal_features(
 
     # Add NDWI if provided
     if ndwi is not None:
-        ndwi_median = np.nanmedian(ndwi, axis=2)
+        if times is not None:
+            ndwi_seasonal = seasonal_composite(ndwi, times)
+            ndwi_median = np.nanmedian(ndwi_seasonal, axis=2)
+        else:
+            ndwi_median = np.nanmedian(ndwi, axis=2)
         ndwi_median_norm = normalize(ndwi_median)
         feature_list.append(ndwi_median_norm)
 

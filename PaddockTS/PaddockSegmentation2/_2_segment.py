@@ -79,8 +79,8 @@ def run_watershed(
     markers = morphology.remove_small_objects(markers, min_size=50)
     markers = morphology.remove_small_holes(markers, area_threshold=25)
 
-    # Erode markers to separate touching regions
-    markers = morphology.binary_erosion(markers, morphology.disk(2))
+    # Erode markers to separate touching regions (scale with edge smoothing sigma)
+    markers = morphology.binary_erosion(markers, morphology.disk(4))
 
     # Label connected marker regions
     markers_labeled, n_markers = ndimage.label(markers)
@@ -390,7 +390,7 @@ def segment(
     # Try watershed (good for obvious paddocks with clear edges)
     if method in ('auto', 'watershed'):
         print("\n--- Watershed segmentation ---")
-        for pct in [10, 15, 20, 25]:
+        for pct in [25]:
             segments_ws = run_watershed(image, marker_percentile=pct)
             gdf_ws, cov_ws = evaluate_segments(segments_ws, f"percentile={pct}")
             if cov_ws > best_score:
@@ -420,7 +420,16 @@ def segment(
 
     # Save best result
     if best_gdf is not None and len(best_gdf) > 0:
+        total_paddock_area = best_gdf['area_ha'].sum()
         print(f"\n==> Best: {len(best_gdf)} paddocks, {best_score:.1f}% coverage")
+        print(f"    Total paddock area: {total_paddock_area:.1f} ha")
+        print(f"    Paddock sizes (ha): min={best_gdf['area_ha'].min():.1f}, "
+              f"max={best_gdf['area_ha'].max():.1f}, "
+              f"mean={best_gdf['area_ha'].mean():.1f}")
+        print("\n    Individual paddocks:")
+        for _, row in best_gdf.sort_values('area_ha', ascending=False).iterrows():
+            print(f"      Paddock {row['paddock_id']:2d}: {row['area_ha']:6.1f} ha  "
+                  f"(compactness={row['compactness']:.2f})")
         best_gdf.to_file(path_output_vector, driver='GPKG')
     else:
         print("No valid paddocks found")
