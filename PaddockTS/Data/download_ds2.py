@@ -5,6 +5,44 @@ import pystac_client
 import odc.stac
 import pickle
 import rioxarray
+import numpy as np
+
+def apply_cloud_mask(ds: Dataset, cloud_band: str = 'oa_fmask') -> Dataset:
+    """
+    Apply cloud masking to a dataset using the fmask band.
+
+    fmask values:
+        0 = nodata
+        1 = valid (clear)
+        2 = cloud
+        3 = shadow
+        4 = snow
+        5 = water
+
+    This function masks out clouds (2) and shadows (3), setting those pixels to NaN.
+
+    Args:
+        ds: xarray Dataset with cloud mask band
+        cloud_band: Name of the cloud mask band
+
+    Returns:
+        Dataset with cloudy pixels set to NaN
+    """
+    if cloud_band not in ds.data_vars:
+        print(f"Warning: {cloud_band} band not found, skipping cloud masking")
+        return ds
+
+    # Create mask: True where pixels are clear (not cloud=2 or shadow=3)
+    fmask = ds[cloud_band]
+    clear_mask = (fmask != 2) & (fmask != 3)
+
+    # Apply mask to all other bands
+    masked_ds = ds.drop_vars(cloud_band)
+    for var in masked_ds.data_vars:
+        masked_ds[var] = masked_ds[var].where(clear_mask)
+
+    return masked_ds
+
 
 def download_ds2(
     query: Query,
@@ -13,6 +51,7 @@ def download_ds2(
     tile_width: int = 1024,
     tile_height: int = 1024,
     tile_time_series_length: int = 1,
+    apply_cloud_masking: bool = True,
 ) -> Dataset:
     """
     Perform a STAC query, load the resulting data into an xarray.Dataset,
@@ -50,9 +89,14 @@ def download_ds2(
     )
     items = list(query_results.items())
 
+    # Add fmask band if cloud masking is enabled and not already included
+    bands_to_load = list(query.bands)
+    if apply_cloud_masking and 'oa_fmask' not in bands_to_load:
+        bands_to_load.append('oa_fmask')
+
     ds2_pipeline = odc.stac.load(
         items,
-        bands=query.bands,
+        bands=bands_to_load,
         crs=query.crs,
         resolution=query.resolution,
         groupby=query.groupby,
@@ -67,6 +111,10 @@ def download_ds2(
     ds2: Dataset = future.result()
     dask_client.close()
     ds2 = ds2.rio.write_crs(query.crs)
+
+    # Apply cloud masking if requested
+    if apply_cloud_masking:
+        ds2 = apply_cloud_mask(ds2)
 
     with open(query.path_ds2, 'wb') as handle:
         pickle.dump(ds2, handle, protocol=pickle.HIGHEST_PROTOCOL)

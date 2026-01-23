@@ -11,16 +11,17 @@ def get_paddocks(
     max_area_ha: int = 1500,
     max_perim_area_ratio: int = 30,
     device='cpu',
+    model_type='vit_b',
     reload=False
 ):
     if not exists(query.path_ds2) or reload:
         download_ds2(query)
-    
+
     if not exists(query.path_preseg_tif) or reload:
         presegment(query)
 
     if not exists(query.path_polygons) or reload:
-        segment(query, min_area_ha, max_area_ha, max_perim_area_ratio, device=device)
+        segment(query, min_area_ha, max_area_ha, max_perim_area_ratio, device=device, model_type=model_type)
 
 def test():
     from PaddockTS.query import get_example_query
