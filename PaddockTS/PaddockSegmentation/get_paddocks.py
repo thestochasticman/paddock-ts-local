@@ -1,6 +1,6 @@
 from PaddockTS.PaddockSegmentation._1_presegment import presegment
 from PaddockTS.PaddockSegmentation._2_segment import segment
-from PaddockTS.Data.download_ds2 import download_ds2
+from PaddockTS.Data.download_sentinel2 import download_sentinel2
 from PaddockTS.query import Query
 from os.path import exists
 
@@ -15,7 +15,7 @@ def get_paddocks(
     reload=False
 ):
     if not exists(query.path_ds2) or reload:
-        download_ds2(query)
+        download_sentinel2(query)
 
     if not exists(query.path_preseg_tif) or reload:
         presegment(query)

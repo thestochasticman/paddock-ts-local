@@ -1,6 +1,6 @@
 from PaddockTS.query import Query
 from os.path import exists
-from PaddockTS.Data.download_ds2 import download_ds2
+from PaddockTS.Data.download_sentinel2 import download_sentinel2
 from PaddockTS.PaddockSegmentation.utils import fourier_mean
 from PaddockTS.PaddockSegmentation.utils import completion
 import pickle

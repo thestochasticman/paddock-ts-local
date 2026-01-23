@@ -44,7 +44,7 @@ def apply_cloud_mask(ds: Dataset, cloud_band: str = 'oa_fmask') -> Dataset:
     return masked_ds
 
 
-def download_ds2(
+def download_sentinel2(
     query: Query,
     num_workers: int = 4,
     threads_per_worker: int = 2,
@@ -70,7 +70,6 @@ def download_ds2(
         Dataset: The loaded xarray Dataset (also saved to `{DS2_DIR}/{stub}.pkl`).
     """
 
-    print(query.path_ds2, query.stub)
     dask_client = DaskClient(
         n_workers=num_workers,
         threads_per_worker=threads_per_worker
@@ -156,7 +155,7 @@ def test() -> bool:
     from PaddockTS.query import get_example_query
 
     query = get_example_query()
-    download_ds2(query)
+    download_sentinel2(query)
     return test_returned_dataset_values(query)
 
 if __name__ == '__main__':

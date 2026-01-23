@@ -1,5 +1,5 @@
 from PaddockTS.query import Query
-from PaddockTS.Data.download_ds2 import download_ds2
+from PaddockTS.Data.download_sentinel2 import download_sentinel2
 from PaddockTS.Data.environmental import download_environmental_data
 from PaddockTS.PaddockSegmentation.get_paddocks import get_paddocks
 from PaddockTS.IndicesAndVegFrac.add_indices_and_veg_frac import add_indices_and_veg_frac
@@ -10,7 +10,7 @@ from PaddockTS.Plotting.topographic_plots import plot_topography
 def get_outputs( 
     query: Query,
 ):
-    download_ds2(query)
+    download_sentinel2(query)
     download_environmental_data(query)
     get_paddocks(query)
     add_indices_and_veg_frac(query)
