@@ -68,18 +68,6 @@ This typically will:
 
 ---
 
-## Configuration
-
-On first import, [`PaddockTS/legend.py`](./PaddockTS/legend.py) creates `~/.configs/PaddockTSLocal.json` with:
-
-- `out_dir`: final outputs  
-- `tmp_dir`: intermediates (stacks, shapefiles)  
-- `scratch_dir`: heavy/temporary files
-
-Update these paths after first run to match your storage.
-
----
-
 ## Repository layout
 
 ### Top-level files & folders
@@ -210,16 +198,92 @@ Update these paths after first run to match your storage.
 
 ## Development notes
 
-- Start with a small AOI and short date window to validate your environment and caches.  
-- Point `gdalwmscache/`, `tmp_dir`, and `scratch_dir` to fast local storage—these can grow quickly.  
+- Start with a small AOI and short date window to validate your environment and caches.
+- Point `gdalwmscache/`, `tmp_dir`, and `scratch_dir` to fast local storage—these can grow quickly.
 - If you add indices or environmental variables, wire changes through:
-  1) acquisition ([`PaddockTS/Data/...`](./PaddockTS/Data/)) →  
-  2) transforms ([`PaddockTS/IndicesAndVegFrac/...`](./PaddockTS/IndicesAndVegFrac/)) →  
-  3) aggregation ([`PaddockTS/PaddockTS/get_paddock_ts.py`](./PaddockTS/PaddockTS/get_paddock_ts.py)) →  
+  1) acquisition ([`PaddockTS/Data/...`](./PaddockTS/Data/)) →
+  2) transforms ([`PaddockTS/IndicesAndVegFrac/...`](./PaddockTS/IndicesAndVegFrac/)) →
+  3) aggregation ([`PaddockTS/PaddockTS/get_paddock_ts.py`](./PaddockTS/PaddockTS/get_paddock_ts.py)) →
   4) plotting ([`PaddockTS/Plotting/...`](./PaddockTS/Plotting/)).
 
 ---
 
+## Configuration
 
+PaddockTS uses a config file at `~/.paddockts.yaml` (or `~/.config/paddockts/config.yaml`):
+
+```yaml
+out_dir: ~/Documents/PaddockTSLocal    # Final outputs
+tmp_dir: ~/Downloads/PaddockTSLocal    # Intermediate files
+silo_dir: /path/to/shared/SILO         # SILO cache (optional)
+```
+
+**Set config programmatically:**
+
+```python
+from PaddockTS.config import config
+
+config.out_dir = "/data/paddockts/output"
+config.tmp_dir = "/data/paddockts/tmp"
+config.silo_dir = "/data/paddockts/silo"
+config.save()  # Writes to ~/.paddockts.yaml
+```
+
+**Environment variables** (override config file):
+
+```bash
+export PADDOCKTS_OUT_DIR=/data/output
+export PADDOCKTS_TMP_DIR=/data/tmp
+export PADDOCKTS_SILO_DIR=/data/silo
+```
+
+---
+
+## SILO Data Cache
+
+SILO provides daily climate data for Australia (~400MB per year/variable). PaddockTS caches this data locally in Zarr format for thread-safe parallel access.
+
+### Background Updater
+
+The SILO updater keeps your cache fresh and fills missing years:
+
+```bash
+# One-shot update (fills missing years + refreshes current year)
+python -m PaddockTS.Data.Environmental.silo_updater --once
+
+# Run as background daemon (updates every 6 hours)
+python -m PaddockTS.Data.Environmental.silo_updater --daemon
+
+# Custom settings
+python -m PaddockTS.Data.Environmental.silo_updater --daemon --interval 12 --past-years 5
+```
+
+### Install as System Service
+
+**Systemd (recommended for servers):**
+
+```bash
+python -m PaddockTS.Data.Environmental.silo_updater --install-systemd
+systemctl --user daemon-reload
+systemctl --user enable silo-updater
+systemctl --user start silo-updater
+
+# Check status
+systemctl --user status silo-updater
+```
+
+**Cron (alternative):**
+
+```bash
+python -m PaddockTS.Data.Environmental.silo_updater --install-cron
+# Add the printed line to: crontab -e
+```
+
+### What the Updater Does
+
+1. Checks for missing years (default: 2016 to current year)
+2. Downloads missing `.nc` files from SILO
+3. Converts to `.zarr` format (thread-safe)
+4. Refreshes current year if cache is >24 hours old
 
 ---
