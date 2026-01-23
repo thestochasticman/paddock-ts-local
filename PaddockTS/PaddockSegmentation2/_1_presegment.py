@@ -94,6 +94,9 @@ def compute_spectral_temporal_features(ds: Dataset) -> NDArray[np.float32]:
     """
     Compute NDVI and NDWI time series, gap-fill, then extract temporal statistics.
 
+    Uses seasonal compositing to ensure each season contributes equally,
+    preventing bias from uneven temporal sampling (e.g., missing winter).
+
     Args:
         ds: xarray Dataset with Sentinel-2 bands
 
@@ -112,8 +115,11 @@ def compute_spectral_temporal_features(ds: Dataset) -> NDArray[np.float32]:
     ndwi = compute_ndwi(ds)
     ndwi_filled = completion(ndwi)
 
-    # Extract temporal features
-    features = compute_temporal_features(ndvi_filled, ndwi_filled)
+    # Get timestamps for seasonal compositing
+    times = ds.time.values
+
+    # Extract temporal features with seasonal compositing
+    features = compute_temporal_features(ndvi_filled, ndwi_filled, times=times)
     return features
 
 
