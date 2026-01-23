@@ -112,11 +112,14 @@ def update_silo_cache(silo_folder: str, variables: list[str] = None, years: list
                 if os.path.exists(zarr_path):
                     shutil.rmtree(zarr_path)
 
-                # Download and convert
-                _download_from_silo(var, year, silo_folder, verbose=verbose)
+                # Download if needed
+                if not os.path.exists(nc_filename):
+                    _download_from_silo(var, year, silo_folder, verbose=verbose)
+
+                # Convert to Zarr v2 format (compatible with zarr 2.x and 3.x)
                 if os.path.exists(nc_filename):
                     ds = xr.open_dataset(nc_filename, engine='netcdf4')
-                    ds.to_zarr(zarr_path, mode='w')
+                    ds.to_zarr(zarr_path, mode='w', zarr_format=2)
                     ds.close()
                     os.remove(nc_filename)
                     if verbose:
@@ -163,9 +166,9 @@ def _singleyear(var, latitude, longitude, buffer, year, silo_folder, verbose=Tru
 
                 if not os.path.exists(nc_filename):
                     _download_from_silo(var, year, silo_folder, verbose=verbose)
-                # Convert to Zarr for thread-safe caching
+                # Convert to Zarr v2 format (compatible with zarr 2.x and 3.x)
                 ds = xr.open_dataset(nc_filename, engine='netcdf4')
-                ds.to_zarr(zarr_path, mode='w')
+                ds.to_zarr(zarr_path, mode='w', zarr_format=2)
                 ds.close()
                 # Remove netCDF to save space (Zarr is the cache now)
                 if os.path.exists(nc_filename):
@@ -304,9 +307,10 @@ def silo_daily(
     makedirs(tmpdir, exist_ok=True)
 
     # SILO files are large (~400MB each) and shared across all queries
-    # Store in base tmp_dir, not stub-specific tmpdir
+    # Use config.silo_dir (defaults to {tmp_dir}/SILO if not set)
     if silo_folder is None:
-        silo_folder = os.path.join(query.tmp_dir, "SILO")
+        from PaddockTS.config import config
+        silo_folder = config.silo_dir
     makedirs(silo_folder, exist_ok=True)
 
     if verbose:

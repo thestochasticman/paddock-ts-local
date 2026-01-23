@@ -7,6 +7,7 @@ Year-level parallelism is disabled when called from here to avoid
 nested parallelism issues.
 """
 import os
+import multiprocessing
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import xarray as xr
@@ -29,31 +30,31 @@ def _run_slga_soils(query: Query, verbose: bool):
 def _run_ozwald_daily_pg(query: Query, verbose: bool):
     from PaddockTS.Data.Environmental.ozwald_daily import ozwald_daily
     # Disable year-level parallelism to avoid netCDF4 thread-safety issues
-    ozwald_daily(query, variables=['Pg'], save_netcdf=True, save_json=False, verbose=verbose, parallel=False)
+    ozwald_daily(query, variables=['Pg'], save_netcdf=True, save_json=True, verbose=verbose, parallel=False)
     return 'ozwald_daily_Pg'
 
 
 def _run_ozwald_daily_tmax(query: Query, verbose: bool):
     from PaddockTS.Data.Environmental.ozwald_daily import ozwald_daily
-    ozwald_daily(query, variables=['Tmax', 'Tmin'], save_netcdf=True, save_json=False, verbose=verbose, parallel=False)
+    ozwald_daily(query, variables=['Tmax', 'Tmin'], save_netcdf=True, save_json=True, verbose=verbose, parallel=False)
     return 'ozwald_daily_Tmax'
 
 
 def _run_ozwald_daily_uavg(query: Query, verbose: bool):
     from PaddockTS.Data.Environmental.ozwald_daily import ozwald_daily
-    ozwald_daily(query, variables=['Uavg', 'VPeff'], save_netcdf=True, save_json=False, verbose=verbose, parallel=False)
+    ozwald_daily(query, variables=['Uavg', 'VPeff'], save_netcdf=True, save_json=True, verbose=verbose, parallel=False)
     return 'ozwald_daily_Uavg'
 
 
 def _run_ozwald_8day(query: Query, verbose: bool):
     from PaddockTS.Data.Environmental.ozwald_8day import ozwald_8day
-    ozwald_8day(query, variables=['Ssoil', 'Qtot', 'LAI', 'GPP'], save_netcdf=True, save_json=False, verbose=verbose, parallel=False)
+    ozwald_8day(query, variables=['Ssoil', 'Qtot', 'LAI', 'GPP'], save_netcdf=True, save_json=True, verbose=verbose, parallel=False)
     return 'ozwald_8day'
 
 
 def _run_silo_daily(query: Query, verbose: bool):
     from PaddockTS.Data.Environmental.silo_daily import silo_daily
-    silo_daily(query, save_netcdf=True, save_json=False, verbose=verbose)
+    silo_daily(query, save_netcdf=True, save_json=True, verbose=verbose)
     return 'silo_daily'
 
 
@@ -93,7 +94,9 @@ def download_environmental(query: Query, verbose=True):
         print(f"Starting {len(download_tasks)} parallel downloads...")
 
     completed = set()
-    with ProcessPoolExecutor(max_workers=len(download_tasks)) as executor:
+    # Use 'spawn' context to avoid issues with fork() and zarr/HDF5/netCDF4 libraries
+    ctx = multiprocessing.get_context('spawn')
+    with ProcessPoolExecutor(max_workers=len(download_tasks), mp_context=ctx) as executor:
         futures = {executor.submit(func, query, verbose): name for func, name in download_tasks}
 
         for future in as_completed(futures):
