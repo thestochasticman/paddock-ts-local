@@ -26,7 +26,8 @@ def get_paddocks(
     max_area_ha: float = 1500,
     min_compactness: float = 0.1,
     marker_percentile: float = 25,
-    k_range: range = range(4, 16),
+    k_range: range = range(3, 16),
+    scoring: str = 'coverage',
     reload: bool = False,
 ) -> None:
     """
@@ -42,6 +43,7 @@ def get_paddocks(
         min_compactness: Minimum shape compactness 0-1 (default 0.1)
         marker_percentile: Percentile for watershed seed markers (default 25)
         k_range: Range of k values to try when n_clusters='auto' (default 4-15)
+        scoring: Scoring method for optimal k - 'coverage', 'silhouette', or 'combined'
         reload: If True, recompute all stages even if outputs exist
 
     Output files:
@@ -61,6 +63,7 @@ def get_paddocks(
         max_area_ha=max_area_ha,
         min_compactness=min_compactness,
         k_range=k_range,
+        scoring=scoring,
     )
 
     # Stage 2: Watershed on cluster edges
