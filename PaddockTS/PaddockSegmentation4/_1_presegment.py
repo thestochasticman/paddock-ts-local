@@ -16,6 +16,7 @@ import rioxarray
 from numpy.typing import NDArray
 from xarray.core.dataset import Dataset
 from sklearn.cluster import KMeans
+from scipy.ndimage import gaussian_filter
 
 from PaddockTS.query import Query
 from PaddockTS.PaddockSegmentation4.utils import completion, compute_cluster_edges, normalize
@@ -275,6 +276,11 @@ def compute_preseg_features(
     # Compute and gap-fill NDVI
     ndvi = compute_ndvi(ds)
     ndvi_filled = completion(ndvi)
+
+    # Apply Gaussian smoothing to each timestep
+    sigma = 1.0
+    for t in range(ndvi_filled.shape[2]):
+        ndvi_filled[:, :, t] = gaussian_filter(ndvi_filled[:, :, t], sigma=sigma)
 
     # Find optimal k if auto
     if n_clusters == 'auto':
