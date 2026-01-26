@@ -14,9 +14,7 @@ authors = [
 license = { text = "MIT" }
 requires-python = ">=3.8"
 dependencies = [
-  "numpy<2",
   'tensorflow; sys_platform == "darwin"',
-  'tflite_runtime; sys_platform != "darwin"',
   "dataclasses-json",
   "typing_extensions",
 ]

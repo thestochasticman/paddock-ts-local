@@ -43,8 +43,6 @@ def _is_cache_stale(zarr_path: str, year: str) -> bool:
     return age > timedelta(hours=CURRENT_YEAR_CACHE_MAX_AGE_HOURS)
 
 
-
-
 SILO_VARIABLES = {
     "daily_rain": "Daily rainfall, mm",
     "monthly_rain": "Monthly rainfall, mm",

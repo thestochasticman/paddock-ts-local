@@ -10,8 +10,8 @@ from PaddockTS.Plotting.topographic_plots import plot_topography
 def get_outputs( 
     query: Query,
 ):
-    download_sentinel2(query)
-    download_environmental_data(query)
+    # download_sentinel2(query)
+    # download_environmental_data(query)
     get_paddocks(query)
     add_indices_and_veg_frac(query)
     get_paddock_ts(query)
