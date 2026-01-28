@@ -1,6 +1,6 @@
 PaddockTS/**/__pycache__/
+PaddockTS/**/pytest_cache/
 PaddockTS.egg-info/
-
 gdalwmscache/
 dist/
 terrain_tiles.xml

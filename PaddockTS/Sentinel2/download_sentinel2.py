@@ -18,100 +18,25 @@ import pystac_client
 import rioxarray  # noqa: F401 - required for rio accessor
 from dask.distributed import Client as DaskClient
 from xarray import Dataset
+from PaddockTS.query import Query
 
-if TYPE_CHECKING:
-    from PaddockTS.query import Query
+# def configure_stac(url: str) -> pystac_client.Client:
+#     odc.stac.configure_rio(
+#         cloud_defaults=True,
+#         aws={"aws_unsigned": True},
+#     )
+#     return pystac_client.Client.open(str)
 
-# -----------------------------------------------------------------------------
-# Constants
-# -----------------------------------------------------------------------------
-
-DEA_STAC_URL = "https://explorer.dea.ga.gov.au/stac"
-CLOUD_MASK_BAND = "oa_fmask"
-
-# fmask values
-FMASK_NODATA = 0
-FMASK_VALID = 1
-FMASK_CLOUD = 2
-FMASK_SHADOW = 3
-FMASK_SNOW = 4
-FMASK_WATER = 5
-
-# Default STAC collections (Sentinel-2A and 2B)
-DEFAULT_COLLECTIONS = [
-    "ga_s2am_ard_3",
-    "ga_s2bm_ard_3",
-]
-
-# Default Sentinel-2 bands
-DEFAULT_BANDS = [
-    "nbart_blue",
-    "nbart_green",
-    "nbart_red",
-    "nbart_red_edge_1",
-    "nbart_red_edge_2",
-    "nbart_red_edge_3",
-    "nbart_nir_1",
-    "nbart_nir_2",
-    "nbart_swir_2",
-    "nbart_swir_3",
-]
-
-# Default cloud cover filter (< 10%)
-DEFAULT_FILTER = {"op": "<", "args": [{"property": "eo:cloud_cover"}, 0.10]}
-
-
-# -----------------------------------------------------------------------------
-# Dask Client Management
-# -----------------------------------------------------------------------------
-
-@contextmanager
-def dask_client(
-    num_workers: int = 4,
-    threads_per_worker: int = 2,
-) -> Generator[DaskClient, None, None]:
-    """
-    Context manager for Dask distributed client.
-
-    Args:
-        num_workers: Number of Dask worker processes.
-        threads_per_worker: Threads per worker.
-
-    Yields:
-        Configured DaskClient instance.
-    """
-    client = DaskClient(
-        n_workers=num_workers,
-        threads_per_worker=threads_per_worker,
-    )
-    try:
-        yield client
-    finally:
-        client.close()
-
-
-# -----------------------------------------------------------------------------
-# STAC Query Functions
-# -----------------------------------------------------------------------------
-
-def configure_stac() -> pystac_client.Client:
-    """
-    Configure and return a STAC client for DEA.
-
-    Returns:
-        Configured pystac Client.
-    """
-    odc.stac.configure_rio(
-        cloud_defaults=True,
-        aws={"aws_unsigned": True},
-    )
-    return pystac_client.Client.open(DEA_STAC_URL)
+def configure_rasterio_for_cloud_storage_access():
+    odc.stac.configure_rio(cloud_defaults=True, aws={"aws_unsigned": True})
 
 
 def search_stac(
     catalog: pystac_client.Client,
-    query: Query,
     collections: list[str],
+    bbox: list[str],
+    datetime: str,
+    cloud_filter: dict,
 ) -> list:
     """
     Search STAC catalog for items matching query parameters.
@@ -128,7 +53,7 @@ def search_stac(
         bbox=query.bbox,
         collections=collections,
         datetime=query.datetime,
-        filter=DEFAULT_FILTER,
+        filter=cloud_filter,
     )
     return list(results.items())
 
