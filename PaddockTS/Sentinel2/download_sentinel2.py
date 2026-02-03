@@ -29,7 +29,7 @@ def download_sentinel2(
         datetime=f'{query.start}/{query.end}',
         filter=sentinel2.cloud_cover_filter
     )
-    with DaskClient(n_workers=num_workers, n_threads=threads_per_worker) as client:
+    with DaskClient(n_workers=num_workers, threads_per_worker=threads_per_worker) as client:
         try:
             ds: Dataset = odc.stac.load(
                 list(result.items()),
@@ -57,3 +57,10 @@ def download_sentinel2(
     ds = ds.sel(time=nan_frac < max_nan_fraction)
     return ds
 
+
+def test():
+    from PaddockTS.utils import get_example_query
+    download_sentinel2(get_example_query())
+
+if __name__ == '__main__':
+    test()
