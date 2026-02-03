@@ -20,13 +20,8 @@ class Query:
     stub_tmp_dir: str = field(init=False)
     stub_out_dir: str = field(init=False)
     silo_dir: str = field(init=False)
-    
+
     centre_lon.default(lambda s: (s.bbox[0] + s.bbox[1])/2)
     centre_lat.default(lambda s: (s.bbox[1] + s.bbox[2])/2)
     stub_tmp_dir.default(lambda s: f'{s.tmp_dir}/{s.stub}')
     stub_out_dir.default(lambda s: f'{s.out_dir}/{s.stub}')
-
-if __name__ == '__main__':
-    query = Query([1, 2, 3, 4], date(2020, 1, 1), date(2020, 2, 2))
-    print(query.centre_lon)
-    print(query)
