@@ -11,7 +11,6 @@ class Config:
     tmp_dir: str
     silo_dir: str = field(default=F(lambda s: f'{s.tmp_dir}/SILO', takes_self=True))
 
-
 _out = expanduser('~/Downloads/PaddockTS-Outputs')
 _tmp = expanduser('~/Documents/PaddockTS-Tmp')
 _default = Config(_out, _tmp)
