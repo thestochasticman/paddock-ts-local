@@ -25,3 +25,4 @@ class Query:
     centre_lat.default(lambda s: (s.bbox[1] + s.bbox[2])/2)
     stub_tmp_dir.default(lambda s: f'{s.tmp_dir}/{s.stub}')
     stub_out_dir.default(lambda s: f'{s.out_dir}/{s.stub}')
+

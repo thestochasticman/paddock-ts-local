@@ -2,9 +2,7 @@ from rasterio.windows import from_bounds
 from .utils import _setup_tern_auth
 from .utils import load_tern_api
 from .utils import get_cog_url
-import numpy as np
 import rasterio
-import os
 
 def download_cog(
     bbox: tuple,

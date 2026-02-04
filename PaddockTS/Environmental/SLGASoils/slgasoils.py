@@ -23,5 +23,4 @@ class SLGASoils:
         '60-100cm': ('060', '100'),
         '100-200cm': ('100', '200'),
     }
-    
     url_template = 'https://data.tern.org.au/model-derived/slga/NationalMaps/SoilAndLandscapeGrid/{attr_code}/v2/{attr_code}_{depth_start}_{depth_end}_EV_N_P_AU_TRN_N_20210902.tif'
