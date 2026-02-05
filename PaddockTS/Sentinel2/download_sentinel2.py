@@ -40,7 +40,6 @@ def download_sentinel2(
                 bbox=query.bbox,
                 chunks={'time': chunk_time, 'x': chunk_x, 'y': chunk_y},
             )
-
             ds = client.compute(ds).result()
         except Exception as e:
             print(f'Creating dataset using dask failed due to: {e}')
