@@ -55,7 +55,7 @@ def labels_to_polygons(
         )
 
         # Morphological smoothing before contour extraction
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (4, 4))
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)  # Fill small gaps
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)   # Remove noise
 

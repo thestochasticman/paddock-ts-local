@@ -16,7 +16,9 @@ import rioxarray
 from numpy.typing import NDArray
 from xarray.core.dataset import Dataset
 from sklearn.cluster import KMeans
+from sklearn.mixture import GaussianMixture
 from scipy.ndimage import gaussian_filter
+from skimage import exposure
 
 from PaddockTS.query import Query
 from PaddockTS.PaddockSegmentation4.utils import completion, compute_cluster_edges, normalize
@@ -147,7 +149,8 @@ def find_optimal_clusters(
             n_samples = len(labels_flat)
             if n_samples > 10000:
                 # Subsample for speed
-                idx = np.random.choice(n_samples, 10000, replace=False)
+                rng = np.random.default_rng(42)
+                idx = rng.choice(n_samples, 10000, replace=False)
                 silhouette = silhouette_score(pixels_flat[idx], labels_flat[idx])
             else:
                 silhouette = silhouette_score(pixels_flat, labels_flat)
@@ -278,9 +281,19 @@ def compute_preseg_features(
     ndvi_filled = completion(ndvi)
 
     # Apply Gaussian smoothing to each timestep
-    sigma = 1.0
+    sigma = 1.5
     for t in range(ndvi_filled.shape[2]):
         ndvi_filled[:, :, t] = gaussian_filter(ndvi_filled[:, :, t], sigma=sigma)
+
+    # # Histogram specification: match to normal distribution
+    # n_pixels = ndvi_filled.shape[0] * ndvi_filled.shape[1]
+    # reference = np.sort(np.random.default_rng(42).normal(0.5, 0.15, n_pixels))
+    # reference = np.clip(reference, 0, 1)
+    # for t in range(ndvi_filled.shape[2]):
+    #     img = ndvi_filled[:, :, t]
+    #     img_flat = img.reshape(-1)
+    #     matched = exposure.match_histograms(img_flat, reference)
+    #     ndvi_filled[:, :, t] = matched.reshape(img.shape)
 
     # Find optimal k if auto
     if n_clusters == 'auto':

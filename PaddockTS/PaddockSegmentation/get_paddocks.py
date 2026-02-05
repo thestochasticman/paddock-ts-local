@@ -17,11 +17,11 @@ def get_paddocks(
     if not exists(query.path_ds2) or reload:
         download_sentinel2(query)
 
-    if not exists(query.path_preseg_tif) or reload:
-        presegment(query)
+    # if not exists(query.path_preseg_tif) or reload:
+    presegment(query)
 
-    if not exists(query.path_polygons) or reload:
-        segment(query, min_area_ha, max_area_ha, max_perim_area_ratio, device=device, model_type=model_type)
+    # if not exists(query.path_polygons) or reload:
+    segment(query, min_area_ha, max_area_ha, max_perim_area_ratio, device=device, model_type=model_type)
 
 def test():
     from PaddockTS.query import get_example_query

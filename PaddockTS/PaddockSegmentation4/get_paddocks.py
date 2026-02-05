@@ -19,6 +19,7 @@ from PaddockTS.Data.download_sentinel2 import download_sentinel2
 from PaddockTS.query import Query
 
 
+
 def get_paddocks(
     query: Query,
     n_clusters: int | str = 'auto',
