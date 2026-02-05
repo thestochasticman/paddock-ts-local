@@ -13,16 +13,18 @@ class Query:
     end: date
     stub: str = field(default=build_from_input)  
 
-    tmp_dir: str = config.tmp_dir
-    out_dir: str = config.out_dir
+    tmp_dir: str = field(init=False)
+    out_dir: str = field(init=False)
     centre_lon: float = field(init=False)
     centre_lat: float = field(init=False)
-    stub_tmp_dir: str = field(init=False)
-    stub_out_dir: str = field(init=False)
     silo_dir: str = field(init=False)
 
+    tmp_dir.default(lambda s: f'{config.tmp_dir}/{s.stub}')
+    out_dir.default(lambda s: f'{config.out_dir}/{s.stub}')
     centre_lon.default(lambda s: (s.bbox[0] + s.bbox[1])/2)
     centre_lat.default(lambda s: (s.bbox[1] + s.bbox[2])/2)
-    stub_tmp_dir.default(lambda s: f'{s.tmp_dir}/{s.stub}')
-    stub_out_dir.default(lambda s: f'{s.out_dir}/{s.stub}')
+
+    # __str__ = lambda s: s.stub
+    def __str__(s)->str:
+        return s.stub
 
