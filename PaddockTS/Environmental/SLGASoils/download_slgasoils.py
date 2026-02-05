@@ -7,7 +7,6 @@ from os import makedirs
 from .plot import plot
 
 slgasoils = SLGASoils()
-
 get_filename = lambda q, v, d: f'{q.tmp_dir}/Environmental/{q.stub}_{v}_{d}.tif'
 
 def download_slga_soils(query: Query, vars=['Clay', 'Sand', 'Silt'], depths=['5-15cm']):
