@@ -2,6 +2,7 @@ import odc.stac
 import rioxarray
 import numpy as np
 import pystac_client
+from os import makedirs
 from xarray import Dataset
 from .sentinel2 import Sentinel2
 from PaddockTS.query import Query
@@ -37,7 +38,7 @@ def download_sentinel2(
                 crs=sentinel2.crs,
                 resolution=sentinel2.resolution,
                 groupby=sentinel2.groupby,
-                bbox=query.bbox,
+                bbox=query.bbox, 
                 chunks={'time': chunk_time, 'x': chunk_x, 'y': chunk_y},
             )
             ds = client.compute(ds).result()
@@ -54,6 +55,8 @@ def download_sentinel2(
     #dropping frames using a nan percentage threshold
     nan_frac = ds.to_array().isnull().mean(dim=['variable', 'x', 'y'])
     ds = ds.sel(time=nan_frac < max_nan_fraction)
+    makedirs(query.tmp_dir, exist_ok=True)
+    ds.to_zarr(query.sentinel2_path, mode='w')
     return ds
 
 
