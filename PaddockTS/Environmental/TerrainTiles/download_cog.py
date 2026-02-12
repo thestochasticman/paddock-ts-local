@@ -25,7 +25,6 @@ def download_cog(bbox, url, filename):
     with rasterio.open(filename, 'w', **meta) as dst:
         dst.write(data, 1)
 
-
 def download_cogs(bbox, urls, filename):
     """Download and merge multiple COGs into a single clipped tif
 
