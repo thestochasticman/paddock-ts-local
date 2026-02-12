@@ -27,6 +27,5 @@ class Query:
     sentinel2_path.default(lambda s: f'{s.tmp_dir}/{s.stub}_sentinel2.zarr')
 
     # __str__ = lambda s: s.stub
-    def __str__(s)->str:
-        return s.stub
+    def __str__(s)->str: return s.stub
 

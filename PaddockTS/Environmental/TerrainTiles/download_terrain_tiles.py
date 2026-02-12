@@ -8,7 +8,6 @@ get_filename = lambda q: f'{q.tmp_dir}/Environmental/{q.stub}_terrain.tif'
 
 BASE_URL = 'https://copernicus-dem-30m.s3.amazonaws.com'
 
-
 def get_cog_urls(bbox):
     lon_min, lat_min, lon_max, lat_max = bbox
     lats = range(floor(lat_min), ceil(lat_max))
