@@ -3,12 +3,11 @@ import xarray as xr
 from os.path import exists
 from PaddockTS.query import Query
 from .preprocess import preprocess
-from .utils import compute_ndvi, compute_ndwi, labels_to_paddocks, evaluate_paddocks
+from .utils import compute_ndvi, labels_to_paddocks, evaluate_paddocks
 
 
 def get_paddocks(
     query: Query,
-    clustering: str = 'kmeans',
     n_clusters: int | str = 'auto',
     min_area_ha: float = 5,
     max_area_ha: float = 1500,
@@ -16,29 +15,21 @@ def get_paddocks(
     k_range: range = range(3, 16),
     scoring: str = 'silhouette',
     epsilon_factor: float = 0.005,
-    method: str = 'contours',
-    n_classes: int = 5,
-    max_epochs: int = 500,
-    ncut_weight: float = 1.0,
+    method: str = 'rasterio',
 ):
     from PaddockTS.Sentinel2.download_sentinel2 import download_sentinel2
 
     if not exists(query.sentinel2_path):
         download_sentinel2(query)
 
-    ds = xr.open_zarr(query.sentinel2_path)
+    ds = xr.open_zarr(query.sentinel2_path, chunks=None)
     ndvi = compute_ndvi(ds)
 
-    if clustering == 'wnet':
-        from PaddockTS.PaddockSegmentation3.wnet import segment_wnet
-        ndwi = compute_ndwi(ds)
-        labels = segment_wnet(ndvi, ndwi, n_classes=n_classes, max_epochs=max_epochs, ncut_weight=ncut_weight)
-    else:
-        geotiff = preprocess(query, n_clusters=n_clusters, min_area_ha=min_area_ha,
-                             max_area_ha=max_area_ha, min_compactness=min_compactness,
-                             k_range=k_range, scoring=scoring,
-                             epsilon_factor=epsilon_factor, method=method)
-        labels = geotiff[:, :, 0].values
+    geotiff = preprocess(query, n_clusters=n_clusters, min_area_ha=min_area_ha,
+                         max_area_ha=max_area_ha, min_compactness=min_compactness,
+                         k_range=k_range, scoring=scoring,
+                         epsilon_factor=epsilon_factor, method=method)
+    labels = geotiff[:, :, 0].values
 
     paddocks = labels_to_paddocks(labels, transform=ds.rio.transform(), crs=ds.rio.crs,
                                   min_area_ha=min_area_ha, max_area_ha=max_area_ha,
@@ -49,6 +40,9 @@ def get_paddocks(
           f'within var: {metrics["mean_within_variance"]:.4f} | '
           f'between var: {metrics["between_variance"]:.4f} | '
           f'ratio: {metrics["variance_ratio"]:.2f}')
+
+    paddocks = paddocks.sort_values('area_ha', ascending=False).reset_index(drop=True)
+    paddocks['label'] = range(1, len(paddocks) + 1)
 
     gpkg_path = f'{query.tmp_dir}/{query.stub}_paddocks.gpkg'
     paddocks.to_file(gpkg_path, driver='GPKG')
@@ -62,9 +56,9 @@ def test():
     import rioxarray
 
     query = get_example_query()
-    paddocks, labels = get_paddocks(query, scoring='variance_ratio', method='rasterio')
+    paddocks, labels = get_paddocks(query, scoring='variance_ratio', method='contours')
 
-    ds = xr.open_zarr(query.sentinel2_path)
+    ds = xr.open_zarr(query.sentinel2_path, chunks=None)
     ndvi_median = np.nanmedian(compute_ndvi(ds), axis=2)
     x, y = ds.x.values, ds.y.values
     extent = [x.min(), x.max(), y.min(), y.max()]

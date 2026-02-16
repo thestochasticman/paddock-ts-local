@@ -106,7 +106,7 @@ def preprocess(
     if not exists(query.sentinel2_path):
         raise FileNotFoundError(f'Sentinel-2 data not found at {query.sentinel2_path}. Run download_sentinel2(query) first.')
 
-    ds = xr.open_zarr(query.sentinel2_path)
+    ds = xr.open_zarr(query.sentinel2_path, chunks=None)
 
     features = compute_preseg_features(
         ds,

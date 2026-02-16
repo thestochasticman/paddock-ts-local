@@ -1,5 +1,4 @@
 from xarray.core.dataset import Dataset
-from sklearn.cluster import KMeans
 from numpy.typing import NDArray
 import numpy as np
 
@@ -19,47 +18,6 @@ def compute_ndvi(ds: Dataset) -> NDArray[np.float32]:
 
 def compute_ndwi(ds: Dataset) -> NDArray[np.float32]:
     return _normalised_diff(_band(ds, 'nbart_green'), _band(ds, 'nbart_nir_1'))
-
-def timeseries_kmeans(
-    *indices: NDArray[np.float32],
-    n_clusters: int = 8,
-    verbose: bool = True,
-) -> NDArray[np.int32]:
-    h, w, t = indices[0].shape
-    pixels = np.concatenate([idx.reshape(-1, t) for idx in indices], axis=1)
-    nan_mask = np.any(np.isnan(pixels), axis=1)
-    pixels = np.nan_to_num(pixels, nan=0.0)
-
-    kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
-    labels = np.full(h * w, -1, dtype=np.int32)
-    labels[~nan_mask] = kmeans.fit_predict(pixels[~nan_mask])
-    labels = labels.reshape(h, w)
-
-    if verbose:
-        unique, counts = np.unique(labels, return_counts=True)
-        for u, c in zip(unique, counts):
-            print(f'  Cluster {u}: {c:,} pixels ({100*c/(h*w):.1f}%)')
-
-    return labels
-
-
-def compute_cluster_edges(labels: NDArray[np.int32]) -> NDArray[np.float32]:
-    from scipy import ndimage
-    h, w = labels.shape
-    # Compute gradient of cluster labels
-    # Where labels change, gradient is high
-    sobel_x = ndimage.sobel(labels.astype(np.float32), axis=1)
-    sobel_y = ndimage.sobel(labels.astype(np.float32), axis=0)
-    edges = np.sqrt(sobel_x**2 + sobel_y**2)
-
-    # Normalize to [0, 1]
-    if edges.max() > 0:
-        edges = edges / edges.max()
-
-    # Apply gaussian smoothing to spread edges slightly
-    edges = ndimage.gaussian_filter(edges, sigma=2)
-    return edges.astype(np.float32)
-
 
 def _contours_to_records(labels, transform, epsilon_factor):
     import cv2
@@ -149,65 +107,3 @@ def evaluate_paddocks(paddocks, ndvi, transform):
         'variance_ratio': ratio,
         'n_paddocks': len(paddocks),
     }
-
-
-def find_optimal_clusters(
-    *indices: NDArray[np.float32],
-    transform,
-    crs,
-    k_range: range = range(2, 16),
-    min_area_ha: float = 5,
-    max_area_ha: float = 1500,
-    min_compactness: float = 0.1,
-    epsilon_factor: float = 0.005,
-    method: str = 'contours',
-    scoring: str = 'variance_ratio',
-) -> dict:
-    from sklearn.metrics import silhouette_score
-
-    h, w, t = indices[0].shape
-    pixels_flat = np.concatenate([idx.reshape(-1, t) for idx in indices], axis=1)
-    pixels_flat = np.nan_to_num(pixels_flat, nan=0.0)
-
-    results = []
-    for k in k_range:
-        labels = timeseries_kmeans(*indices, n_clusters=k, verbose=False)
-        paddocks = labels_to_paddocks(labels, transform, crs, min_area_ha, max_area_ha, min_compactness, epsilon_factor, method)
-
-        silhouette = 0.0
-        if scoring in ('silhouette', 'combined'):
-            labels_flat = labels.reshape(-1)
-            n = len(labels_flat)
-            if n > 10000:
-                idx = np.random.default_rng(42).choice(n, 10000, replace=False)
-                silhouette = silhouette_score(pixels_flat[idx], labels_flat[idx])
-            else:
-                silhouette = silhouette_score(pixels_flat, labels_flat)
-
-        var_ratio = 0.0
-        if scoring in ('variance_ratio', 'combined') and len(paddocks) > 0:
-            metrics = evaluate_paddocks(paddocks, indices[0], transform)
-            var_ratio = metrics['variance_ratio']
-
-        coverage = paddocks.geometry.area.sum() / (h * w * abs(transform.a * transform.e)) if len(paddocks) > 0 else 0.0
-
-        if scoring == 'silhouette':
-            score = silhouette
-        elif scoring == 'variance_ratio':
-            score = var_ratio
-        elif scoring == 'coverage':
-            score = coverage
-        elif scoring == 'combined':
-            score = 0.5 * ((silhouette + 1) / 2) + 0.5 * min(var_ratio / 10, 1.0)
-        else:
-            score = var_ratio
-
-        results.append({'k': k, 'n_paddocks': len(paddocks), 'silhouette': silhouette, 'variance_ratio': var_ratio, 'coverage': coverage, 'score': score})
-        print(f'k={k}: {len(paddocks)} paddocks, silhouette={silhouette:.3f}, var_ratio={var_ratio:.2f}, coverage={coverage:.2f}, score={score:.3f}')
-
-    optimal_idx = max(range(len(results)), key=lambda i: results[i]['score'])
-    optimal_k = results[optimal_idx]['k']
-    print(f'\nOptimal k={optimal_k} (score={results[optimal_idx]["score"]:.3f})')
-
-    return {'optimal_k': optimal_k, 'results': results}
-

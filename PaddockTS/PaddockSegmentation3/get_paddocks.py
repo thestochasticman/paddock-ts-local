@@ -2,10 +2,7 @@ import numpy as np
 import xarray as xr
 from os.path import exists
 from PaddockTS.query import Query
-from PaddockTS.PaddockSegmentation2.utils import (
-    compute_ndvi, compute_ndwi, compute_cluster_edges,
-    labels_to_paddocks, evaluate_paddocks,
-)
+from .utils import compute_ndvi, compute_ndwi, labels_to_paddocks, evaluate_paddocks
 from .wnet import segment_wnet
 
 
@@ -25,7 +22,7 @@ def get_paddocks(
     if not exists(query.sentinel2_path):
         download_sentinel2(query)
 
-    ds = xr.open_zarr(query.sentinel2_path)
+    ds = xr.open_zarr(query.sentinel2_path, chunks=None)
     ndvi = compute_ndvi(ds)
     ndwi = compute_ndwi(ds)
 
@@ -40,6 +37,9 @@ def get_paddocks(
           f'between var: {metrics["between_variance"]:.4f} | '
           f'ratio: {metrics["variance_ratio"]:.2f}')
 
+    paddocks = paddocks.sort_values('area_ha', ascending=False).reset_index(drop=True)
+    paddocks['label'] = range(1, len(paddocks) + 1)
+
     gpkg_path = f'{query.tmp_dir}/{query.stub}_paddocks_wnet.gpkg'
     paddocks.to_file(gpkg_path, driver='GPKG')
     print(f'Saved to {gpkg_path}')
@@ -53,7 +53,7 @@ def test():
     query = get_example_query()
     paddocks, labels = get_paddocks(query, n_classes=7)
 
-    ds = xr.open_zarr(query.sentinel2_path)
+    ds = xr.open_zarr(query.sentinel2_path, chunks=None)
     ndvi_median = np.nanmedian(compute_ndvi(ds), axis=2)
     x, y = ds.x.values, ds.y.values
     extent = [x.min(), x.max(), y.min(), y.max()]
