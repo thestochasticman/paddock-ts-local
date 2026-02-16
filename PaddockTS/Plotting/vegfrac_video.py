@@ -5,34 +5,38 @@ from PaddockTS.query import Query
 
 
 def _to_rgb(ds, time_idx):
-    r = ds['nbart_red'].isel(time=time_idx).values.astype(np.float32)
-    g = ds['nbart_green'].isel(time=time_idx).values.astype(np.float32)
-    b = ds['nbart_blue'].isel(time=time_idx).values.astype(np.float32)
+    """Map vegfrac to RGB: pv=green, npv=yellow, bg=brown."""
+    pv = ds['pv'].isel(time=time_idx).values.astype(np.float32)
+    npv = ds['npv'].isel(time=time_idx).values.astype(np.float32)
+    bg = ds['bg'].isel(time=time_idx).values.astype(np.float32)
+
+    total = np.maximum(pv + npv + bg, 1e-6)
+    pv, npv, bg = pv / total, npv / total, bg / total
+
+    r = np.clip(0.2 * pv + 0.8 * npv + 0.6 * bg, 0, 1)
+    g = np.clip(0.7 * pv + 0.7 * npv + 0.4 * bg, 0, 1)
+    b = np.clip(0.1 * pv + 0.1 * npv + 0.2 * bg, 0, 1)
+
     rgb = np.stack([r, g, b], axis=-1)
-    rgb[rgb == 0] = np.nan
-    rgb /= 10000.0
-    rgb = np.clip(rgb * 3, 0, 1)
-    rgb = np.nan_to_num(rgb, nan=0.0)
-    return rgb
+    return np.nan_to_num(rgb, nan=0.0)
 
 
-def sentinel2_video(query: Query, fps: int = 4, min_size: int = 1080):
-    ds = xr.open_zarr(query.sentinel2_path, chunks=None)
+def vegfrac_video(query: Query, fps: int = 4, min_size: int = 1080):
+    ds = xr.open_zarr(query.vegfrac_path, chunks=None)
     n_times = ds.sizes['time']
     dates = ds.time.values
     h, w = ds.sizes['y'], ds.sizes['x']
 
     scale = max(1, min_size / max(h, w))
-    out_h, out_w = int(h * scale) // 2 * 2, int(w * scale) // 2 * 2  # H.264 needs even dimensions
+    out_h, out_w = int(h * scale) // 2 * 2, int(w * scale) // 2 * 2
 
     import os
     import subprocess
     import tempfile
 
     os.makedirs(query.out_dir, exist_ok=True)
-    out_path = f'{query.out_dir}/{query.stub}_sentinel2.mp4'
+    out_path = f'{query.out_dir}/{query.stub}_vegfrac.mp4'
 
-    # write frames as PNGs, then encode with ffmpeg for H.264
     with tempfile.TemporaryDirectory() as tmpdir:
         for i in range(n_times):
             rgb = _to_rgb(ds, i)
@@ -68,8 +72,13 @@ def sentinel2_video(query: Query, fps: int = 4, min_size: int = 1080):
 
 
 def test():
+    from os.path import exists
     from PaddockTS.utils import get_example_query
-    sentinel2_video(get_example_query())
+    query = get_example_query()
+    if not exists(query.vegfrac_path):
+        from PaddockTS.IndicesAndVegFrac.veg_frac import compute_fractional_cover
+        compute_fractional_cover(query)
+    vegfrac_video(query)
 
 if __name__ == '__main__':
     test()
