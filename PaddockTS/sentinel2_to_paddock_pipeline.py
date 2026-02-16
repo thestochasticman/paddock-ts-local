@@ -1,10 +1,15 @@
+import io
+import os
 import time
+from contextlib import redirect_stdout
 from os.path import exists
 from rich.live import Live
 from rich.table import Table
 from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn
-from rich.console import Group
+from rich.console import Console, Group
 from PaddockTS.query import Query
+
+_console = Console(stderr=True)
 
 STEPS = [
     'Download Sentinel-2',
@@ -40,7 +45,16 @@ def _make_table(statuses, times):
     return table
 
 
-def run(query: Query):
+def run(query: Query, reload: bool = False):
+    if reload:
+        import shutil
+        for path in [query.sentinel2_path, query.vegfrac_path]:
+            if exists(path):
+                shutil.rmtree(path)
+        gpkg_path = f'{query.tmp_dir}/{query.stub}_paddocks.gpkg'
+        if exists(gpkg_path):
+            os.remove(gpkg_path)
+
     statuses = ['pending'] * len(STEPS)
     times = [None] * len(STEPS)
     paddocks = None
@@ -50,6 +64,7 @@ def run(query: Query):
         BarColumn(),
         TextColumn('{task.completed}/{task.total}'),
         TimeElapsedColumn(),
+        console=_console,
     )
     task_id = progress.add_task('Pipeline', total=len(STEPS))
 
@@ -64,19 +79,20 @@ def run(query: Query):
         lambda p=None: _vegfrac_paddocks_video(query, p),
     ]
 
-    with Live(Group(_make_table(statuses, times), progress), refresh_per_second=4) as live:
+    with Live(Group(_make_table(statuses, times), progress), console=_console, refresh_per_second=4) as live:
         for i, fn in enumerate(step_fns):
             statuses[i] = 'running'
             live.update(Group(_make_table(statuses, times), progress))
 
             t0 = time.time()
             try:
-                if i == 5:
-                    result = _sentinel2_paddocks_video(query, paddocks)
-                elif i == 7:
-                    result = _vegfrac_paddocks_video(query, paddocks)
-                else:
-                    result = fn()
+                with redirect_stdout(io.StringIO()):
+                    if i == 5:
+                        result = _sentinel2_paddocks_video(query, paddocks)
+                    elif i == 7:
+                        result = _vegfrac_paddocks_video(query, paddocks)
+                    else:
+                        result = fn()
                 if i == 3:
                     paddocks = result
                 statuses[i] = 'done'
@@ -141,5 +157,6 @@ def _vegfrac_paddocks_video(query, paddocks):
 
 
 if __name__ == '__main__':
+    import sys
     from PaddockTS.utils import get_example_query
-    run(get_example_query())
+    run(get_example_query(), reload='--reload' in sys.argv)
