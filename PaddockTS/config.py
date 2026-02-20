@@ -16,4 +16,4 @@ _tmp = expanduser('~/Downloads/PaddockTS-Tmp')
 _default = Config(_out, _tmp)
 
 confpath = os.path.expanduser('~/.config/PaddockTS.json')
-config = Config(**load(confpath)) if exists(confpath) else _default
+config = Config(**load(open(confpath))) if exists(confpath) else _default

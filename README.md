@@ -1,289 +1,88 @@
-# PaddockTS Local
+# PaddockTS
 
-A Python toolkit for paddock-level remote sensing workflows. It helps you:
+Satellite imagery to paddock boundaries and time-series videos.
 
-- Query an area of interest and time range  
-- Download satellite & environmental data  
-- Compute vegetation indices and fractional cover  
-- Segment paddock boundaries  
-- Build paddock time-series and plot maps/checkpoints
+Downloads Sentinel-2 data for a given bounding box and date range, computes vegetation indices and fractional cover, segments paddock boundaries, and generates video outputs.
 
-> This repo is a light, local developer workspace for the core library under [`PaddockTS/`](./PaddockTS/) plus configs, demos, and utilities.
-
----
-
-## Installation
-
-Using Conda (recommended):
+## Setup
 
 ```bash
-conda env create -f env.yml
-conda activate PaddockTSEnv
-```
-
-Minimal editable install with pip:
-
-```bash
+conda env create -f paddock-ts-env.yml
+conda activate paddock-ts
 pip install -e .
 ```
 
-> Dependencies/env specs live in [`env.yml`](./env.yml), [`env_2.yml`](./env_2.yml), and [`pyproject.toml`](./pyproject.toml).
+`fractionalcover3` needs to be installed from source separately.
 
----
-
-## Quick start
+## Usage
 
 ```python
+from datetime import date
 from PaddockTS.query import Query
-from PaddockTS.filter import Filter
-from PaddockTS.get_outputs import get_outputs
+from PaddockTS.sentinel2_to_paddock_pipeline import run
 
-
-# 1) Define your area/time window
 q = Query(
-    lat=-33.5040,
-    lon=148.4,
-    buffer=0.01,
-    start_time=date(2020, 1, 1),
-    end_time=date(2020, 6, 1),
-    collections=['ga_s2am_ard_3', 'ga_s2bm_ard_3'],
-    bands=[
-        'nbart_blue',
-        'nbart_green',
-        'nbart_red',
-    ],
-    filter=Filter.lt('eo:cloud_cover', 10)
+    bbox=[148.36265, -33.52606, 148.38265, -33.50606],
+    start=date(2020, 1, 1),
+    end=date(2024, 12, 31),
 )
 
-# 2) Produce standard outputs
-outputs = get_outputs(q)
+run(q)
+run(q, reload=True)  # delete cached data and rerun
 ```
 
-This typically will:
+Or from the command line:
 
-- Download Sentinel-2 and environmental data  
-- Compute indices and fractional cover  
-- Segment paddock boundaries  
-- Generate paddock-level time-series and optional figures
-
----
-
-## Repository layout
-
-### Top-level files & folders
-
-- [`PaddockTS/`](./PaddockTS/) — Core Python package (details below).  
-- [`demo/`](./demo/) — Simple examples/walk-throughs. 
-- [`env.yml`](./env.yml) — Primary Conda environment.  
-- [`env_2.yml`](./env_2.yml) — Alternative/experimental environment.  
-- [`pyproject.toml`](./pyproject.toml) — Project metadata & dependencies (PEP 621). 
-- [`test.py`](./test.py) — Small local test harness.  
-- [`README.md`](./README.md) — This document.
-
----
-
-
-### Python package: `PaddockTS/`
-
-
-```
-├── env.yml                             # Conda environment specification
-├── pyproject.toml                      # Package metadata & dependencies
-│
-├── PaddockTS/                          # Core library modules
-│   ├── Data/                           # Data acquisition utilities (download, environmental)
-│   │   ├── download_ds2.py               # Download Sentinel 2 data
-│   │   └── environmental.py              # Download Environment Data(Silo, etc)
-│   │
-│   ├── IndicesAndVegFrac/              # Index and fractional cover calculations
-│   │   ├── indices.py                    # Calculate Indices            
-│   │   ├── veg_frac.py                   # Add fractional cover score per pixel using a pretrained model
-│   │   ├── add_indices_and_veg_frac.py   # Run the above 2 steps
-│   │   └── utils.py
-│   │ 
-│   ├── PaddockSegmentation/            # Paddock boundary segmentation routines
-│   │   ├── _1_presegment.py              # Calculate NDWI Time Series and convert to a fourier image
-│   │   ├── _2_segment.py                 # Take the fourier image and segment to get paddocks(maks or polygons).
-│   │   ├── segment_paddocks.py           # Run the above 2 steps
-│   │   └── utils.py                      # Some utilities for paddock_ts
-│   │
-│   ├── PaddockTS                       # Generate Paddock Time Series Data
-│   │    ├──get_paddock_ts.py              # Generate PaddockTime Series Data
-│   │
-│   ├── Plotting/                         # Static plotting functions
-│   │   ├── plotting_functions.py       # Plotting
-│   │   ├── checkpoint_plots.py           # Checkpoint Plots
-│   │   └── topographic_plots.py          # Topographic Plots
-│   │ 
-│   ├── filter.py           # STAC‐API filter builder
-│   ├── legend.py           # File paths & configuration management
-│   ├── query.py            # Query class to define area of interest
-│   ├── get_outputs.py      # Wrapper to get all outputs from a given query
-│   └── __init__.py
-├── dist/                   # Built distributions
-└── README.md               # This documentation
-
+```bash
+python -m PaddockTS.sentinel2_to_paddock_pipeline
+python -m PaddockTS.sentinel2_to_paddock_pipeline --reload
 ```
 
-#### Data acquisition
+## Pipeline steps
 
-- [`PaddockTS/Data/download_ds2.py`](./PaddockTS/Data/download_ds2.py)  
-  Sentinel-2 acquisition: STAC-style search, AOI/time filtering, fetches required bands.
+1. Download Sentinel-2 imagery (DEA STAC) -> `{stub}_sentinel2.zarr`
+2. Compute indices (NDVI, CFI, NIRv, NDTI, CAI) -> in-memory
+3. Compute fractional cover (bg, pv, npv) -> `{stub}_vegfrac.zarr`
+4. Segment paddocks (k-means + vectorization) -> `{stub}_paddocks.gpkg`
+5. Sentinel-2 video -> `{stub}_sentinel2.mp4`
+6. Sentinel-2 + paddocks video -> `{stub}_sentinel2_paddocks.mp4`
+7. Vegfrac video -> `{stub}_vegfrac.mp4`
+8. Vegfrac + paddocks video -> `{stub}_vegfrac_paddocks.mp4`
 
-- [`PaddockTS/Data/environmental.py`](./PaddockTS/Data/environmental.py)  
-  Environmental data acquisition (e.g., rainfall/temperature). Stages variables for later joins.
+Intermediates go to `~/Downloads/PaddockTS-Tmp/{stub}/`, outputs to `~/Documents/PaddockTS-Outputs/{stub}/`. Override via `~/.config/PaddockTS.json`.
 
-#### Indices & fractional cover
+`{stub}` is a SHA-256 hash of `bbox + start + end`.
 
-- [`PaddockTS/IndicesAndVegFrac/indices.py`](./PaddockTS/IndicesAndVegFrac/indices.py)  
-  Spectral indices (e.g., NDVI, NDWI). Extend as needed.
-
-- [`PaddockTS/IndicesAndVegFrac/veg_frac.py`](./PaddockTS/IndicesAndVegFrac/veg_frac.py)  
-  Fractional cover from pretrained model/features.
-
-- [`PaddockTS/IndicesAndVegFrac/add_indices_and_veg_frac.py`](./PaddockTS/IndicesAndVegFrac/add_indices_and_veg_frac.py)  
-  Orchestrates index + veg-frac computation for scenes/stacks.
-
-- [`PaddockTS/IndicesAndVegFrac/utils.py`](./PaddockTS/IndicesAndVegFrac/utils.py)  
-  Band math, masking, QA, and shared I/O helpers.
-
-#### Paddock segmentation
-
-- [`PaddockTS/PaddockSegmentation/_1_presegment.py`](./PaddockTS/PaddockSegmentation/_1_presegment.py)  
-  Builds NDWI time-series and Fourier (seasonality) representation for segmentation.
-
-- [`PaddockTS/PaddockSegmentation/_2_segment.py`](./PaddockTS/PaddockSegmentation/_2_segment.py)  
-  Consumes Fourier image, produces paddock masks/polygons.
-
-- [`PaddockTS/PaddockSegmentation/segment_paddocks.py`](./PaddockTS/PaddockSegmentation/segment_paddocks.py)  
-  High-level driver that runs pre-segment + segment for an AOI.
-
-- [`PaddockTS/PaddockSegmentation/utils.py`](./PaddockTS/PaddockSegmentation/utils.py)  
-  Morphology, polygonization, cleaning, and other helpers.
-
-#### Paddock time-series
-
-- [`PaddockTS/PaddockTS/get_paddock_ts.py`](./PaddockTS/PaddockTS/get_paddock_ts.py)  
-  Aggregates per-pixel indices/cover within paddock polygons over time; can join environmental variables.
-
-#### Plotting
-
-- [`PaddockTS/Plotting/plotting_functions.py`](./PaddockTS/Plotting/plotting_functions.py)  
-  General plotting utilities for maps/time-series.
-
-- [`PaddockTS/Plotting/checkpoint_plots.py`](./PaddockTS/Plotting/checkpoint_plots.py)  
-  Visualizes intermediate “checkpoints” (masks, overlays, diagnostic panels).
-
-- [`PaddockTS/Plotting/topographic_plots.py`](./PaddockTS/Plotting/topographic_plots.py)  
-  Hillshade, slope/aspect overlays and topography QA plots.
-
-#### Core helpers
-
-- [`PaddockTS/filter.py`](./PaddockTS/filter.py)  
-  STAC/collection filter builder used by download routines.
-
-- [`PaddockTS/legend.py`](./PaddockTS/legend.py)  
-  Configuration manager: initializes and reads `~/.configs/PaddockTSLocal.json`.
-
-- [`PaddockTS/query.py`](./PaddockTS/query.py)  
-  Defines the `Query` object (AOI, CRS, date range, naming).
-
-- [`PaddockTS/get_outputs.py`](./PaddockTS/get_outputs.py)  
-  Convenience entry point tying the high-level steps together for a `Query`.
-
-- [`PaddockTS/__init__.py`](./PaddockTS/__init__.py)  
-  Package marker; may expose selected top-level imports.
-
----
-
-## Development notes
-
-- Start with a small AOI and short date window to validate your environment and caches.
-- Point `gdalwmscache/`, `tmp_dir`, and `scratch_dir` to fast local storage—these can grow quickly.
-- If you add indices or environmental variables, wire changes through:
-  1) acquisition ([`PaddockTS/Data/...`](./PaddockTS/Data/)) →
-  2) transforms ([`PaddockTS/IndicesAndVegFrac/...`](./PaddockTS/IndicesAndVegFrac/)) →
-  3) aggregation ([`PaddockTS/PaddockTS/get_paddock_ts.py`](./PaddockTS/PaddockTS/get_paddock_ts.py)) →
-  4) plotting ([`PaddockTS/Plotting/...`](./PaddockTS/Plotting/)).
-
----
-
-## Configuration
-
-PaddockTS uses a config file at `~/.paddockts.yaml` (or `~/.config/paddockts/config.yaml`):
-
-```yaml
-out_dir: ~/Documents/PaddockTSLocal    # Final outputs
-tmp_dir: ~/Downloads/PaddockTSLocal    # Intermediate files
-silo_dir: /path/to/shared/SILO         # SILO cache (optional)
-```
-
-**Set config programmatically:**
+## Check status
 
 ```python
-from PaddockTS.config import config
-
-config.out_dir = "/data/paddockts/output"
-config.tmp_dir = "/data/paddockts/tmp"
-config.silo_dir = "/data/paddockts/silo"
-config.save()  # Writes to ~/.paddockts.yaml
+from PaddockTS.status import status
+status(q)
+# {'sentinel2_video': True, 'sentinel2_paddocks_video': True, ...}
 ```
 
-**Environment variables** (override config file):
+## Project structure
+
+- `PaddockTS/query.py` — Query dataclass (bbox, start, end -> stub, paths)
+- `PaddockTS/config.py` — out_dir, tmp_dir, silo_dir
+- `PaddockTS/sentinel2_to_paddock_pipeline.py` — runs everything with a Rich progress table
+- `PaddockTS/status.py` — check which outputs exist for a query
+- `PaddockTS/Sentinel2/` — Sentinel-2 download (STAC search, cloud masking, Zarr)
+- `PaddockTS/IndicesAndVegFrac/` — spectral indices and fractional cover
+- `PaddockTS/PaddockSegmentation2/` — k-means based paddock segmentation
+- `PaddockTS/PaddockSegmentation3/` — experimental W-Net (PyTorch) segmentation
+- `PaddockTS/Plotting/` — video generation (sentinel2, vegfrac, with/without paddock overlays)
+- `PaddockTS/Environmental/` — SLGA soils and terrain tile downloads (standalone)
+
+## Running individual modules
+
+Each module has a `test()` function and `__main__` block that uses the example query (NSW, 2020-2024):
 
 ```bash
-export PADDOCKTS_OUT_DIR=/data/output
-export PADDOCKTS_TMP_DIR=/data/tmp
-export PADDOCKTS_SILO_DIR=/data/silo
+python -m PaddockTS.Sentinel2.download_sentinel2
+python -m PaddockTS.IndicesAndVegFrac.indices
+python -m PaddockTS.IndicesAndVegFrac.veg_frac
+python -m PaddockTS.PaddockSegmentation2.get_paddocks
+python -m PaddockTS.Plotting.sentinel2_video
+python -m PaddockTS.Plotting.vegfrac_video
 ```
-
----
-
-## SILO Data Cache
-
-SILO provides daily climate data for Australia (~400MB per year/variable). PaddockTS caches this data locally in Zarr format for thread-safe parallel access.
-
-### Background Updater
-
-The SILO updater keeps your cache fresh and fills missing years:
-
-```bash
-# One-shot update (fills missing years + refreshes current year)
-python -m PaddockTS.Data.Environmental.silo_updater --once
-
-# Run as background daemon (updates every 6 hours)
-python -m PaddockTS.Data.Environmental.silo_updater --daemon
-
-# Custom settings
-python -m PaddockTS.Data.Environmental.silo_updater --daemon --interval 12 --past-years 5
-```
-
-### Install as System Service
-
-**Systemd (recommended for servers):**
-
-```bash
-python -m PaddockTS.Data.Environmental.silo_updater --install-systemd
-systemctl --user daemon-reload
-systemctl --user enable silo-updater
-systemctl --user start silo-updater
-
-# Check status
-systemctl --user status silo-updater
-```
-
-**Cron (alternative):**
-
-```bash
-python -m PaddockTS.Data.Environmental.silo_updater --install-cron
-# Add the printed line to: crontab -e
-```
-
-### What the Updater Does
-
-1. Checks for missing years (default: 2016 to current year)
-2. Downloads missing `.nc` files from SILO
-3. Converts to `.zarr` format (thread-safe)
-4. Refreshes current year if cache is >24 hours old
-
----
