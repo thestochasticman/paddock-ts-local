@@ -5,7 +5,7 @@ from PaddockTS.query import Query
 
 
 def _to_rgb(ds, time_idx):
-    """Map vegfrac to RGB: pv=green, npv=yellow, bg=brown."""
+    """Map vegfrac to RGB: R=bg, G=pv, B=npv."""
     pv = ds['pv'].isel(time=time_idx).values.astype(np.float32)
     npv = ds['npv'].isel(time=time_idx).values.astype(np.float32)
     bg = ds['bg'].isel(time=time_idx).values.astype(np.float32)
@@ -13,12 +13,8 @@ def _to_rgb(ds, time_idx):
     total = np.maximum(pv + npv + bg, 1e-6)
     pv, npv, bg = pv / total, npv / total, bg / total
 
-    r = np.clip(0.2 * pv + 0.8 * npv + 0.6 * bg, 0, 1)
-    g = np.clip(0.7 * pv + 0.7 * npv + 0.4 * bg, 0, 1)
-    b = np.clip(0.1 * pv + 0.1 * npv + 0.2 * bg, 0, 1)
-
-    rgb = np.stack([r, g, b], axis=-1)
-    return np.nan_to_num(rgb, nan=0.0)
+    rgb = np.stack([bg, pv, npv], axis=-1)
+    return np.nan_to_num(np.clip(rgb, 0, 1), nan=0.0)
 
 
 def vegfrac_video(query: Query, fps: int = 4, min_size: int = 1080):

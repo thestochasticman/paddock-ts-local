@@ -11,7 +11,7 @@ class Query:
     bbox: list[float]
     start: date
     end: date
-    stub: str = field(default=build_from_input)  
+    stub: str = field(default=build_from_input) 
 
     tmp_dir: str = field(init=False)
     out_dir: str = field(init=False)

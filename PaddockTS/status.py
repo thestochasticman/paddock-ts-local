@@ -1,7 +1,8 @@
 from os.path import exists
 from PaddockTS.query import Query
 
-def check_status(query: Query) -> bool:
+
+def status(query: Query) -> dict[str, bool]:
     s = query.stub
     return {
         'sentinel2_video': exists(f'{query.out_dir}/{s}_sentinel2.mp4'),
@@ -9,7 +10,3 @@ def check_status(query: Query) -> bool:
         'vegfrac_video': exists(f'{query.out_dir}/{s}_vegfrac.mp4'),
         'vegfrac_paddocks_video': exists(f'{query.out_dir}/{s}_vegfrac_paddocks.mp4'),
     }
-
-if __name__ == '__main__':
-    from PaddockTS.utils import get_example_query
-    print(check_status(get_example_query()))

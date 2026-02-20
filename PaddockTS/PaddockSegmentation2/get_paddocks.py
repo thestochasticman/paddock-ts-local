@@ -15,7 +15,7 @@ def get_paddocks(
     k_range: range = range(3, 16),
     scoring: str = 'silhouette',
     epsilon_factor: float = 0.005,
-    method: str = 'rasterio',
+    method: str = 'contours',
 ):
     from PaddockTS.Sentinel2.download_sentinel2 import download_sentinel2
 
