@@ -51,9 +51,10 @@ def run(query: Query, reload: bool = False):
         for path in [query.sentinel2_path, query.vegfrac_path]:
             if exists(path):
                 shutil.rmtree(path)
-        gpkg_path = f'{query.tmp_dir}/{query.stub}_paddocks.gpkg'
-        if exists(gpkg_path):
-            os.remove(gpkg_path)
+        for suffix in ['_paddocks.gpkg', '_preseg.tif', '_sam_mask.tif', '_sam_raw.gpkg']:
+            path = f'{query.tmp_dir}/{query.stub}{suffix}'
+            if exists(path):
+                os.remove(path)
 
     statuses = ['pending'] * len(STEPS)
     times = [None] * len(STEPS)
@@ -86,13 +87,18 @@ def run(query: Query, reload: bool = False):
 
             t0 = time.time()
             try:
-                with redirect_stdout(io.StringIO()):
-                    if i == 5:
-                        result = _sentinel2_paddocks_video(query, paddocks)
-                    elif i == 7:
-                        result = _vegfrac_paddocks_video(query, paddocks)
-                    else:
-                        result = fn()
+                if i == 3:
+                    live.stop()
+                    result = fn()
+                    live.start()
+                else:
+                    with redirect_stdout(open(os.devnull, 'w')):
+                        if i == 5:
+                            result = _sentinel2_paddocks_video(query, paddocks)
+                        elif i == 7:
+                            result = _vegfrac_paddocks_video(query, paddocks)
+                        else:
+                            result = fn()
                 if i == 3:
                     paddocks = result
                 statuses[i] = 'done'
@@ -131,9 +137,8 @@ def _segment_paddocks(query):
     gpkg_path = f'{query.tmp_dir}/{query.stub}_paddocks.gpkg'
     if exists(gpkg_path):
         return gpd.read_file(gpkg_path)
-    from PaddockTS.PaddockSegmentation2.get_paddocks import get_paddocks
-    paddocks, labels = get_paddocks(query)
-    return paddocks
+    from PaddockTS.PaddockSegmentation.get_paddocks import get_paddocks
+    return get_paddocks(query)
 
 
 def _sentinel2_video(query):

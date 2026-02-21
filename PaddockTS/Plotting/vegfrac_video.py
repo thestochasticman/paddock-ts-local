@@ -46,7 +46,7 @@ def vegfrac_video(query: Query, fps: int = 4, min_size: int = 1080):
             thickness = max(1, int(out_h / 400))
             (tw, th), _ = cv2.getTextSize(date_str, font, font_scale, thickness)
             x_pos = out_w - tw - 15
-            y_pos = out_h - 15
+            y_pos = th + 15
             cv2.putText(frame, date_str, (x_pos, y_pos), font, font_scale, (255, 255, 255), thickness, cv2.LINE_AA)
 
             bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)

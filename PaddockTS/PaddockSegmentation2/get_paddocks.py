@@ -13,7 +13,7 @@ def get_paddocks(
     max_area_ha: float = 1500,
     min_compactness: float = 0.0,
     k_range: range = range(3, 16),
-    scoring: str = 'silhouette',
+    scoring: str = 'variance_ratio',
     epsilon_factor: float = 0.005,
     method: str = 'contours',
 ):

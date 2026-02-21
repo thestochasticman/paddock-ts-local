@@ -62,7 +62,7 @@ def sentinel2_video_with_paddocks(query: Query, paddocks, fps: int = 4, min_size
             font_scale = out_h / 600
             thickness = max(1, int(out_h / 400))
             (tw, th), _ = cv2.getTextSize(date_str, font, font_scale, thickness)
-            cv2.putText(frame, date_str, (out_w - tw - 15, out_h - 15),
+            cv2.putText(frame, date_str, (out_w - tw - 15, th + 15),
                         font, font_scale, (255, 255, 255), thickness, cv2.LINE_AA)
 
             bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
@@ -91,8 +91,8 @@ def test():
     if exists(gpkg_path):
         paddocks = gpd.read_file(gpkg_path)
     else:
-        from PaddockTS.PaddockSegmentation2.get_paddocks import get_paddocks
-        paddocks, labels = get_paddocks(query)
+        from PaddockTS.PaddockSegmentation.get_paddocks import get_paddocks
+        paddocks = get_paddocks(query)
     sentinel2_video_with_paddocks(query, paddocks)
 
 if __name__ == '__main__':

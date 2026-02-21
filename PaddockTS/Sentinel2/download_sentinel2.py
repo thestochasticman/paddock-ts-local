@@ -30,6 +30,8 @@ def download_sentinel2(
         datetime=f'{query.start}/{query.end}',
         filter=sentinel2.cloud_cover_filter
     )
+    import os
+    omp_before = os.environ.get('OMP_NUM_THREADS')
     with DaskClient(n_workers=num_workers, threads_per_worker=threads_per_worker) as client:
         try:
             ds: Dataset = odc.stac.load(
@@ -38,7 +40,7 @@ def download_sentinel2(
                 crs=sentinel2.crs,
                 resolution=sentinel2.resolution,
                 groupby=sentinel2.groupby,
-                bbox=query.bbox, 
+                bbox=query.bbox,
                 chunks={'time': chunk_time, 'x': chunk_x, 'y': chunk_y},
             )
             ds = client.compute(ds).result()
@@ -47,6 +49,11 @@ def download_sentinel2(
             raise
         finally:
             client.close()
+    # Dask sets OMP_NUM_THREADS=1 which cripples PyTorch in later pipeline steps
+    if omp_before is None:
+        os.environ.pop('OMP_NUM_THREADS', None)
+    else:
+        os.environ['OMP_NUM_THREADS'] = omp_before
     
     #creating cloud mask
     fmask = ds[sentinel2.cloud_mask_band]
