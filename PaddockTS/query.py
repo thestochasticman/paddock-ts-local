@@ -17,7 +17,6 @@ class Query:
     out_dir: str = field(init=False)
     centre_lon: float = field(init=False)
     centre_lat: float = field(init=False)
-    silo_dir: str = field(init=False)
     sentinel2_path: str = field(init=False)
     vegfrac_path: str = field(init=False)
 

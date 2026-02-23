@@ -9,11 +9,15 @@ import os
 class Config:
     out_dir: str
     tmp_dir: str
-    silo_dir: str = field(default=F(lambda s: f'{s.tmp_dir}/SILO', takes_self=True))
+    email: Optional[str] = None
+    tern_api_key: Optional[str] = None
 
 _out = expanduser('~/Documents/PaddockTS-Outputs')
 _tmp = expanduser('~/Downloads/PaddockTS-Tmp')
-_default = Config(_out, _tmp)
+_default = Config(_out, _tmp, None)
 
 confpath = os.path.expanduser('~/.config/PaddockTS.json')
 config = Config(**load(open(confpath))) if exists(confpath) else _default
+
+if __name__ == '__main__':
+    print(config)
