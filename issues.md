@@ -1,0 +1,1 @@
+Note on Segmentation: Try smoothing/resampling the NDWI time series before Fourier Transform. Maybe every 4 weeks. Should remove effects of clouds etc.

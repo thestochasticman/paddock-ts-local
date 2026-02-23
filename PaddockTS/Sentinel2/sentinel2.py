@@ -24,7 +24,7 @@ class Sentinel2:
     )
 
     cloud_mask_band: str = 'oa_fmask'
-    cloud_cover_filter: dict = {'op': '<', 'args': [{'property': 'eo:cloud_cover'}, 0.10],}
+    cloud_cover_filter: dict = {'op': '<', 'args': [{'property': 'eo:cloud_cover'}, 0.40],}
     fmask_cloud: int = 2
     fmask_shadow: int = 3
     crs: str = 'EPSG:6933'

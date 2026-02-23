@@ -1,3 +1,4 @@
+import gc
 import io
 import os
 import time
@@ -84,6 +85,19 @@ def run(query: Query, reload: bool = False):
         for i, fn in enumerate(step_fns):
             statuses[i] = 'running'
             live.update(Group(_make_table(statuses, times), progress))
+
+            # Clean up before segmentation step
+            if i == 3:
+                gc.collect()
+                for var in ['OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS']:
+                    os.environ.pop(var, None)
+                try:
+                    import torch
+                    torch.set_num_threads(os.cpu_count() or 4)
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                except ImportError:
+                    pass
 
             t0 = time.time()
             try:
