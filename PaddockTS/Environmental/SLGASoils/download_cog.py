@@ -13,7 +13,7 @@ def download_cog(
     api_key: str = None
 ) -> None:
     
-    api_key = load_tern_api() if api_key is None else api_key
+    api_key = load_tern_api(api_key) if api_key is None else api_key
     _setup_tern_auth(api_key)
     url = get_cog_url(attribute, depth)
     
