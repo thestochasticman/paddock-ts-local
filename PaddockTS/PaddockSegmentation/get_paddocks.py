@@ -15,6 +15,7 @@ def _log(msg):
 
 def get_paddocks(
     query: Query,
+    ds_sentinel2=None,
     min_area_ha: float = 5,
     max_area_ha: float = 1500,
     min_compactness: float = 0.1,
@@ -29,7 +30,7 @@ def get_paddocks(
     # 1. Presegmentation image
     _log("  Preseg: computing NDWI Fourier features...")
     t0 = time.time()
-    preseg_path = presegment(query)
+    preseg_path = presegment(query, ds_sentinel2=ds_sentinel2)
     _log(f"  Preseg: done ({time.time() - t0:.1f}s)")
 
     # 2. SAMGeo segmentation

@@ -97,7 +97,7 @@ def save_geotiff(ds: xr.Dataset, uint8_image: NDArray[np.uint8], path: str) -> N
     da.transpose("band", "y", "x").rio.to_raster(path)
 
 
-def presegment(query: Query) -> str:
+def presegment(query: Query, ds_sentinel2=None) -> str:
     """
     Create a 3-band uint8 NDWI Fourier GeoTIFF from Sentinel-2 data.
     Returns the path to the saved preseg GeoTIFF.
@@ -106,12 +106,13 @@ def presegment(query: Query) -> str:
     if exists(preseg_path):
         return preseg_path
 
-    from PaddockTS.Sentinel2.download_sentinel2 import download_sentinel2
-
-    if not exists(query.sentinel2_path):
-        download_sentinel2(query)
-
-    ds = xr.open_zarr(query.sentinel2_path, chunks=None)
+    if ds_sentinel2 is None:
+        if not exists(query.sentinel2_path):
+            from PaddockTS.Sentinel2.download_sentinel2 import download_sentinel2
+            download_sentinel2(query)
+        ds = xr.open_zarr(query.sentinel2_path, chunks=None)
+    else:
+        ds = ds_sentinel2
     features = compute_ndwi_fourier(ds)
     uint8_image = rescale_uint8(features)
 

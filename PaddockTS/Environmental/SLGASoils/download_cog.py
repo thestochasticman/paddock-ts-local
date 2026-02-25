@@ -1,7 +1,7 @@
 from rasterio.errors import RasterioIOError
 from rasterio.windows import from_bounds
 from .utils import _setup_tern_auth
-from .utils import load_tern_api
+from .utils import load_tern_api_key
 from .utils import get_cog_url
 import rasterio
 
@@ -13,7 +13,7 @@ def download_cog(
     api_key: str = None
 ) -> None:
     
-    api_key = load_tern_api(api_key) if api_key is None else api_key
+    api_key = load_tern_api_key(api_key) if api_key is None else api_key
     _setup_tern_auth(api_key)
     url = get_cog_url(attribute, depth)
     

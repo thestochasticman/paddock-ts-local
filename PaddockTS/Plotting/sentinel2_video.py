@@ -16,8 +16,15 @@ def _to_rgb(ds, time_idx):
     return rgb
 
 
-def sentinel2_video(query: Query, fps: int = 4, min_size: int = 1080):
-    ds = xr.open_zarr(query.sentinel2_path, chunks=None)
+def sentinel2_video(query: Query, ds_sentinel2=None, fps: int = 4, min_size: int = 1080):
+    if ds_sentinel2 is None:
+        import os
+        if not os.path.exists(query.sentinel2_path):
+            from PaddockTS.Sentinel2.download_sentinel2 import download_sentinel2
+            download_sentinel2(query)
+        ds = xr.open_zarr(query.sentinel2_path, chunks=None)
+    else:
+        ds = ds_sentinel2
     n_times = ds.sizes['time']
     dates = ds.time.values
     h, w = ds.sizes['y'], ds.sizes['x']
