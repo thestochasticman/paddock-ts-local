@@ -7,16 +7,18 @@ from PaddockTS.query import Query
 BANDS = ['nbart_blue', 'nbart_green', 'nbart_red', 'nbart_nir_1', 'nbart_swir_2', 'nbart_swir_3']
 
 
-def compute_fractional_cover(query: Query, model_n: int = 4, correction: bool = False):
+def compute_fractional_cover(query: Query, ds_sentinel2=None, model_n: int = 4, correction: bool = False):
     from os.path import exists
-    from PaddockTS.Sentinel2.download_sentinel2 import download_sentinel2
     from fractionalcover3.unmixcover import unmix_fractional_cover
     from fractionalcover3 import data
 
-    if not exists(query.sentinel2_path):
-        download_sentinel2(query)
-
-    ds = xr.open_zarr(query.sentinel2_path, chunks=None)
+    if ds_sentinel2 is None:
+        if not exists(query.sentinel2_path):
+            from PaddockTS.Sentinel2.download_sentinel2 import download_sentinel2
+            download_sentinel2(query)
+        ds = xr.open_zarr(query.sentinel2_path, chunks=None)
+    else:
+        ds = ds_sentinel2
     inref = np.stack([ds[b].values for b in BANDS], axis=1).astype(np.float32)
 
     if correction:

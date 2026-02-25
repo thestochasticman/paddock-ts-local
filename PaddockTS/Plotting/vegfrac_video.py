@@ -17,8 +17,15 @@ def _to_rgb(ds, time_idx):
     return np.nan_to_num(np.clip(rgb, 0, 1), nan=0.0)
 
 
-def vegfrac_video(query: Query, fps: int = 4, min_size: int = 1080):
-    ds = xr.open_zarr(query.vegfrac_path, chunks=None)
+def vegfrac_video(query: Query, ds_vegfrac=None, fps: int = 4, min_size: int = 1080):
+    if ds_vegfrac is None:
+        import os
+        if not os.path.exists(query.vegfrac_path):
+            from PaddockTS.IndicesAndVegFrac.veg_frac import compute_fractional_cover
+            compute_fractional_cover(query)
+        ds = xr.open_zarr(query.vegfrac_path, chunks=None)
+    else:
+        ds = ds_vegfrac
     n_times = ds.sizes['time']
     dates = ds.time.values
     h, w = ds.sizes['y'], ds.sizes['x']

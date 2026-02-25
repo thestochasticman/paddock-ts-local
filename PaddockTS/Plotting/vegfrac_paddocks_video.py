@@ -7,8 +7,15 @@ from PaddockTS.query import Query
 from .vegfrac_video import _to_rgb
 
 
-def vegfrac_video_with_paddocks(query: Query, paddocks, fps: int = 4, min_size: int = 1080):
-    ds = xr.open_zarr(query.vegfrac_path, chunks=None)
+def vegfrac_video_with_paddocks(query: Query, paddocks, ds_vegfrac=None, ds_sentinel2=None, fps: int = 4, min_size: int = 1080):
+    if ds_vegfrac is None:
+        import os
+        if not os.path.exists(query.vegfrac_path):
+            from PaddockTS.IndicesAndVegFrac.veg_frac import compute_fractional_cover
+            compute_fractional_cover(query)
+        ds = xr.open_zarr(query.vegfrac_path, chunks=None)
+    else:
+        ds = ds_vegfrac
     n_times = ds.sizes['time']
     dates = ds.time.values
     h, w = ds.sizes['y'], ds.sizes['x']
@@ -17,7 +24,10 @@ def vegfrac_video_with_paddocks(query: Query, paddocks, fps: int = 4, min_size: 
     out_h, out_w = int(h * scale) // 2 * 2, int(w * scale) // 2 * 2
 
     # rasterize boundaries once
-    s2 = xr.open_zarr(query.sentinel2_path, chunks=None)
+    if ds_sentinel2 is None:
+        s2 = xr.open_zarr(query.sentinel2_path, chunks=None)
+    else:
+        s2 = ds_sentinel2
     transform = s2.rio.transform()
     shapes = [(geom.boundary, 1) for geom in paddocks.geometry]
     boundary_mask = rasterize(shapes, out_shape=(h, w), transform=transform, fill=0,
