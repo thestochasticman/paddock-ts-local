@@ -1,0 +1,3 @@
+[submodule "PaddockTS/PaddockTS/Phenology/phenolopy"]
+	path = PaddockTS/PaddockTS/Phenology/phenolopy
+	url = https://github.com/lewistrotter/phenolopy

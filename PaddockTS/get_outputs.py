@@ -5,7 +5,7 @@ from PaddockTS.Environmental.SILO.download_silo import download_silo
 
 from PaddockTS.IndicesAndVegFrac.veg_frac import compute_fractional_cover
 from PaddockTS.Sentinel2.download_sentinel2 import download_sentinel2
-from PaddockTS.PaddockSegmentation2.get_paddocks import get_paddocks
+from PaddockTS.PaddockSegmentation.get_paddocks import get_paddocks
 
 from PaddockTS.Plotting.sentinel2_paddocks_video import sentinel2_video_with_paddocks
 from PaddockTS.Plotting.vegfrac_paddocks_video import vegfrac_video_with_paddocks

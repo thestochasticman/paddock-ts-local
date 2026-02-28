@@ -80,7 +80,7 @@ def get_paddocks(
         & (gdf["compactness"] >= min_compactness)
     ].copy()
     paddocks = paddocks.sort_values("area_ha", ascending=False).reset_index(drop=True)
-    paddocks["label"] = range(1, len(paddocks) + 1)
+    paddocks["paddock"] = range(1, len(paddocks) + 1)
 
     gpkg_path = f"{query.tmp_dir}/{query.stub}_paddocks.gpkg"
     paddocks.to_file(gpkg_path, driver="GPKG")
