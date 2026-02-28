@@ -41,7 +41,7 @@ def vegfrac_video_with_paddocks(query: Query, paddocks, ds_vegfrac=None, ds_sent
     for _, row in paddocks.iterrows():
         cx, cy = row.geometry.representative_point().x, row.geometry.representative_point().y
         px, py = inv_transform * (cx, cy)
-        label_positions.append((int(row.label), int(px * scale), int(py * scale)))
+        label_positions.append((int(row.paddock), int(px * scale), int(py * scale)))
 
     import os
     import subprocess
