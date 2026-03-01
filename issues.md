@@ -1,1 +1,3 @@
 Note on Segmentation: Try smoothing/resampling the NDWI time series before Fourier Transform. Maybe every 4 weeks. Should remove effects of clouds etc.
+
+PROJ version mismatch: pip-installed rasterio 1.4.4 bundles PROJ 9.7.1 (proj.db layout 1.6) which conflicts with conda PROJ 9.6.2 (proj.db layout 1.5). This breaks phenolopy import because datacube calls rasterio.crs.CRS.from_epsg(3857) at import time. Fix: install rasterio from conda-forge instead of pip (`conda install -c conda-forge rasterio`).

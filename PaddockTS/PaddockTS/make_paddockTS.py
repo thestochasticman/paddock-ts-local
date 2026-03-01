@@ -38,6 +38,10 @@ def make_paddockTS(query, ds_sentinel2=None, paddocks=None, crs="epsg:6933"):
             download_sentinel2(query)
         ds_sentinel2 = xr.open_zarr(query.sentinel2_path, chunks=None)
 
+    # Compute vegetation indices (NDVI, CFI, NIRv, NDTI, CAI)
+    from PaddockTS.IndicesAndVegFrac.indices import compute_indices
+    ds_sentinel2 = compute_indices(query, ds_sentinel2=ds_sentinel2)
+
     if paddocks is None:
         import geopandas as gpd
         gpkg_path = f'{query.tmp_dir}/{query.stub}_paddocks.gpkg'
