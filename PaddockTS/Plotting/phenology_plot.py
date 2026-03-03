@@ -7,7 +7,7 @@ import xarray as xr
 from PaddockTS.query import Query
 
 
-def phenology_plot(query: Query, phenology_results: dict[int, pd.DataFrame] | None = None, ds_yearly: dict[int, xr.Dataset] | None = None, ds_paddockTS: xr.Dataset | None = None, variable: str = 'nbart_nir_1') -> str:
+def phenology_plot(query: Query, phenology_results: dict[int, pd.DataFrame] | None = None, ds_yearly: dict[int, xr.Dataset] | None = None, ds_paddockTS: xr.Dataset | None = None, variable: str = 'NDVI') -> str:
     """
     Overlay raw and interpolated data with phenology markers.
     Layout: paddock rows x year columns.

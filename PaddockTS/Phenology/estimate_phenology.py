@@ -20,7 +20,7 @@ def _override_xr_merge():
         phenolopy.xr.merge = _real_merge
 
 
-def estimate_phenology(query, ds_yearly=None, variable='nbart_nir_1'):
+def estimate_phenology(query, ds_yearly=None, variable='NDVI'):
     """
     For each year in ds_yearly, compute phenology metrics using phenolopy.
 

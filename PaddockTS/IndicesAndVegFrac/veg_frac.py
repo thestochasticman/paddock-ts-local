@@ -1,3 +1,10 @@
+import os
+import warnings
+
+os.environ.setdefault('TF_CPP_MIN_LOG_LEVEL', '3')
+warnings.filterwarnings('ignore', module='tensorflow')
+warnings.filterwarnings('ignore', module='keras')
+
 import numpy as np
 import xarray as xr
 from xarray import Dataset
