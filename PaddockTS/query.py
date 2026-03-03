@@ -30,3 +30,4 @@ class Query:
     # __str__ = lambda s: s.stub
     def __str__(s)->str: return s.stub
 
+
