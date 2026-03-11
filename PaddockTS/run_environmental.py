@@ -17,6 +17,7 @@ STEPS = [
     'Download OzWALD daily',
     'Download SILO',
     'Download SLGA soils',
+    'DAESim forcing',
     'OzWALD plot',
     'SILO plot',
     'Terrain plot',
@@ -104,14 +105,18 @@ def run_environmental(query: Query, reload: bool = False, concurrent: bool = Fal
                         download_slga_soils(query)
 
                     elif i == 4:
+                        from PaddockTS.Environmental.daesim_forcing import daesim_forcing
+                        daesim_forcing(query)
+
+                    elif i == 5:
                         from PaddockTS.Plotting.ozwald_plot import ozwald_daily_plot
                         ozwald_daily_plot(query)
 
-                    elif i == 5:
+                    elif i == 6:
                         from PaddockTS.Plotting.silo_plot import silo_plot
                         silo_plot(query)
 
-                    elif i == 6:
+                    elif i == 7:
                         if concurrent:
                             statuses[i] = 'waiting'
                             live.update(Group(_make_table(statuses, times), progress))
