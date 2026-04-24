@@ -37,7 +37,7 @@ pip install -e .
 from PaddockTS.query import Query
 from PaddockTS.filter import Filter
 from PaddockTS.get_outputs import get_outputs
-
+from datetime import date
 
 # 1) Define your area/time window
 q = Query(
