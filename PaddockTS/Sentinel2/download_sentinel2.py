@@ -1,3 +1,4 @@
+import os
 import odc.stac
 import rioxarray
 import numpy as np
@@ -9,7 +10,13 @@ from PaddockTS.query import Query
 from .sentinel2 import defaultsentinel2
 from dask.distributed import Client as DaskClient
 
-odc.stac.configure_rio(cloud_defaults=True, aws={"aws_unsigned": True},)
+def _s3_to_https(url: str) -> str:
+    """Convert S3 URLs to HTTPS to avoid AWS auth issues."""
+    if url.startswith('s3://dea-public-data/'):
+        return url.replace('s3://dea-public-data/', 'https://data.dea.ga.gov.au/')
+    return url
+
+odc.stac.configure_rio(cloud_defaults=True, aws={"aws_unsigned": True})
 
 def download_sentinel2(
     query: Query,
@@ -30,9 +37,9 @@ def download_sentinel2(
         datetime=f'{query.start}/{query.end}',
         filter=sentinel2.cloud_cover_filter
     )
-    import os
     omp_before = os.environ.get('OMP_NUM_THREADS')
     with DaskClient(n_workers=num_workers, threads_per_worker=threads_per_worker) as client:
+        odc.stac.configure_rio(cloud_defaults=True, aws={"aws_unsigned": True}, client=client)
         try:
             ds: Dataset = odc.stac.load(
                 list(result.items()),
@@ -42,6 +49,7 @@ def download_sentinel2(
                 groupby=sentinel2.groupby,
                 bbox=query.bbox,
                 chunks={'time': chunk_time, 'x': chunk_x, 'y': chunk_y},
+                patch_url=_s3_to_https,
             )
             ds = client.compute(ds).result()
         except Exception as e:
