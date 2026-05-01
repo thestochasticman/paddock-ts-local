@@ -29,3 +29,4 @@ dependencies:
   - pip
   - pip:
     - git+https://gitlab.com/yasaradeel/fc-3-u.git
+    - netcdf4
