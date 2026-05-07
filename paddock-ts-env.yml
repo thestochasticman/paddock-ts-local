@@ -26,6 +26,8 @@ dependencies:
   - pandas
   - pillow
   - pysheds
+  - cvxpy
+  - ecos
   - pip
   - pip:
     - git+https://gitlab.com/yasaradeel/fc-3-u.git

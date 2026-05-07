@@ -134,8 +134,9 @@ def download_smips(query: Query, layer: str = smips.layer, workers: int = 8) -> 
     if exists(filename):
         print(f'  cached: {filename}')
         ds = xr.open_dataset(filename)
-        var_name = list(ds.data_vars)[0]
-        da = ds[var_name].load()
+        # Find the actual data variable (not spatial_ref or other metadata)
+        data_vars = [v for v in ds.data_vars if v != 'spatial_ref']
+        da = ds[data_vars[0]].load()
         ds.close()
         return da
 
@@ -143,7 +144,8 @@ def download_smips(query: Query, layer: str = smips.layer, workers: int = 8) -> 
     print(f'  fetching SMIPS data for bbox {bbox}...', flush=True)
 
     cube = smips_cube(query.start, query.end, bbox, layer=layer, workers=workers)
-    # Save as Dataset to preserve all metadata
+    # Compute to avoid dask scheduler issues, then save
+    cube = cube.compute()
     cube.to_dataset(name=layer.lower()).to_netcdf(filename)
     print(f'  saved: {filename} ({len(cube.time)} days)')
     return cube
