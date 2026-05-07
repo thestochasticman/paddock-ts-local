@@ -33,3 +33,5 @@ dependencies:
   - pip:
     - git+https://gitlab.com/yasaradeel/fc-3-u.git
     - netcdf4
+    - statsmodels
+    - datacube
