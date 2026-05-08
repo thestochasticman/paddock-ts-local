@@ -1,7 +1,9 @@
 from attrs import frozen, field, Factory as F
+from typing_extensions import Self
 from os.path import expanduser
-from os.path import exists
 from typing import Optional
+from os.path import exists
+from os import makedirs
 from json import load
 import os
 
@@ -11,6 +13,10 @@ class Config:
     tmp_dir: str
     email: Optional[str] = None
     tern_api_key: Optional[str] = None
+
+    def __post_init__(s: Self):
+        makedirs(s.out_dir, exist_ok=True)
+        makedirs(s.tmp_dir, exist_ok=True)
 
 _out = expanduser('~/Documents/PaddockTS-Outputs')
 _tmp = expanduser('~/Downloads/PaddockTS-Tmp')
