@@ -1,7 +1,9 @@
 from attrs import frozen, field, Factory as F
+from typing_extensions import Self
 from .config import config
-from datetime import date
 from hashlib import sha256
+from datetime import date
+from os import makedirs
 
 encode = lambda x: sha256(x.encode()).hexdigest()
 build_from_input = F(lambda s: encode(''.join([str(s.bbox), str(s.start), str(s.end)])), takes_self=True)
@@ -26,6 +28,10 @@ class Query:
     centre_lat.default(lambda s: (s.bbox[1] + s.bbox[3])/2)
     sentinel2_path.default(lambda s: f'{s.tmp_dir}/{s.stub}_sentinel2.zarr')
     vegfrac_path.default(lambda s: f'{s.tmp_dir}/{s.stub}_vegfrac.zarr')
+
+    def __post_init__(s: Self):
+        makedirs(s.tmp_dir, exist_ok=True)
+        makedirs(s.out_dir, exist_ok=True)
 
     # __str__ = lambda s: s.stub
     def __str__(s)->str: return s.stub
