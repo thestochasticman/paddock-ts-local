@@ -21,3 +21,6 @@ dependencies = [
 
 [tool.setuptools.packages.find]
 include = ["PaddockTS", "PaddockTS.*"]
+
+[project.scripts]
+paddockts-setup = "PaddockTS.setup:run_setup"
