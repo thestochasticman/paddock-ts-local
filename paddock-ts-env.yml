@@ -22,7 +22,6 @@ dependencies:
   - pystac-client
   - odc-stac
   - pytorch
-  - pytorch-cuda
   - pandas
   - pillow
   - pysheds

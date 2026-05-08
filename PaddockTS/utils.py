@@ -7,3 +7,21 @@ get_example_query = lambda: Query(
     end=date(2021, 12, 31),
     stub='RANDOM_PADDOCKTS_QUERY_2'
 )
+
+get_example_query2 = lambda: Query.from_lat_lon(
+    -35.098087,
+    148.929983,
+    2,
+    date(2025, 6, 1),
+    date(2025, 6, 30),
+    stub='EXAMPLE_2'
+)
+
+get_example_query2 = lambda: Query.from_lat_lon(
+    -35.098087,
+    148.929983,
+    2,
+    date(2025, 6, 1),
+    date(2025, 6, 30),
+    stub='EXAMPLE_3'
+)

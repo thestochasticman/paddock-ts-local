@@ -26,9 +26,9 @@ class SMIPSDownscaleConfig:
         Print solver progress. Default False.
     """
 
-    lambda_smoothness: float = 0.1
+    lambda_smoothness: float = 0.5
     solver: str = 'SCS'
     max_iters: int = 5000
     max_gap_days: int = 1
     use_terrain: bool = True
-    verbose: bool = False
+    verbose: bool = True

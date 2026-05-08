@@ -281,12 +281,16 @@ def test():
 
     # Murrumbateman area, NSW - hilly grazing/wine country
     # Good terrain variation + seasonal soil moisture changes
-    test_q = Query(
-        bbox=[149.00, -34.98, 149.02, -34.96],  # ~2km x 2km
-        start=date(2022, 1, 1),   # Summer (dry)
-        end=date(2022, 12, 31),   # Full year for seasonal variation
-        stub='SMIPS_DOWNSCALE_HILLY',
-    )
+    # test_q = Query(
+    #     bbox=[149.00, -34.98, 149.02, -34.96],  # ~2km x 2km
+    #     start=date(2022, 1, 1),   # Summer (dry)
+    #     end=date(2022, 12, 31),   # Full year for seasonal variation
+    #     stub='SMIPS_DOWNSCALE_HILLY',
+    # )
+
+    from PaddockTS.utils import get_example_query2
+
+    test_q = get_example_query2()
 
     # Ensure S2 data exists
     if not exists(test_q.sentinel2_path):
@@ -343,7 +347,7 @@ def test():
     if len(result.time) > 0:
         fig, axes = plt.subplots(2, 2, figsize=(12, 10))
 
-        t0 = result.time[0].values
+        t0 = result.time[2].values
 
         # Original SMIPS (find nearest)
         smips_t = select_nearest_smips(smips, t0)
