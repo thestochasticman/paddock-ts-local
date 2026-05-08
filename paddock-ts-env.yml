@@ -1,4 +1,4 @@
-name: paddock-ts
+name: paddockts-env
 channels:
   - conda-forge
   - pytorch
@@ -29,8 +29,10 @@ dependencies:
   - ecos
   - pip
   - tensorflow
+  - datacube
+
   - pip:
     - git+https://gitlab.com/yasaradeel/fc-3-u.git
     - netcdf4
     - statsmodels
-    - datacube
+ 

@@ -1,6 +1,9 @@
+import os
+import sys
+os.environ["PROJ_DATA"] = os.path.join(sys.prefix, "share", "proj")
+
 import gc
 import io
-import os
 import time
 from contextlib import redirect_stdout
 from os.path import exists
