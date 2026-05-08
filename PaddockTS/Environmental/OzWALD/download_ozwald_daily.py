@@ -31,6 +31,7 @@ def _download_variable(variable, years, bbox):
 
 def download_ozwald_daily(query: Query, variables: list[str] = None):
     makedirs(f'{query.tmp_dir}/Environmental', exist_ok=True)
+    makedirs(f'{query.out_dir}/Environmental', exist_ok=True)
     filename = get_filename(query)
 
     if exists(filename):
