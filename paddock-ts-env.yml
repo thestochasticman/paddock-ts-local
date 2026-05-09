@@ -3,7 +3,7 @@ channels:
   - conda-forge
   - pytorch
 dependencies:
-  - python=3.10
+  - python=3.11
   - samgeo
   - numpy
   - xarray
@@ -32,7 +32,6 @@ dependencies:
   - datacube
 
   - pip:
-    - git+https://gitlab.com/yasaradeel/fc-3-u.git
     - netcdf4
     - statsmodels
  

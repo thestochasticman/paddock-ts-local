@@ -94,13 +94,18 @@ def test():
     import rioxarray
     import matplotlib.pyplot as plt
     from PaddockTS.utils import get_example_query
-    from PaddockTS.PaddockSegmentation2.utils import compute_ndvi
 
     query = get_example_query()
     paddocks = get_paddocks(query, device="cpu")
 
     ds = xr.open_zarr(query.sentinel2_path, chunks=None)
-    ndvi_median = np.nanmedian(compute_ndvi(ds), axis=2)
+    nir = ds["nbart_nir_1"].transpose("y", "x", "time").values.astype(np.float32)
+    red = ds["nbart_red"].transpose("y", "x", "time").values.astype(np.float32)
+    nir[nir == 0] = np.nan
+    red[red == 0] = np.nan
+    ndvi = (nir - red) / (nir + red)
+    ndvi[~np.isfinite(ndvi)] = np.nan
+    ndvi_median = np.nanmedian(ndvi, axis=2)
     x, y = ds.x.values, ds.y.values
     extent = [x.min(), x.max(), y.min(), y.max()]
 

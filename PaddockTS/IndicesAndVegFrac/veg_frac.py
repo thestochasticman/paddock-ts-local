@@ -16,8 +16,7 @@ BANDS = ['nbart_blue', 'nbart_green', 'nbart_red', 'nbart_nir_1', 'nbart_swir_2'
 
 def compute_fractional_cover(query: Query, ds_sentinel2=None, model_n: int = 4, correction: bool = False):
     from os.path import exists
-    from fractionalcover3.unmixcover import unmix_fractional_cover
-    from fractionalcover3 import data
+    from PaddockTS.IndicesAndVegFrac._unmix import unmix_fractional_cover, get_model
 
     if ds_sentinel2 is None:
         if not exists(query.sentinel2_path):
@@ -37,7 +36,7 @@ def compute_fractional_cover(query: Query, ds_sentinel2=None, model_n: int = 4, 
 
     fractions = np.empty((inref.shape[0], 3, inref.shape[2], inref.shape[3]))
     for t in range(inref.shape[0]):
-        fractions[t] = unmix_fractional_cover(inref[t], fc_model=data.get_model(n=model_n))
+        fractions[t] = unmix_fractional_cover(inref[t], fc_model=get_model(n=model_n))
 
     coords = {'time': ds.time, 'y': ds.y, 'x': ds.x}
     frac_ds = xr.Dataset({

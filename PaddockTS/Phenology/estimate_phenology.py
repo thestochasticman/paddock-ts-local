@@ -1,6 +1,6 @@
 import xarray as xr
 from contextlib import contextmanager
-from PaddockTS.Phenology.phenolopy.scripts import phenolopy
+from PaddockTS.Phenology import _phenolopy as phenolopy
 
 # Backup the original merge
 _real_merge = xr.merge

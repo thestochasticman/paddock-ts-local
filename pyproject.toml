@@ -5,22 +5,72 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "PaddockTS"
 version = "0.8.0"
-description = "Vegetation fractional cover estimates via a TensorFlow-trained MLP model"
+description = "Paddock segmentation and time-series analysis from Sentinel-2 imagery"
 readme = "README.md"
 authors = [
-  { name = "Borevitz Labs Australian National University" },
+  { name = "Borevitz Lab, Australian National University" },
   { name = "Yasar Adeel Ansari", email = "u6737670@anu.edu.au" },
 ]
 license = { text = "MIT" }
-requires-python = ">=3.8"
-dependencies = [
-  'tensorflow; sys_platform == "darwin"',
-  "dataclasses-json",
-  "typing_extensions",
+requires-python = ">=3.11"
+keywords = [
+  "remote-sensing",
+  "sentinel-2",
+  "agriculture",
+  "phenology",
+  "segmentation",
+  "fractional-cover",
+  "time-series",
+  "geospatial",
+  "paddock",
 ]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: GIS",
+  "Topic :: Scientific/Engineering :: Image Processing",
+]
+dependencies = [
+  "attrs",
+  "cvxpy",
+  "dask",
+  "datacube",
+  "geopandas",
+  "matplotlib",
+  "netcdf4",
+  "numpy",
+  "odc-stac",
+  "opencv-python",
+  "pandas",
+  "pillow",
+  "pysheds",
+  "pystac-client",
+  "rasterio",
+  "requests",
+  "rich",
+  "rioxarray",
+  "scipy",
+  "segment-geospatial",
+  "shapely",
+  "statsmodels",
+  "tensorflow",
+  "torch",
+  "typing_extensions",
+  "xarray",
+]
+
+[project.urls]
+Homepage = "https://github.com/thestochasticman/paddock-ts-local"
+Repository = "https://github.com/thestochasticman/paddock-ts-local"
+Issues = "https://github.com/thestochasticman/paddock-ts-local/issues"
 
 [tool.setuptools.packages.find]
 include = ["PaddockTS", "PaddockTS.*"]
 
-[project.scripts]
-paddockts-setup = "PaddockTS.setup:run_setup"
+[tool.setuptools.package-data]
+"PaddockTS.IndicesAndVegFrac._models" = ["*.tflite"]
