@@ -71,7 +71,7 @@ def download_sentinel2(
     nan_frac = ds.to_array().isnull().mean(dim=['variable', 'x', 'y'])
     ds = ds.sel(time=nan_frac < max_nan_fraction)
     makedirs(query.tmp_dir, exist_ok=True)
-    ds.to_zarr(query.sentinel2_path, mode='w')
+    ds.to_zarr(query.sentinel2_path, mode='w', zarr_format=2)
     return ds
 
 

@@ -18,12 +18,12 @@ _console = Console(stderr=True)
 STEPS = [
     'Download Sentinel-2',
     'Compute indices',
-    'Compute vegfrac',
+    'Compute fractional cover',
     'Segment paddocks',
     'Sentinel-2 video',
     'Sentinel-2 + paddocks video',
-    'Vegfrac video',
-    'Vegfrac + paddocks video',
+    'Fractional cover video',
+    'Fractional cover + paddocks video',
 ]
 
 
@@ -52,7 +52,7 @@ def _make_table(statuses, times):
 def run(query: Query, reload: bool = False):
     if reload:
         import shutil
-        for path in [query.sentinel2_path, query.vegfrac_path]:
+        for path in [query.sentinel2_path, query.fractional_cover_path]:
             if exists(path):
                 shutil.rmtree(path)
         for suffix in ['_paddocks.gpkg', '_preseg.tif', '_sam_mask.tif', '_sam_raw.gpkg']:
@@ -76,12 +76,12 @@ def run(query: Query, reload: bool = False):
     step_fns = [
         lambda: _download_sentinel2(query),
         lambda: _compute_indices(query),
-        lambda: _compute_vegfrac(query),
+        lambda: _compute_fractional_cover(query),
         lambda: _segment_paddocks(query),
         lambda: _sentinel2_video(query),
         lambda p=None: _sentinel2_paddocks_video(query, p),
-        lambda: _vegfrac_video(query),
-        lambda p=None: _vegfrac_paddocks_video(query, p),
+        lambda: _fractional_cover_video(query),
+        lambda p=None: _fractional_cover_paddocks_video(query, p),
     ]
 
     with Live(Group(_make_table(statuses, times), progress), console=_console, refresh_per_second=4) as live:
@@ -113,7 +113,7 @@ def run(query: Query, reload: bool = False):
                         if i == 5:
                             result = _sentinel2_paddocks_video(query, paddocks)
                         elif i == 7:
-                            result = _vegfrac_paddocks_video(query, paddocks)
+                            result = _fractional_cover_paddocks_video(query, paddocks)
                         else:
                             result = fn()
                 if i == 3:
@@ -138,14 +138,14 @@ def _download_sentinel2(query):
 
 
 def _compute_indices(query):
-    from PaddockTS.IndicesAndVegFrac.indices import compute_indices
+    from PaddockTS.SpectralIndices.indices import compute_indices
     compute_indices(query)
 
 
-def _compute_vegfrac(query):
-    if exists(query.vegfrac_path):
+def _compute_fractional_cover(query):
+    if exists(query.fractional_cover_path):
         return
-    from PaddockTS.IndicesAndVegFrac.veg_frac import compute_fractional_cover
+    from PaddockTS.FractionalCover.compute_fractional_cover import compute_fractional_cover
     compute_fractional_cover(query)
 
 
@@ -168,14 +168,14 @@ def _sentinel2_paddocks_video(query, paddocks):
     return sentinel2_video_with_paddocks(query, paddocks)
 
 
-def _vegfrac_video(query):
-    from PaddockTS.Plotting.vegfrac_video import vegfrac_video
-    return vegfrac_video(query)
+def _fractional_cover_video(query):
+    from PaddockTS.Plotting.fractional_cover_video import fractional_cover_video
+    return fractional_cover_video(query)
 
 
-def _vegfrac_paddocks_video(query, paddocks):
-    from PaddockTS.Plotting.vegfrac_paddocks_video import vegfrac_video_with_paddocks
-    return vegfrac_video_with_paddocks(query, paddocks)
+def _fractional_cover_paddocks_video(query, paddocks):
+    from PaddockTS.Plotting.fractional_cover_paddocks_video import fractional_cover_paddocks_video
+    return fractional_cover_paddocks_video(query, paddocks)
 
 
 if __name__ == '__main__':

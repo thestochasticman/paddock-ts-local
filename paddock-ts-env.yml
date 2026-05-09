@@ -30,8 +30,6 @@ dependencies:
   - pip
   - tensorflow
   - datacube
-
-  - pip:
-    - netcdf4
-    - statsmodels
+  - netcdf4
+  - statsmodels
  

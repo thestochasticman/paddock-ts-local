@@ -1,5 +1,5 @@
-The fractional cover unmixing logic in PaddockTS/IndicesAndVegFrac/_unmix.py
-and the .tflite model files in PaddockTS/IndicesAndVegFrac/_models/ are
+The fractional cover unmixing logic in PaddockTS/FractionalCover/_unmix.py
+and the .tflite model files in PaddockTS/FractionalCover/_models/ are
 adapted from the fractionalcover3 package by Robert Denham.
 
 The original software is distributed under the following license:

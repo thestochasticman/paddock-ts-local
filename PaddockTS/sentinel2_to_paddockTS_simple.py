@@ -9,7 +9,7 @@ from PaddockTS.query import Query
 
 def run(query: Query, reload: bool = False):
     if reload:
-        for path in [query.sentinel2_path, query.vegfrac_path]:
+        for path in [query.sentinel2_path, query.fractional_cover_path]:
             if exists(path):
                 shutil.rmtree(path)
         for pattern in [
@@ -49,19 +49,19 @@ def run(query: Query, reload: bool = False):
     # 2. Compute indices
     print('[2/13] Compute indices...', flush=True)
     t0 = time.time()
-    from PaddockTS.IndicesAndVegFrac.indices import compute_indices
+    from PaddockTS.SpectralIndices.indices import compute_indices
     ds_sentinel2 = compute_indices(query, ds_sentinel2=ds_sentinel2)
     print(f'  done ({time.time() - t0:.1f}s)', flush=True)
     gc.collect()
 
-    # 3. Compute vegfrac
-    print('[3/13] Compute vegfrac...', flush=True)
+    # 3. Compute fractional cover
+    print('[3/13] Compute fractional cover...', flush=True)
     t0 = time.time()
-    if not exists(query.vegfrac_path):
-        from PaddockTS.IndicesAndVegFrac.veg_frac import compute_fractional_cover
-        ds_vegfrac = compute_fractional_cover(query, ds_sentinel2=ds_sentinel2)
+    if not exists(query.fractional_cover_path):
+        from PaddockTS.FractionalCover.compute_fractional_cover import compute_fractional_cover
+        ds_fractional_cover = compute_fractional_cover(query, ds_sentinel2=ds_sentinel2)
     else:
-        ds_vegfrac = xr.open_zarr(query.vegfrac_path, chunks=None)
+        ds_fractional_cover = xr.open_zarr(query.fractional_cover_path, chunks=None)
         print('  skipped (cached)')
     print(f'  done ({time.time() - t0:.1f}s)', flush=True)
     gc.collect()
@@ -94,18 +94,18 @@ def run(query: Query, reload: bool = False):
     sentinel2_video_with_paddocks(query, paddocks, ds_sentinel2=ds_sentinel2)
     print(f'  done ({time.time() - t0:.1f}s)', flush=True)
 
-    # 7. Vegfrac video
-    print('[7/13] Vegfrac video...', flush=True)
+    # 7. Fractional cover video
+    print('[7/13] Fractional cover video...', flush=True)
     t0 = time.time()
-    from PaddockTS.Plotting.vegfrac_video import vegfrac_video
-    vegfrac_video(query, ds_vegfrac=ds_vegfrac)
+    from PaddockTS.Plotting.fractional_cover_video import fractional_cover_video
+    fractional_cover_video(query, ds_fractional_cover=ds_fractional_cover)
     print(f'  done ({time.time() - t0:.1f}s)', flush=True)
 
-    # 8. Vegfrac + paddocks video
-    print('[8/13] Vegfrac + paddocks video...', flush=True)
+    # 8. Fractional cover + paddocks video
+    print('[8/13] Fractional cover + paddocks video...', flush=True)
     t0 = time.time()
-    from PaddockTS.Plotting.vegfrac_paddocks_video import vegfrac_video_with_paddocks
-    vegfrac_video_with_paddocks(query, paddocks, ds_vegfrac=ds_vegfrac, ds_sentinel2=ds_sentinel2)
+    from PaddockTS.Plotting.fractional_cover_paddocks_video import fractional_cover_paddocks_video
+    fractional_cover_paddocks_video(query, paddocks, ds_fractional_cover=ds_fractional_cover, ds_sentinel2=ds_sentinel2)
     print(f'  done ({time.time() - t0:.1f}s)', flush=True)
 
     # 9. Make paddockTS

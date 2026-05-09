@@ -16,7 +16,7 @@ BANDS = ['nbart_blue', 'nbart_green', 'nbart_red', 'nbart_nir_1', 'nbart_swir_2'
 
 def compute_fractional_cover(query: Query, ds_sentinel2=None, model_n: int = 4, correction: bool = False):
     from os.path import exists
-    from PaddockTS.IndicesAndVegFrac._unmix import unmix_fractional_cover, get_model
+    from PaddockTS.FractionalCover._unmix import unmix_fractional_cover, get_model
 
     if ds_sentinel2 is None:
         if not exists(query.sentinel2_path):
@@ -47,8 +47,8 @@ def compute_fractional_cover(query: Query, ds_sentinel2=None, model_n: int = 4, 
 
     from os import makedirs
     makedirs(query.tmp_dir, exist_ok=True)
-    frac_ds.to_zarr(query.vegfrac_path, mode='w')
-    print(f'Saved to {query.vegfrac_path}')
+    frac_ds.to_zarr(query.fractional_cover_path, mode='w', zarr_format=2)
+    print(f'Saved to {query.fractional_cover_path}')
     print(f'  bg={fractions[:, 0].mean():.3f}, pv={fractions[:, 1].mean():.3f}, npv={fractions[:, 2].mean():.3f}')
     return frac_ds
 

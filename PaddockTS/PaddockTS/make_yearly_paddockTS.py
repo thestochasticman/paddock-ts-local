@@ -40,7 +40,7 @@ def make_yearly_paddockTS(query, ds_paddockTS=None):
 
     for year, ds_year in datasets_by_year.items():
         year_path = f'{query.tmp_dir}/{query.stub}_paddockTS_{year}.zarr'
-        ds_year.to_zarr(year_path, mode='w')
+        ds_year.to_zarr(year_path, mode='w', zarr_format=2)
         print(f'Saved {year}: {ds_year.sizes["time"]} time steps -> {year_path}')
 
     return datasets_by_year

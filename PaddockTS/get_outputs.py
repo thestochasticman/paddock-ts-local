@@ -26,12 +26,12 @@ ENV_STEPS = [
 S2_STEPS = [
     'Download Sentinel-2',
     'Compute indices',
-    'Compute vegfrac',
+    'Compute fractional cover',
     'Sentinel-2 video',
     'Segment paddocks',
     'Sentinel-2 + paddocks video',
-    'Vegfrac video',
-    'Vegfrac + paddocks video',
+    'Fractional cover video',
+    'Fractional cover + paddocks video',
     'Make paddockTS',
     'Make yearly paddockTS',
     'Estimate phenology',
@@ -111,7 +111,7 @@ def _run_s2_steps(query, statuses, times):
     import xarray as xr
 
     ds_sentinel2 = None
-    ds_vegfrac = None
+    ds_fractional_cover = None
     paddocks = None
     ds_paddockTS = None
     ds_yearly = None
@@ -144,11 +144,11 @@ def _run_s2_steps(query, statuses, times):
                     else:
                         ds_sentinel2 = xr.open_zarr(query.sentinel2_path, chunks=None)
                 elif i == 1:
-                    from PaddockTS.IndicesAndVegFrac.indices import compute_indices
+                    from PaddockTS.SpectralIndices.indices import compute_indices
                     ds_sentinel2 = compute_indices(query, ds_sentinel2=ds_sentinel2)
                 elif i == 2:
-                    from PaddockTS.IndicesAndVegFrac.veg_frac import compute_fractional_cover
-                    ds_vegfrac = compute_fractional_cover(query, ds_sentinel2=ds_sentinel2)
+                    from PaddockTS.FractionalCover.compute_fractional_cover import compute_fractional_cover
+                    ds_fractional_cover = compute_fractional_cover(query, ds_sentinel2=ds_sentinel2)
                 elif i == 3:
                     from PaddockTS.Plotting.sentinel2_video import sentinel2_video
                     sentinel2_video(query, ds_sentinel2=ds_sentinel2)
@@ -164,11 +164,11 @@ def _run_s2_steps(query, statuses, times):
                     from PaddockTS.Plotting.sentinel2_paddocks_video import sentinel2_video_with_paddocks
                     sentinel2_video_with_paddocks(query, paddocks, ds_sentinel2=ds_sentinel2)
                 elif i == 6:
-                    from PaddockTS.Plotting.vegfrac_video import vegfrac_video
-                    vegfrac_video(query, ds_vegfrac=ds_vegfrac)
+                    from PaddockTS.Plotting.fractional_cover_video import fractional_cover_video
+                    fractional_cover_video(query, ds_fractional_cover=ds_fractional_cover)
                 elif i == 7:
-                    from PaddockTS.Plotting.vegfrac_paddocks_video import vegfrac_video_with_paddocks
-                    vegfrac_video_with_paddocks(query, paddocks, ds_vegfrac=ds_vegfrac, ds_sentinel2=ds_sentinel2)
+                    from PaddockTS.Plotting.fractional_cover_paddocks_video import fractional_cover_paddocks_video
+                    fractional_cover_paddocks_video(query, paddocks, ds_fractional_cover=ds_fractional_cover, ds_sentinel2=ds_sentinel2)
                 elif i == 8:
                     from PaddockTS.PaddockTS.make_paddockTS import make_paddockTS
                     ds_paddockTS = make_paddockTS(query, ds_sentinel2=ds_sentinel2, paddocks=paddocks)

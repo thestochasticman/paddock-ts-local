@@ -94,7 +94,7 @@ def make_smoothed_paddockTS(query, ds_paddockTS=None, days=10, window_length=7, 
             ds_new = ds_new.assign_coords({c: ds[c]})
 
     smoothed_path = f'{query.tmp_dir}/{query.stub}_paddockTS_smoothed.zarr'
-    ds_new.to_zarr(smoothed_path, mode='w')
+    ds_new.to_zarr(smoothed_path, mode='w', zarr_format=2)
     print(f'Saved to {smoothed_path}')
     return ds_new
 

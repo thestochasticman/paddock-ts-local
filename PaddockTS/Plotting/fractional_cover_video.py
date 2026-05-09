@@ -5,7 +5,7 @@ from PaddockTS.query import Query
 
 
 def _to_rgb(ds, time_idx):
-    """Map vegfrac to RGB: R=bg, G=pv, B=npv."""
+    """Map fractional cover to RGB: R=bg, G=pv, B=npv."""
     pv = ds['pv'].isel(time=time_idx).values.astype(np.float32)
     npv = ds['npv'].isel(time=time_idx).values.astype(np.float32)
     bg = ds['bg'].isel(time=time_idx).values.astype(np.float32)
@@ -17,15 +17,15 @@ def _to_rgb(ds, time_idx):
     return np.nan_to_num(np.clip(rgb, 0, 1), nan=0.0)
 
 
-def vegfrac_video(query: Query, ds_vegfrac=None, fps: int = 4, min_size: int = 1080):
-    if ds_vegfrac is None:
+def fractional_cover_video(query: Query, ds_fractional_cover=None, fps: int = 4, min_size: int = 1080):
+    if ds_fractional_cover is None:
         import os
-        if not os.path.exists(query.vegfrac_path):
-            from PaddockTS.IndicesAndVegFrac.veg_frac import compute_fractional_cover
+        if not os.path.exists(query.fractional_cover_path):
+            from PaddockTS.FractionalCover.compute_fractional_cover import compute_fractional_cover
             compute_fractional_cover(query)
-        ds = xr.open_zarr(query.vegfrac_path, chunks=None)
+        ds = xr.open_zarr(query.fractional_cover_path, chunks=None)
     else:
-        ds = ds_vegfrac
+        ds = ds_fractional_cover
     n_times = ds.sizes['time']
     dates = ds.time.values
     h, w = ds.sizes['y'], ds.sizes['x']
@@ -38,7 +38,7 @@ def vegfrac_video(query: Query, ds_vegfrac=None, fps: int = 4, min_size: int = 1
     import tempfile
 
     os.makedirs(query.out_dir, exist_ok=True)
-    out_path = f'{query.out_dir}/{query.stub}_vegfrac.mp4'
+    out_path = f'{query.out_dir}/{query.stub}_fractional_cover.mp4'
 
     with tempfile.TemporaryDirectory() as tmpdir:
         for i in range(n_times):
@@ -78,10 +78,10 @@ def test():
     from os.path import exists
     from PaddockTS.utils import get_example_query
     query = get_example_query()
-    if not exists(query.vegfrac_path):
-        from PaddockTS.IndicesAndVegFrac.veg_frac import compute_fractional_cover
+    if not exists(query.fractional_cover_path):
+        from PaddockTS.FractionalCover.compute_fractional_cover import compute_fractional_cover
         compute_fractional_cover(query)
-    vegfrac_video(query)
+    fractional_cover_video(query)
 
 if __name__ == '__main__':
     test()

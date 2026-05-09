@@ -8,7 +8,7 @@ from PaddockTS.query import Query
 
 def run(query: Query, reload: bool = False):
     if reload:
-        for path in [query.sentinel2_path, query.vegfrac_path]:
+        for path in [query.sentinel2_path, query.fractional_cover_path]:
             if exists(path):
                 shutil.rmtree(path)
         for suffix in ['_paddocks.gpkg', '_preseg.tif', '_sam_mask.tif', '_sam_raw.gpkg']:
@@ -32,16 +32,16 @@ def run(query: Query, reload: bool = False):
     # 2. Compute indices
     print('[2/8] Compute indices...', flush=True)
     t0 = time.time()
-    from PaddockTS.IndicesAndVegFrac.indices import compute_indices
+    from PaddockTS.SpectralIndices.indices import compute_indices
     compute_indices(query)
     print(f'  done ({time.time() - t0:.1f}s)', flush=True)
     gc.collect()
 
-    # 3. Compute vegfrac
-    print('[3/8] Compute vegfrac...', flush=True)
+    # 3. Compute fractional cover
+    print('[3/8] Compute fractional cover...', flush=True)
     t0 = time.time()
-    if not exists(query.vegfrac_path):
-        from PaddockTS.IndicesAndVegFrac.veg_frac import compute_fractional_cover
+    if not exists(query.fractional_cover_path):
+        from PaddockTS.FractionalCover.compute_fractional_cover import compute_fractional_cover
         compute_fractional_cover(query)
     else:
         print('  skipped (cached)')
@@ -86,18 +86,18 @@ def run(query: Query, reload: bool = False):
     sentinel2_video_with_paddocks(query, paddocks)
     print(f'  done ({time.time() - t0:.1f}s)', flush=True)
 
-    # 7. Vegfrac video
-    print('[7/8] Vegfrac video...', flush=True)
+    # 7. Fractional cover video
+    print('[7/8] Fractional cover video...', flush=True)
     t0 = time.time()
-    from PaddockTS.Plotting.vegfrac_video import vegfrac_video
-    vegfrac_video(query)
+    from PaddockTS.Plotting.fractional_cover_video import fractional_cover_video
+    fractional_cover_video(query)
     print(f'  done ({time.time() - t0:.1f}s)', flush=True)
 
-    # 8. Vegfrac + paddocks video
-    print('[8/8] Vegfrac + paddocks video...', flush=True)
+    # 8. Fractional cover + paddocks video
+    print('[8/8] Fractional cover + paddocks video...', flush=True)
     t0 = time.time()
-    from PaddockTS.Plotting.vegfrac_paddocks_video import vegfrac_video_with_paddocks
-    vegfrac_video_with_paddocks(query, paddocks)
+    from PaddockTS.Plotting.fractional_cover_paddocks_video import fractional_cover_paddocks_video
+    fractional_cover_paddocks_video(query, paddocks)
     print(f'  done ({time.time() - t0:.1f}s)', flush=True)
 
     print(f'\nTotal: {time.time() - total_t0:.1f}s')

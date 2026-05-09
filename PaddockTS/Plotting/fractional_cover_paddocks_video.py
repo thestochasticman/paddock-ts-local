@@ -4,18 +4,18 @@ import xarray as xr
 import rioxarray
 from rasterio.features import rasterize
 from PaddockTS.query import Query
-from .vegfrac_video import _to_rgb
+from .fractional_cover_video import _to_rgb
 
 
-def vegfrac_video_with_paddocks(query: Query, paddocks, ds_vegfrac=None, ds_sentinel2=None, fps: int = 4, min_size: int = 1080):
-    if ds_vegfrac is None:
+def fractional_cover_paddocks_video(query: Query, paddocks, ds_fractional_cover=None, ds_sentinel2=None, fps: int = 4, min_size: int = 1080):
+    if ds_fractional_cover is None:
         import os
-        if not os.path.exists(query.vegfrac_path):
-            from PaddockTS.IndicesAndVegFrac.veg_frac import compute_fractional_cover
+        if not os.path.exists(query.fractional_cover_path):
+            from PaddockTS.FractionalCover.compute_fractional_cover import compute_fractional_cover
             compute_fractional_cover(query)
-        ds = xr.open_zarr(query.vegfrac_path, chunks=None)
+        ds = xr.open_zarr(query.fractional_cover_path, chunks=None)
     else:
-        ds = ds_vegfrac
+        ds = ds_fractional_cover
     n_times = ds.sizes['time']
     dates = ds.time.values
     h, w = ds.sizes['y'], ds.sizes['x']
@@ -48,7 +48,7 @@ def vegfrac_video_with_paddocks(query: Query, paddocks, ds_vegfrac=None, ds_sent
     import tempfile
 
     os.makedirs(query.out_dir, exist_ok=True)
-    out_path = f'{query.out_dir}/{query.stub}_vegfrac_paddocks.mp4'
+    out_path = f'{query.out_dir}/{query.stub}_fractional_cover_paddocks.mp4'
 
     with tempfile.TemporaryDirectory() as tmpdir:
         for i in range(n_times):
@@ -98,8 +98,8 @@ def test():
     from os.path import exists
     from PaddockTS.utils import get_example_query
     query = get_example_query()
-    if not exists(query.vegfrac_path):
-        from PaddockTS.IndicesAndVegFrac.veg_frac import compute_fractional_cover
+    if not exists(query.fractional_cover_path):
+        from PaddockTS.FractionalCover.compute_fractional_cover import compute_fractional_cover
         compute_fractional_cover(query)
     gpkg_path = f'{query.tmp_dir}/{query.stub}_paddocks.gpkg'
     if exists(gpkg_path):
@@ -107,7 +107,7 @@ def test():
     else:
         from PaddockTS.PaddockSegmentation.get_paddocks import get_paddocks
         paddocks = get_paddocks(query)
-    vegfrac_video_with_paddocks(query, paddocks)
+    fractional_cover_paddocks_video(query, paddocks)
 
 if __name__ == '__main__':
     test()

@@ -39,7 +39,7 @@ def make_paddockTS(query, ds_sentinel2=None, paddocks=None, crs="epsg:6933"):
         ds_sentinel2 = xr.open_zarr(query.sentinel2_path, chunks=None)
 
     # Compute vegetation indices (NDVI, CFI, NIRv, NDTI, CAI)
-    from PaddockTS.IndicesAndVegFrac.indices import compute_indices
+    from PaddockTS.SpectralIndices.indices import compute_indices
     ds_sentinel2 = compute_indices(query, ds_sentinel2=ds_sentinel2)
 
     if paddocks is None:
@@ -111,7 +111,7 @@ def make_paddockTS(query, ds_sentinel2=None, paddocks=None, crs="epsg:6933"):
     result = xr.Dataset(data_vars, coords=coords)
 
     zarr_path = f'{query.tmp_dir}/{query.stub}_paddockTS.zarr'
-    result.to_zarr(zarr_path, mode='w')
+    result.to_zarr(zarr_path, mode='w', zarr_format=2)
     print(f'Saved to {zarr_path}')
     return result
 

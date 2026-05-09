@@ -1,5 +1,8 @@
 # Vendored from phenolopy by Lewis Trotter (https://github.com/lewistrotter/phenolopy).
 # Distributed under the Apache License 2.0 — see PaddockTS/LICENSES/phenolopy.LICENSE.
+#
+# Local modifications:
+#   - np.trapz -> np.trapezoid (NumPy 2.0 compatibility; trapz was removed in NumPy 2.0).
 
 # phenolopy
 '''
@@ -1988,7 +1991,7 @@ def get_los(da, da_sos_times, da_eos_times):
         da_los_values = xr.where(da_los_values >= 0, da_los_values, da_max_times + da_neg_values)
         
         # drop time dim if exists
-        da_los_values = da_los_values.drop({'time'}, errors='ignore')
+        da_los_values = da_los_values.drop_vars({'time'}, errors='ignore')
 
     # convert type
     da_los_values = da_los_values.astype('int16')
@@ -2137,7 +2140,7 @@ def get_lios(da, da_sos_times, da_eos_times):
                               (da['time.dayofyear'] <= da_eos_times), 0)
     
     # calculate lios using trapz (note: more sophisticated than integrate)
-    da_lios_values = xr.apply_ufunc(np.trapz, da_lios_values, 
+    da_lios_values = xr.apply_ufunc(np.trapezoid, da_lios_values, 
                                     input_core_dims=[['time']],
                                     dask='parallelized', 
                                     output_dtypes=[np.float32],
@@ -2194,7 +2197,7 @@ def get_sios(da, da_sos_times, da_eos_times, da_base_values):
                               (da['time.dayofyear'] <= da_eos_times), 0)
     
     # calculate sios using trapz (note: more sophisticated than integrate)
-    da_sios_values = xr.apply_ufunc(np.trapz, da_sios_values, 
+    da_sios_values = xr.apply_ufunc(np.trapezoid, da_sios_values, 
                                     input_core_dims=[['time']],
                                     dask='parallelized', 
                                     output_dtypes=[np.float32],
@@ -2208,7 +2211,7 @@ def get_sios(da, da_sos_times, da_eos_times, da_base_values):
                                                   (da_sios_bse_values['time.dayofyear'] <= da_eos_times), 0)
     
     # calculate trapz of base (note: more sophisticated than integrate)
-    da_sios_bse_values = xr.apply_ufunc(np.trapz, da_sios_bse_values, 
+    da_sios_bse_values = xr.apply_ufunc(np.trapezoid, da_sios_bse_values, 
                                     input_core_dims=[['time']],
                                     dask='parallelized', 
                                     output_dtypes=[np.float32],
@@ -2253,7 +2256,7 @@ def get_liot(da):
 
     # calculate liot using trapz (note: more sophisticated than integrate)
     print('> Calculating long integral of total (liot) values.')
-    da_liot_values = xr.apply_ufunc(np.trapz, da, 
+    da_liot_values = xr.apply_ufunc(np.trapezoid, da, 
                                     input_core_dims=[['time']],
                                     dask='parallelized', 
                                     output_dtypes=[np.float32],
@@ -2299,7 +2302,7 @@ def get_siot(da, da_base_values):
 
     # calculate siot using trapz (note: more sophisticated than integrate)
     print('> Calculating short integral of total (siot) values.')
-    da_siot_values = xr.apply_ufunc(np.trapz, da, 
+    da_siot_values = xr.apply_ufunc(np.trapezoid, da, 
                                     input_core_dims=[['time']],
                                     dask='parallelized', 
                                     output_dtypes=[np.float32],
@@ -2309,7 +2312,7 @@ def get_siot(da, da_base_values):
     da_siot_bse_values = da_base_values.combine_first(da)
     
     # calculate trapz of base (note: more sophisticated than integrate)
-    da_siot_bse_values = xr.apply_ufunc(np.trapz, da_siot_bse_values, 
+    da_siot_bse_values = xr.apply_ufunc(np.trapezoid, da_siot_bse_values, 
                                     input_core_dims=[['time']],
                                     dask='parallelized', 
                                     output_dtypes=[np.float32],
