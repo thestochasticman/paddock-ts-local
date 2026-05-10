@@ -1,4 +1,4 @@
-name: paddockts-env
+name: paddockts
 channels:
   - conda-forge
   - pytorch
