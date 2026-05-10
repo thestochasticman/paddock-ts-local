@@ -86,13 +86,19 @@ def download_sentinel2(
             load or Dask compute, after printing a diagnostic.
 
     Example:
-        >>> from datetime import date
-        >>> from PaddockTS.query import Query
-        >>> from PaddockTS.Sentinel2.download_sentinel2 import download_sentinel2
-        >>> q = Query(bbox=[148.46, -34.39, 148.50, -34.36],
-        ...           start=date(2023, 1, 1), end=date(2023, 12, 31),
-        ...           stub='milgadara')
-        >>> ds = download_sentinel2(q)
+        ```python
+        from datetime import date
+        from PaddockTS.query import Query
+        from PaddockTS.Sentinel2.download_sentinel2 import download_sentinel2
+
+        q = Query(
+            bbox=[148.46, -34.39, 148.50, -34.36],
+            start=date(2023, 1, 1),
+            end=date(2023, 12, 31),
+            stub='milgadara',
+        )
+        ds = download_sentinel2(q)
+        ```
     """
     bands = sentinel2.bands
     catalog = pystac_client.Client.open(sentinel2.stac_url)

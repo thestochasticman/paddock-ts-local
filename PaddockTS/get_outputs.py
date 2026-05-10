@@ -373,13 +373,19 @@ def get_outputs(query: Query, reload: bool = False, show_log: bool = False):
             against the offending step.
 
     Example:
-        >>> from datetime import date
-        >>> from PaddockTS.query import Query
-        >>> from PaddockTS.get_outputs import get_outputs
-        >>> q = Query(bbox=[148.46, -34.39, 148.50, -34.36],
-        ...           start=date(2023, 1, 1), end=date(2023, 12, 31),
-        ...           stub='milgadara')
-        >>> get_outputs(q)
+        ```python
+        from datetime import date
+        from PaddockTS.query import Query
+        from PaddockTS.get_outputs import get_outputs
+
+        q = Query(
+            bbox=[148.46, -34.39, 148.50, -34.36],
+            start=date(2023, 1, 1),
+            end=date(2023, 12, 31),
+            stub='milgadara',
+        )
+        get_outputs(q)
+        ```
     """
     if reload:
         if exists(query.tmp_dir):
