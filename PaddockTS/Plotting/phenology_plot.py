@@ -1,3 +1,12 @@
+"""Per-paddock × per-year phenology curves with SoS / PoS / EoS markers.
+
+Generates a single multi-panel PNG: rows are paddocks, columns are
+years, and each panel overlays the raw vegetation-index series (filled
+blue dots) and the resampled-and-smoothed series (open blue dots) on a
+DOY axis, with the start-of-season, peak-of-season, and end-of-season
+DOYs drawn as vertical reference lines.
+"""
+
 from __future__ import annotations
 
 import matplotlib.pyplot as plt
@@ -8,9 +17,25 @@ from PaddockTS.query import Query
 
 
 def phenology_plot(query: Query, phenology_results: dict[int, pd.DataFrame] | None = None, ds_yearly: dict[int, xr.Dataset] | None = None, ds_paddockTS: xr.Dataset | None = None, variable: str = 'NDVI') -> str:
-    """
-    Overlay raw and interpolated data with phenology markers.
-    Layout: paddock rows x year columns.
+    """Plot per-paddock × per-year phenology curves with SoS / PoS / EoS markers.
+
+    Args:
+        query: The :class:`PaddockTS.query.Query`. Output is written to
+            ``{query.out_dir}/{query.stub}_phenology.png``.
+        phenology_results: Optional ``{year: DataFrame}`` from
+            :func:`PaddockTS.Phenology.estimate_phenology`. If ``None``,
+            recomputed on demand using ``variable``.
+        ds_yearly: Optional ``{year: Dataset}`` from
+            :func:`PaddockTS.PaddockTS.make_yearly_paddockTS`. If
+            ``None``, built on demand.
+        ds_paddockTS: Optional raw per-paddock time series Dataset. If
+            ``None``, opened (or generated, then opened) from cache.
+            Used to plot the un-resampled raw observations.
+        variable: Vegetation index column to plot. Default ``'NDVI'``;
+            ``'NIRv'`` and ``'CFI'`` also work.
+
+    Returns:
+        str: Filesystem path of the generated PNG.
     """
     import os
     os.makedirs(query.out_dir, exist_ok=True)

@@ -1,4 +1,10 @@
-### updated verison of make_paddockTS3() that can take integer or string for pol[paddock]
+"""Aggregate per-pixel Sentinel-2 data into per-paddock medians.
+
+Rasterises the paddock polygons onto the Sentinel-2 grid, then for every
+band in the dataset computes the per-paddock median across pixels at
+each timestep. The result is the central time-series dataset that
+downstream stages (yearly split, smoothing, phenology, plotting) consume.
+"""
 
 import numpy as np
 import xarray as xr
@@ -27,6 +33,37 @@ def _band_medians(band_array, mask_flat, paddock_ids):
     return out
 
 def make_paddockTS(query, ds_sentinel2=None, paddocks=None, crs="epsg:6933"):
+    """Compute per-paddock medians for every band at every timestep.
+
+    Steps:
+
+    1. Compute the five spectral indices (NDVI, CFI, NIRv, NDTI, CAI)
+       and add them to the input dataset.
+    2. Rasterise paddock polygons to integer IDs aligned with the
+       Sentinel-2 grid.
+    3. For each band, in parallel across processes, compute the
+       per-paddock NaN-aware median across pixels at every timestep.
+    4. Stitch results back into an xarray Dataset on dims
+       ``(paddock, time)`` and persist as Zarr v2 to
+       ``{query.tmp_dir}/{query.stub}_paddockTS.zarr``.
+
+    Args:
+        query: The :class:`PaddockTS.query.Query`.
+        ds_sentinel2: Optional in-memory Sentinel-2 dataset. If ``None``,
+            ``query.sentinel2_path`` is opened (or downloaded first).
+        paddocks: Optional :class:`geopandas.GeoDataFrame` of paddock
+            polygons (must include a ``paddock`` column for IDs). If
+            ``None``, loaded from the cached gpkg or generated via
+            :func:`PaddockTS.PaddockSegmentation.get_paddocks`.
+        crs: Equal-area CRS to write onto the dataset for
+            georeferencing the rasterised mask. Defaults to EPSG:6933
+            (WGS84 / NSIDC EASE-Grid 2.0 Global).
+
+    Returns:
+        xarray.Dataset: Per-paddock medians on dims ``(paddock, time)``
+        with one data variable per Sentinel-2 band and per spectral
+        index. Also persisted to ``{query.tmp_dir}/{query.stub}_paddockTS.zarr``.
+    """
     import rasterio.features
     from affine import Affine
     import pandas as pd

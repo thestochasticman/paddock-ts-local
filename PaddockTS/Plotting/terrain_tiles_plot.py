@@ -1,3 +1,20 @@
+"""Topography figure: elevation, flow accumulation, aspect, and slope.
+
+Loads the Copernicus DEM tile downloaded by
+:mod:`PaddockTS.Environmental.TerrainTiles.download_terrain_tiles`,
+applies a Gaussian smoother before flow analysis (sharp DEMs cause flow
+algorithms to produce striped artefacts), and derives:
+
+- elevation (m)
+- D8 flow accumulation (cells)
+- aspect (cardinal direction)
+- slope (degrees)
+- topographic wetness index (TWI; computed but not plotted)
+
+The four panels are reprojected to EPSG:4326 and the Sentinel-2 grid for
+easy overlay against other PaddockTS outputs, and saved as a single PNG.
+"""
+
 from matplotlib import pyplot as plt
 from matplotlib import colors
 import numpy as np
@@ -27,6 +44,23 @@ def _array_to_tif(array, ref_path, out_path, dtype=None):
 
 
 def terrain_tiles_plot(query: Query, ds_sentinel2=None, sigma: int = 10):
+    """Plot a 2 × 2 panel of elevation, flow accumulation, aspect, and slope.
+
+    Args:
+        query: The :class:`PaddockTS.query.Query`. Output is written to
+            ``{query.out_dir}/{query.stub}_topography.png``.
+        ds_sentinel2: Optional in-memory Sentinel-2 dataset, used as the
+            spatial reference grid that the terrain tiles are
+            reprojected onto. If ``None``, ``query.sentinel2_path`` is
+            opened (or downloaded first).
+        sigma: Standard deviation of the Gaussian smoother applied to
+            the DEM before flow analysis, in pixels. Larger values
+            produce smoother, less-striped flow fields at the cost of
+            losing fine drainage detail. Default 10.
+
+    Returns:
+        str: Filesystem path of the generated PNG.
+    """
     makedirs(query.out_dir, exist_ok=True)
 
     terrain_path = get_filename(query)

@@ -1,3 +1,17 @@
+"""Download SILO climate data for the AOI centre point.
+
+`SILO <https://www.longpaddock.qld.gov.au/silo/>`_ is the Queensland
+Government's daily climate database for Australia, with a continuous
+record from 1889 onward via spatial interpolation of station data.
+This module hits the SILO DataDrillDataset CGI endpoint at the centre
+of ``query.bbox``, requests every available variable, drops the
+``_source`` columns and metadata, and writes a tidy CSV.
+
+Requires an email address to be registered with SILO via
+``~/.config/PaddockTS.json`` (``"email": "..."``) or passed explicitly
+to :func:`download_silo`.
+"""
+
 from PaddockTS.query import Query
 from PaddockTS.config import config
 from .silo import SILO
@@ -15,6 +29,28 @@ ALL_CODES = 'RXNJVDESCLFTAPWMHG'
 
 
 def download_silo(query: Query, email: str = None):
+    """Fetch SILO daily climate data for the centre of ``query.bbox``.
+
+    Cached: if the output CSV already exists at
+    ``{query.tmp_dir}/Environmental/{query.stub}_silo.csv``, it is loaded
+    and returned without contacting SILO.
+
+    Args:
+        query: The :class:`PaddockTS.query.Query`.
+        email: SILO registration email. If ``None``, falls back to
+            ``config.email`` (read from ``~/.config/PaddockTS.json``).
+            SILO uses this as the username; ``apirequest`` is sent as
+            the password.
+
+    Returns:
+        pandas.DataFrame: One row per day in ``[query.start, query.end]``
+        with a ``YYYY-MM-DD`` column and one column per climate variable
+        (``daily_rain``, ``max_temp``, ``radiation``, ``vp``,
+        ``et_short_crop``, etc.).
+
+    Raises:
+        ValueError: If no email is configured.
+    """
     email = email or config.email
     if not email:
         raise ValueError('Set email in ~/.config/PaddockTS.json or pass email parameter')

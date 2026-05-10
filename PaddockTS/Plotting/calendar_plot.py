@@ -1,3 +1,14 @@
+"""Per-year calendar of true-colour Sentinel-2 thumbnails per paddock.
+
+Produces one PNG per year. Rows are paddocks (largest area at top);
+columns are 48 evenly-spaced slots across the year (4 per month). Each
+cell shows the Sentinel-2 RGB thumbnail of that paddock at the
+observation closest to the slot's day-of-year, with non-paddock pixels
+masked black. The result is a single composite image — useful for
+spotting cloud problems, cropping events, or stand-out paddocks at a
+glance.
+"""
+
 from __future__ import annotations
 
 import numpy as np
@@ -21,10 +32,26 @@ def _to_rgb(ds, time_idx):
 
 
 def calendar_plot(query: Query, ds_sentinel2: xr.Dataset | None = None, paddocks: gpd.GeoDataFrame | None = None, thumb_size: int = 64) -> list[str]:
-    """
-    Per-year calendar showing actual sentinel2 RGB thumbnails per paddock.
-    Rows: paddocks (largest to smallest). Columns: 48 slots (4 per month).
-    One plot per year. Composited directly as a PIL image (no matplotlib axes grid).
+    """Generate one calendar PNG per year of paddock × time-slot thumbnails.
+
+    The image is composited directly as a PIL image (no matplotlib
+    axes grid) for memory-efficiency on large paddock counts. Each
+    thumbnail is the bbox-cropped, paddock-masked, nearest-neighbour
+    resized RGB at the closest observation to the slot centre.
+
+    Args:
+        query: The :class:`PaddockTS.query.Query`. Outputs are written
+            to ``{query.out_dir}/{query.stub}_calendar_{year}.png``.
+        ds_sentinel2: Optional in-memory Sentinel-2 dataset. If ``None``,
+            ``query.sentinel2_path`` is opened (or downloaded first).
+        paddocks: Optional :class:`geopandas.GeoDataFrame` of paddock
+            polygons. If ``None``, loaded from cache or generated.
+        thumb_size: Edge length of each thumbnail in pixels. Default 64.
+            Larger values produce sharper but heavier images.
+
+    Returns:
+        list[str]: Filesystem paths of the generated PNGs (one per
+        year that has at least one observation).
     """
     import os
     from PIL import Image, ImageDraw, ImageFont

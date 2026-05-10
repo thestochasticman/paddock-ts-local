@@ -1,3 +1,11 @@
+"""Diagnostic plots for SILO climate variables.
+
+Reads the cached SILO CSV and writes one PNG per group of related
+variables (temperature, rainfall, radiation, evapotranspiration, vapour
+pressure). Rainfall is summarised as monthly totals; everything else is
+plotted as a daily line.
+"""
+
 from matplotlib import pyplot as plt
 from PaddockTS.query import Query
 from PaddockTS.Environmental.SILO.download_silo import get_filename
@@ -36,6 +44,19 @@ PLOT_GROUPS = {
 
 
 def silo_plot(query: Query, groups: dict = None):
+    """Plot SILO climate variables grouped by theme.
+
+    Reads the cached SILO CSV (downloaded by
+    :func:`PaddockTS.Environmental.SILO.download_silo.download_silo`)
+    and writes one PNG per group to
+    ``{query.out_dir}/{query.stub}_silo_{group}.png``.
+
+    Args:
+        query: The :class:`PaddockTS.query.Query`.
+        groups: Optional override of the default grouping. If ``None``,
+            uses :data:`PLOT_GROUPS` (temperature, rainfall, radiation,
+            evapotranspiration, humidity).
+    """
     filename = get_filename(query)
     df = pd.read_csv(filename, parse_dates=['YYYY-MM-DD'])
     groups = groups or PLOT_GROUPS

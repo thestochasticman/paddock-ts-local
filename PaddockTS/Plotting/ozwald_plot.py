@@ -1,3 +1,11 @@
+"""Diagnostic plots for OzWALD daily and 8-day climate / vegetation data.
+
+Each plot file is a single panel covering the full date range of a
+``Query``. Variables are grouped thematically (temperature, rainfall,
+vegetation index, etc.); precipitation/rainfall groups use a monthly
+bar plot and other groups use thin-line time-series.
+"""
+
 from matplotlib import pyplot as plt
 from PaddockTS.query import Query
 from PaddockTS.Environmental.OzWALD.download_ozwald_daily import get_filename as daily_filename
@@ -86,11 +94,39 @@ def _plot_groups(df, time_col, groups, query, prefix):
 
 
 def ozwald_daily_plot(query: Query, groups: dict = None):
+    """Plot OzWALD daily climate variables grouped by theme.
+
+    Reads the cached daily CSV (downloaded by
+    :func:`PaddockTS.Environmental.OzWALD.download_ozwald_daily.download_ozwald_daily`)
+    and writes one PNG per group to
+    ``{query.out_dir}/{query.stub}_ozwald_daily_{group}.png``.
+
+    Args:
+        query: The :class:`PaddockTS.query.Query`.
+        groups: Optional override of the default grouping. Maps a group
+            name to ``{'vars': [...], 'ylabel': str, 'title': str,
+            'kind': 'line'|'bar'}``. If ``None``, uses
+            :data:`DAILY_GROUPS` (temperature, precipitation, wind,
+            radiation).
+    """
     df = pd.read_csv(daily_filename(query), parse_dates=['time'])
     _plot_groups(df, 'time', groups or DAILY_GROUPS, query, 'ozwald_daily')
 
 
 def ozwald_8day_plot(query: Query, groups: dict = None):
+    """Plot OzWALD 8-day vegetation / water variables grouped by theme.
+
+    Reads the cached 8-day CSV (downloaded by
+    :func:`PaddockTS.Environmental.OzWALD.download_ozwald_8day.download_ozwald_8day`)
+    and writes one PNG per group to
+    ``{query.out_dir}/{query.stub}_ozwald_8day_{group}.png``.
+
+    Args:
+        query: The :class:`PaddockTS.query.Query`.
+        groups: Optional override of the default grouping. If ``None``,
+            uses :data:`EIGHTDAY_GROUPS` (vegetation index, fractional
+            cover, LAI/GPP, soil water/runoff).
+    """
     df = pd.read_csv(eightday_filename(query), parse_dates=['time'])
     _plot_groups(df, 'time', groups or EIGHTDAY_GROUPS, query, 'ozwald_8day')
 

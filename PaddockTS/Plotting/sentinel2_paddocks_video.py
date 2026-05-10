@@ -1,3 +1,11 @@
+"""True-colour Sentinel-2 video with paddock boundaries and labels overlaid.
+
+Like :func:`PaddockTS.Plotting.sentinel2_video.sentinel2_video`, but
+each frame has paddock polygon boundaries rasterised in red and the
+paddock ID drawn at the polygon's representative point. Useful for
+visually verifying segmentation quality against the underlying imagery.
+"""
+
 import cv2
 import numpy as np
 import xarray as xr
@@ -8,6 +16,27 @@ from .sentinel2_video import _to_rgb
 
 
 def sentinel2_video_with_paddocks(query: Query, paddocks, ds_sentinel2=None, fps: int = 4, min_size: int = 1080):
+    """Encode a true-colour Sentinel-2 video with paddock outlines + labels.
+
+    Args:
+        query: The :class:`PaddockTS.query.Query`. Output is written to
+            ``{query.out_dir}/{query.stub}_sentinel2_paddocks.mp4``.
+        paddocks: :class:`geopandas.GeoDataFrame` of paddock polygons,
+            with a ``paddock`` integer ID column. Typically the output
+            of :func:`PaddockTS.PaddockSegmentation.get_paddocks`.
+        ds_sentinel2: Optional in-memory Sentinel-2 dataset. If ``None``,
+            ``query.sentinel2_path`` is opened (or downloaded first).
+        fps: Frames per second. Default 4.
+        min_size: Minimum dimension (height or width) of the output
+            video. See :func:`sentinel2_video` for sizing notes.
+
+    Returns:
+        str: Filesystem path of the generated MP4.
+
+    Raises:
+        RuntimeError: If the ``ffmpeg`` invocation returns a non-zero
+            exit code.
+    """
     if ds_sentinel2 is None:
         import os
         if not os.path.exists(query.sentinel2_path):

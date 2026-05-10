@@ -1,17 +1,30 @@
+"""Split a paddockTS dataset by calendar year and attach day-of-year coords.
+
+Phenology metrics are inherently per-season, so downstream code expects
+each year as its own dataset with a ``doy`` coordinate to align years
+on a common axis. This module persists one Zarr per year alongside the
+in-memory dict it returns.
+"""
+
 import numpy as np
 import xarray as xr
 
 
 def split_paddockTS_by_year(ds):
-    """
-    Split paddock time series data by year, add day of year (doy) coordinate.
+    """Group a paddock time-series dataset into one slice per calendar year.
+
+    Adds a ``doy`` coordinate (day-of-year, 1–366) on the ``time``
+    dimension of each per-year slice so seasonal curves can be aligned
+    across years on a common DOY axis.
 
     Args:
-        ds (xarray.Dataset): The input dataset containing time series data for each paddock.
+        ds: An xarray.Dataset on dims ``(paddock, time)`` (typically
+            the output of :func:`make_paddockTS`).
 
     Returns:
-        dict: A dictionary where each key is a year (int), and the value is an xarray.Dataset
-              for that year, with an added 'doy' coordinate.
+        dict[int, xarray.Dataset]: Mapping ``{year: ds_year}`` where each
+        ``ds_year`` covers a single calendar year and carries a ``doy``
+        coordinate alongside ``time``.
     """
     years = np.unique(ds.time.dt.year.values)
     datasets_by_year = {}
@@ -27,6 +40,22 @@ def split_paddockTS_by_year(ds):
 
 
 def make_yearly_paddockTS(query, ds_paddockTS=None):
+    """Persist one Zarr per year and return the same data as a dict.
+
+    Loads the paddockTS Zarr if not provided, calls
+    :func:`split_paddockTS_by_year`, and writes each per-year slice as
+    Zarr v2 to ``{query.tmp_dir}/{query.stub}_paddockTS_{year}.zarr``.
+
+    Args:
+        query: The :class:`PaddockTS.query.Query`.
+        ds_paddockTS: Optional in-memory paddockTS dataset. If ``None``,
+            opens (or generates, then opens) the cached
+            ``{query.stub}_paddockTS.zarr``.
+
+    Returns:
+        dict[int, xarray.Dataset]: Mapping ``{year: ds_year}``. Each
+        per-year slice is also persisted to disk.
+    """
     from os.path import exists
 
     if ds_paddockTS is None:
