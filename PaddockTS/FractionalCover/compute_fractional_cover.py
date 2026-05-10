@@ -1,3 +1,22 @@
+"""Spectral unmixing of Sentinel-2 reflectance into bg / pv / npv fractions.
+
+The model is a small TFLite MLP adapted from
+`fractionalcover3 <https://github.com/jrsrp/fractionalcover3>`_ by
+Robert Denham (MIT-licensed; see
+``PaddockTS/LICENSES/fractionalcover3.LICENSE``). Four model variants
+ship with the package, indexed ``n=1..4`` from least to most complex;
+``n=4`` is the default and most accurate.
+
+Output bands:
+
+- ``bg`` — bare ground fraction
+- ``pv`` — green (photosynthetic) vegetation fraction
+- ``npv`` — non-green (non-photosynthetic) vegetation fraction
+
+Fractions are produced per-pixel per-timestep and persisted to
+``query.fractional_cover_path`` as Zarr v2.
+"""
+
 import os
 import warnings
 
@@ -15,6 +34,35 @@ BANDS = ['nbart_blue', 'nbart_green', 'nbart_red', 'nbart_nir_1', 'nbart_swir_2'
 
 
 def compute_fractional_cover(query: Query, ds_sentinel2=None, model_n: int = 4, correction: bool = False):
+    """Run the TFLite unmixing model over every Sentinel-2 timestep.
+
+    Stacks the six Sentinel-2 SR bands into a ``(time, band, y, x)``
+    tensor, scales reflectance, and invokes the chosen model variant
+    once per timestep. The result is written to
+    ``query.fractional_cover_path`` and returned as an xarray Dataset
+    with ``bg``, ``pv``, ``npv`` data variables on dims
+    ``(time, y, x)``.
+
+    Args:
+        query: The :class:`PaddockTS.query.Query`. ``query.tmp_dir`` is
+            created if missing and the output Zarr is written to
+            ``query.fractional_cover_path``.
+        ds_sentinel2: Optional in-memory Sentinel-2 dataset. If ``None``,
+            opens (or downloads, then opens) ``query.sentinel2_path``.
+            Must contain the six bands in :data:`BANDS`.
+        model_n: Which bundled model variant to use (``1..4``). Higher
+            ``n`` is more accurate but slower; ``n=4`` is the default.
+        correction: If ``True``, apply per-band sensor calibration
+            factors (gains and offsets fitted in the upstream
+            fractionalcover3 work) instead of the simple ``* 0.0001``
+            DN-to-reflectance scaling. Use only when your inputs match
+            the calibration assumptions of the original model.
+
+    Returns:
+        xarray.Dataset: Dataset with variables ``bg``, ``pv``, ``npv``
+        on dims ``(time, y, x)``. Also persisted to
+        ``query.fractional_cover_path``.
+    """
     from os.path import exists
     from PaddockTS.FractionalCover._unmix import unmix_fractional_cover, get_model
 

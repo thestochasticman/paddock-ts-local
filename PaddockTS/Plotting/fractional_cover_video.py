@@ -1,3 +1,12 @@
+"""Render the fractional-cover cube as an MP4 video.
+
+Each frame is a false-colour composite that maps the three fractional
+cover bands to RGB channels: red = bare ground, green = green vegetation,
+blue = non-green vegetation. Fractions are renormalised to sum to 1
+before display, so a fully bare pixel is pure red, fully green vegetation
+is pure green, and so on.
+"""
+
 import cv2
 import numpy as np
 import xarray as xr
@@ -18,6 +27,26 @@ def _to_rgb(ds, time_idx):
 
 
 def fractional_cover_video(query: Query, ds_fractional_cover=None, fps: int = 4, min_size: int = 1080):
+    """Encode the fractional-cover cube as a false-colour H.264 video.
+
+    Args:
+        query: The :class:`PaddockTS.query.Query`. Output is written to
+            ``{query.out_dir}/{query.stub}_fractional_cover.mp4``.
+        ds_fractional_cover: Optional in-memory fractional cover dataset
+            (with ``bg``, ``pv``, ``npv`` variables). If ``None``,
+            ``query.fractional_cover_path`` is opened (or generated first).
+        fps: Frames per second. Default 4.
+        min_size: Minimum dimension of the output video in pixels.
+            Smaller cubes are upscaled with nearest-neighbour. H.264
+            requires even dimensions, so the final size is rounded down.
+
+    Returns:
+        str: Filesystem path of the generated MP4.
+
+    Raises:
+        RuntimeError: If the ``ffmpeg`` invocation returns a non-zero
+            exit code.
+    """
     if ds_fractional_cover is None:
         import os
         if not os.path.exists(query.fractional_cover_path):

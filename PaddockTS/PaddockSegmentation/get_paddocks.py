@@ -1,3 +1,22 @@
+"""Extract paddock polygons from a Sentinel-2 stack via Segment Anything.
+
+The pipeline runs in three internal stages:
+
+1. **Presegmentation** — derive a single grayscale image from the
+   multi-temporal Sentinel-2 stack using NDWI Fourier features, written
+   as a GeoTIFF. This collapses time into a representation that
+   emphasises stable field boundaries.
+2. **SAM mask generation** — feed the presegmented image to
+   `segment-geospatial <https://samgeo.gishub.org/>`_ (default backbone:
+   SAM ViT-H) and write a mask GeoTIFF + raw polygons GeoPackage.
+3. **Vectorisation and filtering** — clean up the polygons, compute
+   per-polygon area (ha) and compactness, drop those outside the
+   user-defined size or shape limits, and assign sequential paddock IDs.
+
+SAM weights (``sam_vit_h_4b8939.pth``, ~2.4 GB) are downloaded on first
+use to ``{config.tmp_dir}/sam_weights`` and cached.
+"""
+
 import gc
 import sys
 import time
@@ -21,11 +40,33 @@ def get_paddocks(
     min_compactness: float = 0.1,
     device: str | None = None,
 ) -> gpd.GeoDataFrame:
-    """
-    End-to-end SAMGeo paddock segmentation:
-    1. Create NDWI Fourier preseg GeoTIFF
-    2. Run SAMGeo automatic segmentation
-    3. Vectorize and filter paddock polygons
+    """End-to-end paddock segmentation: NDWI preseg → SAM masks → filtered polygons.
+
+    Caches each stage's output under ``query.tmp_dir`` so reruns reuse
+    work: ``{stub}_preseg.tif``, ``{stub}_sam_mask.tif``,
+    ``{stub}_sam_raw.gpkg``, and the final ``{stub}_paddocks.gpkg``.
+
+    Args:
+        query: The :class:`PaddockTS.query.Query`.
+        ds_sentinel2: Optional in-memory Sentinel-2 dataset. If ``None``,
+            ``query.sentinel2_path`` is opened (or downloaded first).
+        min_area_ha: Minimum polygon area in hectares; smaller polygons
+            are discarded as noise. Default 5 ha.
+        max_area_ha: Maximum polygon area in hectares; larger polygons
+            (typically the whole-AOI background mask) are discarded.
+            Default 1500 ha.
+        min_compactness: Minimum isoperimetric compactness
+            ``4πA/L²`` ∈ ``[0, 1]``. ``1`` is a circle, low values are
+            sliver-like. Default 0.1 drops elongated edge artefacts.
+        device: Torch device for SAM. ``None`` lets samgeo pick (CUDA if
+            available, else CPU). Pass ``"cpu"`` to force CPU even with
+            a GPU present.
+
+    Returns:
+        geopandas.GeoDataFrame: One row per paddock, sorted by
+        ``area_ha`` descending, with columns ``geometry``, ``area_ha``,
+        ``compactness``, and a 1-based ``paddock`` integer ID. Also
+        written to ``{query.tmp_dir}/{query.stub}_paddocks.gpkg``.
     """
     # 1. Presegmentation image
     _log("  Preseg: computing NDWI Fourier features...")

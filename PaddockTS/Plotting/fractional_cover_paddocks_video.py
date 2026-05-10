@@ -1,3 +1,12 @@
+"""Fractional-cover video with paddock boundaries and labels overlaid.
+
+Like :func:`PaddockTS.Plotting.fractional_cover_video.fractional_cover_video`,
+but each frame has paddock polygon boundaries rasterised in red and the
+paddock ID drawn at the polygon's representative point. The Sentinel-2
+geotransform is used to align the paddocks to the cover grid (the two
+share the same CRS and resolution).
+"""
+
 import cv2
 import numpy as np
 import xarray as xr
@@ -8,6 +17,29 @@ from .fractional_cover_video import _to_rgb
 
 
 def fractional_cover_paddocks_video(query: Query, paddocks, ds_fractional_cover=None, ds_sentinel2=None, fps: int = 4, min_size: int = 1080):
+    """Encode a fractional-cover video with paddock outlines + labels.
+
+    Args:
+        query: The :class:`PaddockTS.query.Query`. Output is written to
+            ``{query.out_dir}/{query.stub}_fractional_cover_paddocks.mp4``.
+        paddocks: :class:`geopandas.GeoDataFrame` of paddock polygons,
+            with a ``paddock`` integer ID column.
+        ds_fractional_cover: Optional in-memory fractional cover dataset.
+            If ``None``, opens (or generates, then opens)
+            ``query.fractional_cover_path``.
+        ds_sentinel2: Optional in-memory Sentinel-2 dataset, used only
+            to read the rasterisation transform. If ``None``, opens
+            ``query.sentinel2_path``.
+        fps: Frames per second. Default 4.
+        min_size: Minimum dimension of the output video in pixels.
+
+    Returns:
+        str: Filesystem path of the generated MP4.
+
+    Raises:
+        RuntimeError: If the ``ffmpeg`` invocation returns a non-zero
+            exit code.
+    """
     if ds_fractional_cover is None:
         import os
         if not os.path.exists(query.fractional_cover_path):

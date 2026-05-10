@@ -1,3 +1,16 @@
+"""Resample, gap-fill, and smooth a per-paddock time series.
+
+Sentinel-2 revisit gaps and cloud-mask drops leave irregular time
+series. This module produces a uniform, smoothed version suitable for
+phenology fitting and plotting:
+
+1. resample to a fixed cadence (median per bin),
+2. fill gaps with monotone PCHIP interpolation (no overshoot), and
+3. smooth with a Savitzky-Golay filter (low-order polynomial fit).
+
+Static (non-time) variables are passed through untouched.
+"""
+
 import numpy as np
 import xarray as xr
 from scipy.interpolate import PchipInterpolator
@@ -5,30 +18,35 @@ from scipy.signal import savgol_filter
 
 
 def make_smoothed_paddockTS(query, ds_paddockTS=None, days=10, window_length=7, polyorder=2):
-    """
-    Resample, conservatively interpolate, and smooth all time-dependent
-    variables in a paddock-time xarray Dataset.
+    """Resample-then-interpolate-then-smooth all time-dependent variables.
 
-      1. Separate non-time-dependent variables.
-      2. Resample time-dependent data every `days` days (median).
-      3. Interpolate missing values with PCHIP (conservative).
-      4. Smooth with Savitzky-Golay.
-      5. Re-attach static variables and return the new dataset.
+    Pipeline applied to each paddock × variable series:
 
-    Parameters
-    ----------
-    query : Query
-        The query object.
-    ds_paddockTS : xarray.Dataset, optional
-        The paddock time series dataset. If None, loaded from query.
-    days : int, optional
-        The resampling frequency in days (default is 10).
-    window_length : int, optional
-        The window length for the Savitzky-Golay filter (default is 7). This value must be odd.
-        This is how many resampled obs the polynomial is fit to.
-    polyorder : int, optional
-        The polynomial order for the Savitzky-Golay filter (default is 2).
-        Should be smaller than window_length.
+    1. Split out non-time-dependent vars (static metadata, etc.).
+    2. Resample time-dependent data with a ``days``-day median.
+    3. Fill gaps with PCHIP (monotone cubic) interpolation;
+       fall back to mean-fill for series with fewer than 2 valid points.
+    4. Smooth with a Savitzky-Golay filter
+       (``window_length`` and ``polyorder`` configurable).
+    5. Re-attach static variables and persist as Zarr v2 to
+       ``{query.tmp_dir}/{query.stub}_paddockTS_smoothed.zarr``.
+
+    Args:
+        query: The :class:`PaddockTS.query.Query`.
+        ds_paddockTS: Optional in-memory paddockTS dataset. If ``None``,
+            opens (or generates, then opens) the cached
+            ``{query.stub}_paddockTS.zarr``.
+        days: Resampling cadence in days. Default 10.
+        window_length: Savitzky-Golay window size in number of resampled
+            samples. Coerced to the next odd integer if even and clipped
+            to fit short series. Default 7.
+        polyorder: Savitzky-Golay polynomial order. Must be less than
+            ``window_length``. Default 2.
+
+    Returns:
+        xarray.Dataset: Smoothed dataset on dims ``(paddock, time)``
+        with the same data variables as the input. Also persisted to
+        ``{query.tmp_dir}/{query.stub}_paddockTS_smoothed.zarr``.
     """
     from os.path import exists
 

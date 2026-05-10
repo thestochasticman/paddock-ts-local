@@ -1,3 +1,11 @@
+"""Render a true-colour Sentinel-2 timeline as an MP4 video.
+
+Each frame is a normalised RGB composite from the ``nbart_red``,
+``nbart_green``, ``nbart_blue`` bands with the acquisition date stamped
+in the top-right corner. Frames are written as PNGs to a temporary
+directory, then encoded to H.264 with ``ffmpeg`` (``libopenh264``).
+"""
+
 import cv2
 import numpy as np
 import xarray as xr
@@ -17,6 +25,26 @@ def _to_rgb(ds, time_idx):
 
 
 def sentinel2_video(query: Query, ds_sentinel2=None, fps: int = 4, min_size: int = 1080):
+    """Encode the Sentinel-2 cube as a true-colour H.264 video.
+
+    Args:
+        query: The :class:`PaddockTS.query.Query`. Output is written to
+            ``{query.out_dir}/{query.stub}_sentinel2.mp4``.
+        ds_sentinel2: Optional in-memory Sentinel-2 dataset. If ``None``,
+            ``query.sentinel2_path`` is opened (or downloaded first).
+        fps: Frames per second. Default 4.
+        min_size: Minimum dimension (height or width) of the output
+            video, in pixels. Smaller cubes are upscaled with
+            nearest-neighbour to ensure legibility; H.264 requires even
+            dimensions, so the final size is rounded down to even.
+
+    Returns:
+        str: Filesystem path of the generated MP4.
+
+    Raises:
+        RuntimeError: If the ``ffmpeg`` invocation returns a non-zero
+            exit code.
+    """
     if ds_sentinel2 is None:
         import os
         if not os.path.exists(query.sentinel2_path):

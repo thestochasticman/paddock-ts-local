@@ -1,3 +1,16 @@
+"""Download daily OzWALD climate variables for the AOI centre.
+
+`OzWALD <https://www.wenfo.org/ozwald/>`_ is the Australian Water and
+Landscape Dynamics dataset hosted by ANU, providing modelled daily
+meteorology over Australia at ~5 km resolution. This module reads the
+OPeNDAP-served NetCDFs, samples the time series at the centre of
+``query.bbox``, concatenates yearly chunks, and persists a tidy CSV.
+
+Variables include ``Tmax``, ``Tmin``, ``Pg`` (precipitation), wind
+speed, and downwelling longwave radiation; the full default set is
+read from :class:`PaddockTS.Environmental.OzWALD.ozwald.OzWALD`.
+"""
+
 from PaddockTS.query import Query
 from .ozwald import OzWALD
 from os import makedirs
@@ -30,6 +43,26 @@ def _download_variable(variable, years, bbox):
 
 
 def download_ozwald_daily(query: Query, variables: list[str] = None):
+    """Fetch daily OzWALD time series for ``query.bbox`` centre.
+
+    For each variable, opens the per-year NetCDF over OPeNDAP, samples
+    the nearest grid cell to the AOI centre, concatenates years, and
+    writes a single tidy CSV (one row per day, one column per variable)
+    to ``{query.tmp_dir}/Environmental/{query.stub}_ozwald_daily.csv``.
+
+    Cached: if the output CSV already exists it is loaded and returned
+    without contacting the server.
+
+    Args:
+        query: The :class:`PaddockTS.query.Query`.
+        variables: Optional list of OzWALD daily variable names to
+            fetch. If ``None``, fetches every variable defined by the
+            bundled :class:`OzWALD` config.
+
+    Returns:
+        pandas.DataFrame: One row per day in ``[query.start, query.end]``
+        with a ``time`` column and one column per variable.
+    """
     makedirs(f'{query.tmp_dir}/Environmental', exist_ok=True)
     makedirs(f'{query.out_dir}/Environmental', exist_ok=True)
     filename = get_filename(query)

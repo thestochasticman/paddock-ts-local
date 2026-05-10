@@ -334,6 +334,53 @@ def _run_s2_steps(query, statuses, times):
 # --- driver ----------------------------------------------------------------
 
 def get_outputs(query: Query, reload: bool = False, show_log: bool = False):
+    """Run the full PaddockTS pipeline for ``query`` with a live status dashboard.
+
+    Spawns two worker threads — one for environmental data
+    (terrain / OzWALD / SILO / SLGA) and one for the
+    Sentinel-2 → PaddockTS chain — and renders a live two-column
+    status table while they run. All stdout, stderr, Python ``logging``,
+    ``warnings.warn``, and even C-level fd 2 writes from GDAL/PROJ/TFLite
+    are captured into a bounded ring buffer and (optionally) shown in a
+    log panel below the tables.
+
+    Each step is cached on disk by the underlying functions, so reruns
+    skip work that's already done. Use ``reload=True`` to force a clean
+    rebuild.
+
+    Pipeline steps (parallel branches):
+
+    - **Environmental** (7 steps): terrain DEM, OzWALD daily climate,
+      SILO climate, SLGA soils, and three diagnostic plots.
+    - **Sentinel-2 → PaddockTS** (13 steps): S2 download, indices,
+      fractional cover, S2 video, paddock segmentation, paddock-overlay
+      videos, paddockTS aggregation, yearly split, phenology, calendar
+      and phenology plots.
+
+    Args:
+        query: The :class:`PaddockTS.query.Query` to run the pipeline for.
+        reload: If ``True``, recursively delete ``query.tmp_dir`` and
+            ``query.out_dir`` before starting, forcing every cached step
+            to re-run. Default ``False``.
+        show_log: If ``True``, render a tail-of-log panel below the
+            status tables. Useful for debugging stuck steps; turns off
+            by default to keep the dashboard compact.
+
+    Raises:
+        Exception: Re-raises the first exception encountered by either
+            worker (after letting the other finish or fail). Specific
+            failures show up in the dashboard as a red ``error`` row
+            against the offending step.
+
+    Example:
+        >>> from datetime import date
+        >>> from PaddockTS.query import Query
+        >>> from PaddockTS.get_outputs import get_outputs
+        >>> q = Query(bbox=[148.46, -34.39, 148.50, -34.36],
+        ...           start=date(2023, 1, 1), end=date(2023, 12, 31),
+        ...           stub='milgadara')
+        >>> get_outputs(q)
+    """
     if reload:
         if exists(query.tmp_dir):
             shutil.rmtree(query.tmp_dir)

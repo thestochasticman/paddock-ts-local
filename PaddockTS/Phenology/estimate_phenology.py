@@ -1,3 +1,21 @@
+"""Per-paddock seasonal phenology metrics via the vendored phenolopy library.
+
+For each year and each paddock, compute season-of-year metrics from a
+single vegetation index time series:
+
+- ``sos`` — start of season (DOY and value)
+- ``pos`` — peak of season (DOY and value)
+- ``eos`` — end of season (DOY and value)
+- amplitudes, length-of-season, integrals, etc.
+
+The implementation wraps :mod:`PaddockTS.Phenology._phenolopy` (a
+vendored copy of `phenolopy <https://github.com/lewistrotter/phenolopy>`_
+by Lewis Trotter, Apache 2.0; see
+``PaddockTS/LICENSES/phenolopy.LICENSE``). A small monkey-patch is
+applied to ``xr.merge`` during the call to silence a coordinate
+mismatch upstream sees as a hard error.
+"""
+
 import xarray as xr
 from contextlib import contextmanager
 from PaddockTS.Phenology import _phenolopy as phenolopy
@@ -21,23 +39,34 @@ def _override_xr_merge():
 
 
 def estimate_phenology(query, ds_yearly=None, variable='NDVI'):
-    """
-    For each year in ds_yearly, compute phenology metrics using phenolopy.
+    """Compute per-paddock phenology metrics for each year.
 
-    Parameters
-    ----------
-    query : Query
-        The query object.
-    ds_yearly : dict, optional
-        Mapping from year (int) to xarray.Dataset with paddock time series and doy coordinate.
-        If None, built from make_yearly_paddockTS.
-    variable : str
-        Name of the data variable to process.
+    For each year in ``ds_yearly``, this:
 
-    Returns
-    -------
-    dict of pd.DataFrame
-        One DataFrame per year with phenology metrics.
+    1. Selects ``variable`` (e.g. ``'NDVI'``) and renames it to
+       ``veg_index`` (phenolopy's expected variable name).
+    2. Calls :func:`phenolopy.calc_num_seasons` to count peaks.
+    3. Calls :func:`phenolopy.calc_phenometrics` with a seasonal-amplitude
+       method (5% threshold, two-sided) to derive SoS / PoS / EoS and
+       associated values.
+    4. Flattens the result into a tidy :class:`pandas.DataFrame` and
+       attaches the peak count.
+
+    Args:
+        query: The :class:`PaddockTS.query.Query`.
+        ds_yearly: Optional ``{year: xarray.Dataset}`` mapping (typically
+            from :func:`PaddockTS.PaddockTS.make_yearly_paddockTS`). If
+            ``None``, built on demand. Each dataset must have a ``doy``
+            coordinate.
+        variable: Name of the data variable to feed into phenolopy.
+            Defaults to ``'NDVI'``; ``'NIRv'`` and ``'CFI'`` also work
+            and are sometimes preferred for low-LAI canopies.
+
+    Returns:
+        dict[int, pandas.DataFrame]: One DataFrame per year. Columns
+        include the phenolopy metrics (``sos_times``, ``sos_values``,
+        ``pos_times``, ``eos_times``, etc.) plus ``num_peaks`` and a
+        ``paddock`` identifier.
     """
     if ds_yearly is None:
         from PaddockTS.PaddockTS.make_yearly_paddockTS import make_yearly_paddockTS
