@@ -4,6 +4,7 @@ __pycache__/
 *.egg-info/
 build/
 dist/
+site/
 .DS_Store
 gdalwmscache/
 terrain_tiles.xml

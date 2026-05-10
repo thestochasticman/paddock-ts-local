@@ -64,6 +64,14 @@ dependencies = [
   "xarray",
 ]
 
+[project.optional-dependencies]
+docs = [
+  "mkdocs",
+  "mkdocs-material",
+  "mkdocstrings[python]",
+  "mkdocs-jupyter",
+]
+
 [project.urls]
 Homepage = "https://github.com/thestochasticman/paddock-ts-local"
 Repository = "https://github.com/thestochasticman/paddock-ts-local"

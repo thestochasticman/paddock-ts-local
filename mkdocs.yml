@@ -1,0 +1,89 @@
+site_name: PaddockTS
+site_description: Paddock segmentation and time-series analysis from Sentinel-2 imagery
+site_url: https://thestochasticman.github.io/paddock-ts-local/
+repo_url: https://github.com/thestochasticman/paddock-ts-local
+repo_name: thestochasticman/paddock-ts-local
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.expand
+    - navigation.indexes
+    - navigation.top
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: green
+      accent: green
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: green
+      accent: light-green
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          options:
+            show_root_heading: true
+            show_source: false
+            members_order: source
+            docstring_style: google
+            merge_init_into_class: true
+            separate_signature: true
+            show_signature_annotations: true
+  - mkdocs-jupyter:
+      include_source: true
+      execute: false
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Pipeline: pipeline.md
+  - API reference:
+    - api/index.md
+    - Query: api/query.md
+    - Sentinel-2 download: api/sentinel2.md
+    - Spectral indices: api/spectral_indices.md
+    - Fractional cover: api/fractional_cover.md
+    - Paddock segmentation: api/paddock_segmentation.md
+    - Paddock time series: api/paddock_ts.md
+    - Phenology: api/phenology.md
+    - Plotting: api/plotting.md
+    - Environmental data: api/environmental.md
+    - Pipeline driver: api/get_outputs.md
