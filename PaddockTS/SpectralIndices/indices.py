@@ -51,7 +51,6 @@ def compute_indices(query: Query, ds_sentinel2=None, indices=None):
     for name, func in indices.items():
         data = func(ds).transpose(2, 0, 1)  # (y, x, time) -> (time, y, x)
         ds[name] = xr.DataArray(data, dims=['time', 'y', 'x'], coords={'time': ds.time, 'y': ds.y, 'x': ds.x})
-        print(f'{name}: {data.shape}')
 
     return ds
 

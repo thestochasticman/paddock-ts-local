@@ -3,8 +3,9 @@ import glob
 import io
 import os
 import shutil
+import sys
 import time
-from contextlib import redirect_stdout
+from contextlib import redirect_stdout, redirect_stderr
 from os.path import exists
 from rich.live import Live
 from rich.table import Table
@@ -12,7 +13,9 @@ from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn
 from rich.console import Console, Group
 from PaddockTS.query import Query
 
-_console = Console(stderr=True)
+# Use the original stderr (sys.__stderr__) so Live keeps drawing to the terminal
+# even when steps redirect stderr into log files (e.g. samgeo's tqdm output).
+_console = Console(file=sys.__stderr__, force_terminal=True)
 
 STEPS = [
     'Download Sentinel-2',
@@ -121,11 +124,7 @@ def run(query: Query, reload: bool = False):
 
             t0 = time.time()
             try:
-                # Segmentation needs live console for SAM progress
-                if i == 4:
-                    live.stop()
-
-                with redirect_stdout(log) if i != 4 else open(os.devnull) as _:
+                with redirect_stdout(log), redirect_stderr(log):
                     if i == 0:
                         # Download Sentinel-2
                         if not exists(query.sentinel2_path):
@@ -199,13 +198,8 @@ def run(query: Query, reload: bool = False):
                         from PaddockTS.Plotting.phenology_plot import phenology_plot
                         phenology_plot(query, phenology_results=phenology_results, ds_yearly=ds_yearly, ds_paddockTS=ds_paddockTS)
 
-                if i == 4:
-                    live.start()
-
                 statuses[i] = 'done'
             except Exception:
-                if i == 4:
-                    live.start()
                 statuses[i] = '[red]error[/red]'
                 times[i] = time.time() - t0
                 live.update(Group(_make_table(statuses, times), progress))

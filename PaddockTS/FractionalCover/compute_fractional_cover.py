@@ -48,8 +48,6 @@ def compute_fractional_cover(query: Query, ds_sentinel2=None, model_n: int = 4, 
     from os import makedirs
     makedirs(query.tmp_dir, exist_ok=True)
     frac_ds.to_zarr(query.fractional_cover_path, mode='w', zarr_format=2)
-    print(f'Saved to {query.fractional_cover_path}')
-    print(f'  bg={fractions[:, 0].mean():.3f}, pv={fractions[:, 1].mean():.3f}, npv={fractions[:, 2].mean():.3f}')
     return frac_ds
 
 

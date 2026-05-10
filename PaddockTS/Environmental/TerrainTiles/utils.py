@@ -1,4 +1,10 @@
 import numpy as np
+
+# pysheds 0.5 calls np.in1d which was removed in NumPy 2.0. Alias to np.isin
+# (the documented replacement, same semantics) before pysheds is imported.
+if not hasattr(np, "in1d"):
+    np.in1d = np.isin
+
 import rasterio
 from pysheds.grid import Grid
 

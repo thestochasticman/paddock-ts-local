@@ -5,7 +5,7 @@ os.environ["PROJ_DATA"] = os.path.join(sys.prefix, "share", "proj")
 import gc
 import io
 import time
-from contextlib import redirect_stdout
+from contextlib import redirect_stdout, redirect_stderr
 from os.path import exists
 from rich.live import Live
 from rich.table import Table
@@ -13,7 +13,9 @@ from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn
 from rich.console import Console, Group
 from PaddockTS.query import Query
 
-_console = Console(stderr=True)
+# Use the original stderr (sys.__stderr__) so Live keeps drawing to the terminal
+# even when steps redirect stderr into log files (e.g. samgeo's tqdm output).
+_console = Console(file=sys.__stderr__, force_terminal=True)
 
 STEPS = [
     'Download Sentinel-2',
@@ -104,18 +106,13 @@ def run(query: Query, reload: bool = False):
 
             t0 = time.time()
             try:
-                if i == 3:
-                    live.stop()
-                    result = fn()
-                    live.start()
-                else:
-                    with redirect_stdout(open(os.devnull, 'w')):
-                        if i == 5:
-                            result = _sentinel2_paddocks_video(query, paddocks)
-                        elif i == 7:
-                            result = _fractional_cover_paddocks_video(query, paddocks)
-                        else:
-                            result = fn()
+                with open(os.devnull, 'w') as _null, redirect_stdout(_null), redirect_stderr(_null):
+                    if i == 5:
+                        result = _sentinel2_paddocks_video(query, paddocks)
+                    elif i == 7:
+                        result = _fractional_cover_paddocks_video(query, paddocks)
+                    else:
+                        result = fn()
                 if i == 3:
                     paddocks = result
                 statuses[i] = 'done'
