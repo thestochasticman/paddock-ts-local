@@ -111,7 +111,7 @@ def compute_indices(query: Query, ds_sentinel2=None, indices=None):
     Each index is computed in float32 and inserted as a ``(time, y, x)``
     data variable on the Sentinel-2 dataset. The dataset is returned
     in-place — nothing is written to disk; persistence is handled by
-    downstream consumers (e.g. ``make_paddockTS``).
+    downstream consumers (e.g. ``make_paddock_time_series``).
 
     Args:
         query: The :class:`PaddockTS.query.Query` for resolving the

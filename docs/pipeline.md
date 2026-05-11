@@ -20,8 +20,8 @@ two threads and shows progress live.
 | 6 | Sentinel-2 + paddocks video | `Plotting.sentinel2_paddocks_video` | `{stub}_sentinel2_paddocks.mp4` |
 | 7 | Fractional cover video | `Plotting.fractional_cover_video` | `{stub}_fractional_cover.mp4` |
 | 8 | Fractional cover + paddocks video | `Plotting.fractional_cover_paddocks_video` | `{stub}_fractional_cover_paddocks.mp4` |
-| 9 | Make paddockTS | `PaddockTS.make_paddockTS` | `{stub}_paddockTS.zarr` |
-| 10 | Make yearly paddockTS | `PaddockTS.make_yearly_paddockTS` | `{stub}_paddockTS_<year>.zarr` |
+| 9 | Make paddock time series | `PaddockTS.PaddockTimeSeries.make_paddock_time_series` | `{stub}_paddockTS.zarr` |
+| 10 | Make yearly paddock time series | `PaddockTS.PaddockTimeSeries.make_yearly_paddock_time_series` | `{stub}_paddockTS_<year>.zarr` |
 | 11 | Estimate phenology | `Phenology.estimate_phenology` | `{stub}_phenology_<year>.csv` |
 | 12 | Calendar plot | `Plotting.calendar_plot` | `{stub}_calendar.png` |
 | 13 | Phenology plot | `Plotting.phenology_plot` | `{stub}_phenology.png` |
@@ -68,12 +68,12 @@ columns `paddock`, `area_ha`, `compactness`, `geometry`.
 
 ### Stage 9: Per-paddock time series
 
-`make_paddockTS` rasterises the paddock polygons over the Sentinel-2 grid
+`make_paddock_time_series` rasterises the paddock polygons over the Sentinel-2 grid
 and computes a per-paddock median for every band and index at every
 timestamp. The output is a `(paddock, time)` xarray Dataset.
 
 This is the central time-series object that downstream stages
-(`make_yearly_paddockTS`, `estimate_phenology`, plots) consume.
+(`make_yearly_paddock_time_series`, `estimate_phenology`, plots) consume.
 
 ## Environmental data pipeline
 

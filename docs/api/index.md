@@ -10,7 +10,7 @@ covers one stage of the pipeline plus its supporting types.
 | [Spectral indices](spectral_indices.md) | NDVI, CFI, NIRv, NDTI, CAI from S2 reflectance. |
 | [Fractional cover](fractional_cover.md) | bg / pv / npv unmixing via TFLite MLP. |
 | [Paddock segmentation](paddock_segmentation.md) | SAM-based field boundary extraction. |
-| [Paddock time series](paddock_ts.md) | Per-paddock medians per timestamp. |
+| [Paddock time series](paddock_time_series.md) | Per-paddock medians per timestamp. |
 | [Phenology](phenology.md) | Per-paddock seasonal metrics. |
 | [Plotting](plotting.md) | Static plots + animation videos. |
 | [Environmental data](environmental.md) | Terrain, climate, soil downloads. |

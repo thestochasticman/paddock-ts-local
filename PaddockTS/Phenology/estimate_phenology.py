@@ -55,7 +55,7 @@ def estimate_phenology(query, ds_yearly=None, variable='NDVI'):
     Args:
         query: The :class:`PaddockTS.query.Query`.
         ds_yearly: Optional ``{year: xarray.Dataset}`` mapping (typically
-            from :func:`PaddockTS.PaddockTS.make_yearly_paddockTS`). If
+            from :func:`PaddockTS.PaddockTimeSeries.make_yearly_paddock_time_series`). If
             ``None``, built on demand. Each dataset must have a ``doy``
             coordinate.
         variable: Name of the data variable to feed into phenolopy.
@@ -69,8 +69,8 @@ def estimate_phenology(query, ds_yearly=None, variable='NDVI'):
         ``paddock`` identifier.
     """
     if ds_yearly is None:
-        from PaddockTS.PaddockTS.make_yearly_paddockTS import make_yearly_paddockTS
-        ds_yearly = make_yearly_paddockTS(query)
+        from PaddockTS.PaddockTimeSeries.make_yearly_paddock_time_series import make_yearly_paddock_time_series
+        ds_yearly = make_yearly_paddock_time_series(query)
 
     results = {}
     for year, ds in ds_yearly.items():

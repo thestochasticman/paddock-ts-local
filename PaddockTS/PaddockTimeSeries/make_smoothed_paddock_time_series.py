@@ -17,7 +17,7 @@ from scipy.interpolate import PchipInterpolator
 from scipy.signal import savgol_filter
 
 
-def make_smoothed_paddockTS(query, ds_paddockTS=None, days=10, window_length=7, polyorder=2):
+def make_smoothed_paddock_time_series(query, ds_paddockTS=None, days=10, window_length=7, polyorder=2):
     """Resample-then-interpolate-then-smooth all time-dependent variables.
 
     Pipeline applied to each paddock × variable series:
@@ -53,8 +53,8 @@ def make_smoothed_paddockTS(query, ds_paddockTS=None, days=10, window_length=7, 
     if ds_paddockTS is None:
         zarr_path = f'{query.tmp_dir}/{query.stub}_paddockTS.zarr'
         if not exists(zarr_path):
-            from PaddockTS.PaddockTS.make_paddockTS import make_paddockTS
-            make_paddockTS(query)
+            from PaddockTS.PaddockTimeSeries.make_paddock_time_series import make_paddock_time_series
+            make_paddock_time_series(query)
         ds_paddockTS = xr.open_zarr(zarr_path, chunks=None)
 
     ds = ds_paddockTS
@@ -121,7 +121,7 @@ def test():
     from PaddockTS.utils import get_example_query
 
     query = get_example_query()
-    smoothed = make_smoothed_paddockTS(query)
+    smoothed = make_smoothed_paddock_time_series(query)
     print(smoothed)
     print(f'Time steps: {smoothed.sizes["time"]}')
 

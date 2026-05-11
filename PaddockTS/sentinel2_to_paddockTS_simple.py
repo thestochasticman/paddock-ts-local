@@ -108,19 +108,19 @@ def run(query: Query, reload: bool = False):
     fractional_cover_paddocks_video(query, paddocks, ds_fractional_cover=ds_fractional_cover, ds_sentinel2=ds_sentinel2)
     print(f'  done ({time.time() - t0:.1f}s)', flush=True)
 
-    # 9. Make paddockTS
-    print('[9/13] Make paddockTS...', flush=True)
+    # 9. Make paddock time series
+    print('[9/13] Make paddock time series...', flush=True)
     t0 = time.time()
-    from PaddockTS.PaddockTS.make_paddockTS import make_paddockTS
-    ds_paddockTS = make_paddockTS(query, ds_sentinel2=ds_sentinel2, paddocks=paddocks)
+    from PaddockTS.PaddockTimeSeries.make_paddock_time_series import make_paddock_time_series
+    ds_paddockTS = make_paddock_time_series(query, ds_sentinel2=ds_sentinel2, paddocks=paddocks)
     print(f'  done ({time.time() - t0:.1f}s)', flush=True)
     gc.collect()
 
-    # 10. Make yearly paddockTS
-    print('[10/13] Make yearly paddockTS...', flush=True)
+    # 10. Make yearly paddock time series
+    print('[10/13] Make yearly paddock time series...', flush=True)
     t0 = time.time()
-    from PaddockTS.PaddockTS.make_yearly_paddockTS import make_yearly_paddockTS
-    ds_yearly = make_yearly_paddockTS(query, ds_paddockTS=ds_paddockTS)
+    from PaddockTS.PaddockTimeSeries.make_yearly_paddock_time_series import make_yearly_paddock_time_series
+    ds_yearly = make_yearly_paddock_time_series(query, ds_paddockTS=ds_paddockTS)
     print(f'  done ({time.time() - t0:.1f}s)', flush=True)
 
     # 11. Estimate phenology

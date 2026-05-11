@@ -10,7 +10,7 @@ import numpy as np
 import xarray as xr
 
 
-def split_paddockTS_by_year(ds):
+def split_paddock_time_series_by_year(ds):
     """Group a paddock time-series dataset into one slice per calendar year.
 
     Adds a ``doy`` coordinate (day-of-year, 1–366) on the ``time``
@@ -19,7 +19,7 @@ def split_paddockTS_by_year(ds):
 
     Args:
         ds: An xarray.Dataset on dims ``(paddock, time)`` (typically
-            the output of :func:`make_paddockTS`).
+            the output of :func:`make_paddock_time_series`).
 
     Returns:
         dict[int, xarray.Dataset]: Mapping ``{year: ds_year}`` where each
@@ -39,11 +39,11 @@ def split_paddockTS_by_year(ds):
     return datasets_by_year
 
 
-def make_yearly_paddockTS(query, ds_paddockTS=None):
+def make_yearly_paddock_time_series(query, ds_paddockTS=None):
     """Persist one Zarr per year and return the same data as a dict.
 
     Loads the paddockTS Zarr if not provided, calls
-    :func:`split_paddockTS_by_year`, and writes each per-year slice as
+    :func:`split_paddock_time_series_by_year`, and writes each per-year slice as
     Zarr v2 to ``{query.tmp_dir}/{query.stub}_paddockTS_{year}.zarr``.
 
     Args:
@@ -61,11 +61,11 @@ def make_yearly_paddockTS(query, ds_paddockTS=None):
     if ds_paddockTS is None:
         zarr_path = f'{query.tmp_dir}/{query.stub}_paddockTS.zarr'
         if not exists(zarr_path):
-            from PaddockTS.PaddockTS.make_paddockTS import make_paddockTS
-            make_paddockTS(query)
+            from PaddockTS.PaddockTimeSeries.make_paddock_time_series import make_paddock_time_series
+            make_paddock_time_series(query)
         ds_paddockTS = xr.open_zarr(zarr_path, chunks=None)
 
-    datasets_by_year = split_paddockTS_by_year(ds_paddockTS)
+    datasets_by_year = split_paddock_time_series_by_year(ds_paddockTS)
 
     for year, ds_year in datasets_by_year.items():
         year_path = f'{query.tmp_dir}/{query.stub}_paddockTS_{year}.zarr'
@@ -79,7 +79,7 @@ def test():
     from PaddockTS.utils import get_example_query
 
     query = get_example_query()
-    yearly = make_yearly_paddockTS(query)
+    yearly = make_yearly_paddock_time_series(query)
     for year, ds in yearly.items():
         print(f'{year}: {ds.sizes["time"]} time steps, doy range {int(ds.doy.min())}-{int(ds.doy.max())}')
 

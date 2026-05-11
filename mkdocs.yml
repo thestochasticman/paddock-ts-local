@@ -82,7 +82,7 @@ nav:
     - Spectral indices: api/spectral_indices.md
     - Fractional cover: api/fractional_cover.md
     - Paddock segmentation: api/paddock_segmentation.md
-    - Paddock time series: api/paddock_ts.md
+    - Paddock time series: api/paddock_time_series.md
     - Phenology: api/phenology.md
     - Plotting: api/plotting.md
     - Environmental data: api/environmental.md

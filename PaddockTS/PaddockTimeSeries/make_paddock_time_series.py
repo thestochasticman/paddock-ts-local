@@ -32,7 +32,7 @@ def _band_medians(band_array, mask_flat, paddock_ids):
 
     return out
 
-def make_paddockTS(query, ds_sentinel2=None, paddocks=None, crs="epsg:6933"):
+def make_paddock_time_series(query, ds_sentinel2=None, paddocks=None, crs="epsg:6933"):
     """Compute per-paddock medians for every band at every timestep.
 
     Steps:
@@ -157,7 +157,7 @@ def test():
     from PaddockTS.utils import get_example_query
 
     query = get_example_query()
-    result = make_paddockTS(query)
+    result = make_paddock_time_series(query)
     print(result)
     for var in result.data_vars:
         print(f'{var}: {float(result[var].mean()):.3f}')

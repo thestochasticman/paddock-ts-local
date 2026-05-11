@@ -39,8 +39,8 @@ S2_STEPS = [
     'Sentinel-2 + paddocks video',
     'Fractional cover video',
     'Fractional cover + paddocks video',
-    'Make paddockTS',
-    'Make yearly paddockTS',
+    'Make paddock time series',
+    'Make yearly paddock time series',
     'Estimate phenology',
     'Calendar plot',
     'Phenology plot',
@@ -309,11 +309,11 @@ def _run_s2_steps(query, statuses, times):
                 from PaddockTS.Plotting.fractional_cover_paddocks_video import fractional_cover_paddocks_video
                 fractional_cover_paddocks_video(query, paddocks, ds_fractional_cover=ds_fractional_cover, ds_sentinel2=ds_sentinel2)
             elif i == 8:
-                from PaddockTS.PaddockTS.make_paddockTS import make_paddockTS
-                ds_paddockTS = make_paddockTS(query, ds_sentinel2=ds_sentinel2, paddocks=paddocks)
+                from PaddockTS.PaddockTimeSeries.make_paddock_time_series import make_paddock_time_series
+                ds_paddockTS = make_paddock_time_series(query, ds_sentinel2=ds_sentinel2, paddocks=paddocks)
             elif i == 9:
-                from PaddockTS.PaddockTS.make_yearly_paddockTS import make_yearly_paddockTS
-                ds_yearly = make_yearly_paddockTS(query, ds_paddockTS=ds_paddockTS)
+                from PaddockTS.PaddockTimeSeries.make_yearly_paddock_time_series import make_yearly_paddock_time_series
+                ds_yearly = make_yearly_paddock_time_series(query, ds_paddockTS=ds_paddockTS)
             elif i == 10:
                 from PaddockTS.Phenology.estimate_phenology import estimate_phenology
                 phenology_results = estimate_phenology(query, ds_yearly=ds_yearly)

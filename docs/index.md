@@ -31,7 +31,7 @@ soil properties (SLGA) for the same area.
 - **Built for Australian agronomy.** Defaults and integrations target Sentinel-2
   ARD, OzWALD, SILO, SLGA, and TERN datasets.
 - **Composable.** Every stage (`download_sentinel2`, `compute_indices`,
-  `compute_fractional_cover`, `get_paddocks`, `make_paddockTS`, `estimate_phenology`)
+  `compute_fractional_cover`, `get_paddocks`, `make_paddock_time_series`, `estimate_phenology`)
   is independently callable. Skip stages, swap in your own data.
 - **Caches by content.** A query's `stub` is a SHA-256 of its inputs, so
   outputs are cached by what the query *means*, not by an arbitrary name.
