@@ -1,6 +1,38 @@
 from PaddockTS.query import Query
 from datetime import date
 
+
+def load_user_paddocks(paddocks_filepath: str):
+    """Load user-provided paddocks and ensure required columns exist.
+
+    Args:
+        paddocks_filepath: Path to a paddocks file (GeoPackage, Shapefile, or GeoJSON).
+
+    Returns:
+        GeoDataFrame with 'paddock', 'area_ha', and 'compactness' columns guaranteed.
+    """
+    import geopandas as gpd
+    import numpy as np
+
+    paddocks = gpd.read_file(paddocks_filepath)
+
+    # Ensure 'paddock' column exists
+    if 'paddock' not in paddocks.columns:
+        paddocks['paddock'] = range(1, len(paddocks) + 1)
+
+    # Compute area_ha if missing (needed by calendar_plot)
+    if 'area_ha' not in paddocks.columns:
+        metric = paddocks.to_crs(paddocks.estimate_utm_crs())
+        paddocks['area_ha'] = metric.geometry.area / 10000
+
+    # Compute compactness if missing
+    if 'compactness' not in paddocks.columns:
+        metric = paddocks.to_crs(paddocks.estimate_utm_crs())
+        paddocks['compactness'] = (4 * np.pi * metric.geometry.area) / (metric.geometry.length ** 2)
+
+    return paddocks
+
+
 get_example_query = lambda: Query(
     bbox=[148.36265, -33.52606, 148.38265, -33.50606],
     start=date(2020, 1, 1),

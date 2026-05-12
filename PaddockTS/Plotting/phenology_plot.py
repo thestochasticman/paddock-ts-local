@@ -56,7 +56,11 @@ def phenology_plot(query: Query, phenology_results: dict[int, pd.DataFrame] | No
             make_paddock_time_series(query, paddocks_filepath=paddocks_filepath)
         ds_paddockTS = xr.open_zarr(zarr_path, chunks=None)
 
-    years = sorted(ds_yearly.keys())
+    # Only plot years that have phenology results (some may be skipped due to insufficient data)
+    years = sorted(set(ds_yearly.keys()) & set(phenology_results.keys()))
+    if not years:
+        print('No years with phenology results to plot')
+        return
     paddocks = list(ds_yearly[years[0]].paddock.values)
     n_rows, n_cols = len(paddocks), len(years)
 

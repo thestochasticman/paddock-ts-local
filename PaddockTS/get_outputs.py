@@ -31,19 +31,26 @@ ENV_STEPS = [
 ]
 
 S2_STEPS = [
-    'Download Sentinel-2',
-    'Compute indices',
-    'Compute fractional cover',
-    'Sentinel-2 video',
-    'Segment paddocks',
-    'Sentinel-2 + paddocks video',
-    'Fractional cover video',
-    'Fractional cover + paddocks video',
-    'Make paddock time series',
-    'Make yearly paddock time series',
-    'Estimate phenology',
-    'Calendar plot',
-    'Phenology plot',
+    'Download Sentinel-2',              # 0
+    'Compute indices',                  # 1
+    'Compute fractional cover',         # 2
+    'Sentinel-2 video',                 # 3
+    'Segment paddocks (SAM)',           # 4 - skipped if skip_sam
+    'S2 + paddocks video (SAM)',        # 5 - skipped if skip_sam
+    'S2 + paddocks video (user)',       # 6 - skipped if no paddocks_filepath
+    'Fractional cover video',           # 7
+    'FC + paddocks video (SAM)',        # 8 - skipped if skip_sam
+    'FC + paddocks video (user)',       # 9 - skipped if no paddocks_filepath
+    'Make paddock TS (SAM)',            # 10 - skipped if skip_sam
+    'Make paddock TS (user)',           # 11 - skipped if no paddocks_filepath
+    'Make yearly paddock TS (SAM)',     # 12 - skipped if skip_sam
+    'Make yearly paddock TS (user)',    # 13 - skipped if no paddocks_filepath
+    'Estimate phenology (SAM)',         # 14 - skipped if skip_sam
+    'Estimate phenology (user)',        # 15 - skipped if no paddocks_filepath
+    'Calendar plot (SAM)',              # 16 - skipped if skip_sam
+    'Calendar plot (user)',             # 17 - skipped if no paddocks_filepath
+    'Phenology plot (SAM)',             # 18 - skipped if skip_sam
+    'Phenology plot (user)',            # 19 - skipped if no paddocks_filepath
 ]
 
 
@@ -170,6 +177,8 @@ def _make_table(title, steps, statuses, times):
             symbol = '[cyan]waiting...[/cyan]'
         elif status == 'error':
             symbol = '[red]error[/red]'
+        elif status == 'skipped':
+            symbol = '[cyan]skipped[/cyan]'
         else:
             symbol = '[dim]pending[/dim]'
         time_str = f'{elapsed:.1f}s' if elapsed is not None else ''
@@ -248,15 +257,24 @@ def _run_env_steps(query, statuses, times, errors=None):
         times[i] = time.time() - t0
 
 
-def _run_s2_steps(query, statuses, times):
+def _run_s2_steps(query, statuses, times, paddocks_filepath=None, skip_sam=False):
     import xarray as xr
 
     ds_sentinel2 = None
     ds_fractional_cover = None
-    paddocks = None
+    paddocks = None  # Primary paddocks (SAM or user if skip_sam)
+    user_paddocks = None  # Secondary paddocks (user-provided, for dual mode)
+    gpkg_path = f'{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg'
+
+    # SAM-based datasets
     ds_paddockTS = None
     ds_yearly = None
     phenology_results = None
+
+    # User-based datasets
+    ds_paddockTS_user = None
+    ds_yearly_user = None
+    phenology_results_user = None
 
     os.makedirs(query.tmp_dir, exist_ok=True)
     for i in range(len(S2_STEPS)):
@@ -291,38 +309,158 @@ def _run_s2_steps(query, statuses, times):
             elif i == 3:
                 from PaddockTS.Plotting.sentinel2_video import sentinel2_video
                 sentinel2_video(query, ds_sentinel2=ds_sentinel2)
+
+            # Step 4: Segment paddocks (SAM)
             elif i == 4:
                 import geopandas as gpd
-                gpkg_path = f'{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg'
-                if exists(gpkg_path):
+                if skip_sam:
+                    # Skip SAM, but load user paddocks as primary for videos
+                    from PaddockTS.utils import load_user_paddocks
+                    paddocks = load_user_paddocks(paddocks_filepath)
+                    statuses[i] = 'skipped'
+                    times[i] = time.time() - t0
+                    continue
+                elif exists(gpkg_path):
                     paddocks = gpd.read_file(gpkg_path)
                 else:
                     from PaddockTS.PaddockSegmentation.get_paddocks import get_paddocks
                     paddocks = get_paddocks(query, ds_sentinel2=ds_sentinel2)
+                # Also load user paddocks if filepath provided (for dual mode)
+                if paddocks_filepath is not None:
+                    from PaddockTS.utils import load_user_paddocks
+                    user_paddocks = load_user_paddocks(paddocks_filepath)
+
+            # Step 5: S2 + paddocks video (SAM)
             elif i == 5:
+                if skip_sam:
+                    statuses[i] = 'skipped'
+                    times[i] = time.time() - t0
+                    continue
                 from PaddockTS.Plotting.sentinel2_paddocks_video import sentinel2_video_with_paddocks
                 sentinel2_video_with_paddocks(query, paddocks, ds_sentinel2=ds_sentinel2)
+
+            # Step 6: S2 + paddocks video (user)
             elif i == 6:
+                if paddocks_filepath is None:
+                    statuses[i] = 'skipped'
+                    times[i] = time.time() - t0
+                    continue
+                from PaddockTS.Plotting.sentinel2_paddocks_video import sentinel2_video_with_paddocks
+                sentinel2_video_with_paddocks(query, user_paddocks, ds_sentinel2=ds_sentinel2, suffix='_user')
+
+            # Step 7: Fractional cover video
+            elif i == 7:
                 from PaddockTS.Plotting.fractional_cover_video import fractional_cover_video
                 fractional_cover_video(query, ds_fractional_cover=ds_fractional_cover)
-            elif i == 7:
+
+            # Step 8: FC + paddocks video (SAM)
+            elif i == 8:
+                if skip_sam:
+                    statuses[i] = 'skipped'
+                    times[i] = time.time() - t0
+                    continue
                 from PaddockTS.Plotting.fractional_cover_paddocks_video import fractional_cover_paddocks_video
                 fractional_cover_paddocks_video(query, paddocks, ds_fractional_cover=ds_fractional_cover, ds_sentinel2=ds_sentinel2)
-            elif i == 8:
+
+            # Step 9: FC + paddocks video (user)
+            elif i == 9:
+                if paddocks_filepath is None:
+                    statuses[i] = 'skipped'
+                    times[i] = time.time() - t0
+                    continue
+                from PaddockTS.Plotting.fractional_cover_paddocks_video import fractional_cover_paddocks_video
+                fractional_cover_paddocks_video(query, user_paddocks, ds_fractional_cover=ds_fractional_cover, ds_sentinel2=ds_sentinel2, suffix='_user')
+
+            # Step 10: Make paddock TS (SAM)
+            elif i == 10:
+                if skip_sam:
+                    statuses[i] = 'skipped'
+                    times[i] = time.time() - t0
+                    continue
                 from PaddockTS.Phenology.make_paddock_time_series import make_paddock_time_series
                 ds_paddockTS = make_paddock_time_series(query, ds_sentinel2=ds_sentinel2, paddocks_filepath=gpkg_path)
-            elif i == 9:
+
+            # Step 11: Make paddock TS (user)
+            elif i == 11:
+                if paddocks_filepath is None:
+                    statuses[i] = 'skipped'
+                    times[i] = time.time() - t0
+                    continue
+                from PaddockTS.Phenology.make_paddock_time_series import make_paddock_time_series
+                ds_paddockTS_user = make_paddock_time_series(query, ds_sentinel2=ds_sentinel2, paddocks_filepath=paddocks_filepath)
+
+            # Step 12: Make yearly paddock TS (SAM)
+            elif i == 12:
+                if skip_sam:
+                    statuses[i] = 'skipped'
+                    times[i] = time.time() - t0
+                    continue
                 from PaddockTS.Phenology.make_yearly_paddock_time_series import make_yearly_paddock_time_series
                 ds_yearly = make_yearly_paddock_time_series(query, ds_paddockTS=ds_paddockTS, paddocks_filepath=gpkg_path)
-            elif i == 10:
+
+            # Step 13: Make yearly paddock TS (user)
+            elif i == 13:
+                if paddocks_filepath is None:
+                    statuses[i] = 'skipped'
+                    times[i] = time.time() - t0
+                    continue
+                from PaddockTS.Phenology.make_yearly_paddock_time_series import make_yearly_paddock_time_series
+                ds_yearly_user = make_yearly_paddock_time_series(query, ds_paddockTS=ds_paddockTS_user, paddocks_filepath=paddocks_filepath)
+
+            # Step 14: Estimate phenology (SAM)
+            elif i == 14:
+                if skip_sam:
+                    statuses[i] = 'skipped'
+                    times[i] = time.time() - t0
+                    continue
                 from PaddockTS.Phenology.estimate_phenology import estimate_phenology
                 phenology_results = estimate_phenology(query, ds_yearly=ds_yearly)
-            elif i == 11:
+
+            # Step 15: Estimate phenology (user)
+            elif i == 15:
+                if paddocks_filepath is None:
+                    statuses[i] = 'skipped'
+                    times[i] = time.time() - t0
+                    continue
+                from PaddockTS.Phenology.estimate_phenology import estimate_phenology
+                phenology_results_user = estimate_phenology(query, ds_yearly=ds_yearly_user)
+
+            # Step 16: Calendar plot (SAM)
+            elif i == 16:
+                if skip_sam:
+                    statuses[i] = 'skipped'
+                    times[i] = time.time() - t0
+                    continue
                 from PaddockTS.Plotting.calendar_plot import calendar_plot
                 calendar_plot(query, ds_sentinel2=ds_sentinel2, paddocks=paddocks)
-            elif i == 12:
+
+            # Step 17: Calendar plot (user)
+            elif i == 17:
+                if paddocks_filepath is None:
+                    statuses[i] = 'skipped'
+                    times[i] = time.time() - t0
+                    continue
+                from PaddockTS.Plotting.calendar_plot import calendar_plot
+                calendar_plot(query, ds_sentinel2=ds_sentinel2, paddocks=user_paddocks)
+
+            # Step 18: Phenology plot (SAM)
+            elif i == 18:
+                if skip_sam:
+                    statuses[i] = 'skipped'
+                    times[i] = time.time() - t0
+                    continue
                 from PaddockTS.Plotting.phenology_plot import phenology_plot
                 phenology_plot(query, phenology_results=phenology_results, ds_yearly=ds_yearly, ds_paddockTS=ds_paddockTS)
+
+            # Step 19: Phenology plot (user)
+            elif i == 19:
+                if paddocks_filepath is None:
+                    statuses[i] = 'skipped'
+                    times[i] = time.time() - t0
+                    continue
+                from PaddockTS.Plotting.phenology_plot import phenology_plot
+                phenology_plot(query, phenology_results=phenology_results_user, ds_yearly=ds_yearly_user, ds_paddockTS=ds_paddockTS_user)
+
             statuses[i] = 'done'
         except Exception:
             statuses[i] = 'error'
@@ -333,7 +471,8 @@ def _run_s2_steps(query, statuses, times):
 
 # --- driver ----------------------------------------------------------------
 
-def get_outputs(query: Query, reload: bool = False, show_log: bool = False):
+def get_outputs(query: Query, reload: bool = False, show_log: bool = False,
+                paddocks_filepath: str = None, skip_sam: bool = False):
     """Run the full PaddockTS pipeline for ``query`` with a live status dashboard.
 
     Spawns two worker threads — one for environmental data
@@ -365,6 +504,11 @@ def get_outputs(query: Query, reload: bool = False, show_log: bool = False):
         show_log: If ``True``, render a tail-of-log panel below the
             status tables. Useful for debugging stuck steps; turns off
             by default to keep the dashboard compact.
+        paddocks_filepath: Optional path to a user-provided paddocks file
+            (GeoPackage, Shapefile, or GeoJSON). Used when ``skip_sam=True``.
+        skip_sam: If ``True``, skip SAM auto-segmentation and use the
+            paddocks from ``paddocks_filepath`` instead. Requires
+            ``paddocks_filepath`` to be provided.
 
     Raises:
         Exception: Re-raises the first exception encountered by either
@@ -387,6 +531,9 @@ def get_outputs(query: Query, reload: bool = False, show_log: bool = False):
         get_outputs(q)
         ```
     """
+    if skip_sam and paddocks_filepath is None:
+        raise ValueError("skip_sam=True requires a valid paddocks_filepath")
+
     if reload:
         if exists(query.tmp_dir):
             shutil.rmtree(query.tmp_dir)
@@ -410,7 +557,8 @@ def get_outputs(query: Query, reload: bool = False, show_log: bool = False):
 
         def s2_worker():
             try:
-                _run_s2_steps(query, s2_statuses, s2_times)
+                _run_s2_steps(query, s2_statuses, s2_times,
+                              paddocks_filepath=paddocks_filepath, skip_sam=skip_sam)
             except Exception as e:
                 errors.append(('Sentinel-2 → PaddockTS', e))
 
@@ -440,4 +588,8 @@ def get_outputs(query: Query, reload: bool = False, show_log: bool = False):
 
 if __name__ == '__main__':
     from PaddockTS.utils import get_example_query
-    get_outputs(get_example_query(), reload='--reload' in sys.argv)
+    from PaddockTS.query import Query
+    from datetime import date
+
+    query = Query.build_from_paddocks('/borevitz_projects/data/manual_downloads/Milgadara_paddock-polygons_2024-12-17_12-45-58.json', date(2024, 1, 1), date(2025, 1, 1), stub='Milgadara')
+    get_outputs(query, reload='--reload' in sys.argv, paddocks_filepath='/borevitz_projects/data/manual_downloads/Milgadara_paddock-polygons_2024-12-17_12-45-58.json')

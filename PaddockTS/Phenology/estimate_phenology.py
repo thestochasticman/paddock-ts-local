@@ -38,7 +38,7 @@ def _override_xr_merge():
         phenolopy.xr.merge = _real_merge
 
 
-def estimate_phenology(query, ds_yearly=None, variable='NDVI'):
+def estimate_phenology(query, ds_yearly=None, variable='NDVI', min_observations=25):
     """Compute per-paddock phenology metrics for each year.
 
     For each year in ``ds_yearly``, this:
@@ -61,6 +61,8 @@ def estimate_phenology(query, ds_yearly=None, variable='NDVI'):
         variable: Name of the data variable to feed into phenolopy.
             Defaults to ``'NDVI'``; ``'NIRv'`` and ``'CFI'`` also work
             and are sometimes preferred for low-LAI canopies.
+        min_observations: Minimum number of valid observations required
+            per paddock. Paddocks with fewer are skipped. Default 25.
 
     Returns:
         dict[int, pandas.DataFrame]: One DataFrame per year. Columns
@@ -79,6 +81,20 @@ def estimate_phenology(query, ds_yearly=None, variable='NDVI'):
             .rename({variable: "veg_index"})
             .drop_vars("doy")
         )
+
+        # Filter paddocks with insufficient observations
+        valid_counts = ds_veg["veg_index"].count(dim="time")
+        valid_mask = valid_counts >= min_observations
+
+        if not valid_mask.any():
+            print(f'  {year}: skipped (no paddocks with >= {min_observations} observations)')
+            continue
+
+        n_skipped = (~valid_mask).sum().item()
+        if n_skipped > 0:
+            print(f'  {year}: ignoring {n_skipped} paddocks with < {min_observations} observations')
+
+        ds_veg = ds_veg.sel(paddock=valid_mask)
 
         da_num_seasons = phenolopy.calc_num_seasons(ds=ds_veg)
 

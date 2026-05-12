@@ -87,7 +87,9 @@ def make_paddock_time_series(query, ds_sentinel2=None, paddocks_filepath=None, c
             from PaddockTS.PaddockSegmentation.get_paddocks import get_paddocks
             get_paddocks(query)
 
-    paddocks = gpd.read_file(paddocks_filepath)
+    # Use load_user_paddocks to ensure 'paddock' column exists
+    from PaddockTS.utils import load_user_paddocks
+    paddocks = load_user_paddocks(paddocks_filepath)
 
     ds = ds_sentinel2
     pol = paddocks
