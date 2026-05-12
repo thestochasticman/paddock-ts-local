@@ -11,7 +11,7 @@ def run(query: Query, reload: bool = False):
         for path in [query.sentinel2_path, query.fractional_cover_path]:
             if exists(path):
                 shutil.rmtree(path)
-        for suffix in ['_paddocks.gpkg', '_preseg.tif', '_sam_mask.tif', '_sam_raw.gpkg']:
+        for suffix in ['_sam_paddocks.gpkg', '_preseg.tif', '_sam_mask.tif', '_sam_raw.gpkg']:
             path = f'{query.tmp_dir}/{query.stub}{suffix}'
             if exists(path):
                 os.remove(path)
@@ -63,7 +63,7 @@ def run(query: Query, reload: bool = False):
     print('[4/8] Segment paddocks...', flush=True)
     t0 = time.time()
     import geopandas as gpd
-    gpkg_path = f'{query.tmp_dir}/{query.stub}_paddocks.gpkg'
+    gpkg_path = f'{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg'
     if exists(gpkg_path):
         paddocks = gpd.read_file(gpkg_path)
         print('  skipped (cached)')

@@ -26,7 +26,7 @@ def phenology_plot(query: Query, phenology_results: dict[int, pd.DataFrame] | No
             :func:`PaddockTS.Phenology.estimate_phenology`. If ``None``,
             recomputed on demand using ``variable``.
         ds_yearly: Optional ``{year: Dataset}`` from
-            :func:`PaddockTS.PaddockTimeSeries.make_yearly_paddock_time_series`. If
+            :func:`PaddockTS.Phenology.make_yearly_paddock_time_series`. If
             ``None``, built on demand.
         ds_paddockTS: Optional raw per-paddock time series Dataset. If
             ``None``, opened (or generated, then opened) from cache.
@@ -45,14 +45,15 @@ def phenology_plot(query: Query, phenology_results: dict[int, pd.DataFrame] | No
         phenology_results = estimate_phenology(query, ds_yearly=ds_yearly, variable=variable)
 
     if ds_yearly is None:
-        from PaddockTS.PaddockTimeSeries.make_yearly_paddock_time_series import make_yearly_paddock_time_series
+        from PaddockTS.Phenology.make_yearly_paddock_time_series import make_yearly_paddock_time_series
         ds_yearly = make_yearly_paddock_time_series(query)
 
     if ds_paddockTS is None:
-        zarr_path = f'{query.tmp_dir}/{query.stub}_paddockTS.zarr'
+        paddocks_filepath = f'{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg'
+        zarr_path = f'{query.tmp_dir}/{query.stub}_paddocks_timeseries.zarr'
         if not os.path.exists(zarr_path):
-            from PaddockTS.PaddockTimeSeries.make_paddock_time_series import make_paddock_time_series
-            make_paddock_time_series(query)
+            from PaddockTS.Phenology.make_paddock_time_series import make_paddock_time_series
+            make_paddock_time_series(query, paddocks_filepath=paddocks_filepath)
         ds_paddockTS = xr.open_zarr(zarr_path, chunks=None)
 
     years = sorted(ds_yearly.keys())

@@ -133,7 +133,7 @@ def test():
     if not exists(query.fractional_cover_path):
         from PaddockTS.FractionalCover.compute_fractional_cover import compute_fractional_cover
         compute_fractional_cover(query)
-    gpkg_path = f'{query.tmp_dir}/{query.stub}_paddocks.gpkg'
+    gpkg_path = f'{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg'
     if exists(gpkg_path):
         paddocks = gpd.read_file(gpkg_path)
     else:

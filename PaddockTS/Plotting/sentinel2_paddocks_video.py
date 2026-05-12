@@ -123,7 +123,7 @@ def test():
     from os.path import exists
     from PaddockTS.utils import get_example_query
     query = get_example_query()
-    gpkg_path = f'{query.tmp_dir}/{query.stub}_paddocks.gpkg'
+    gpkg_path = f'{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg'
     if exists(gpkg_path):
         paddocks = gpd.read_file(gpkg_path)
     else:

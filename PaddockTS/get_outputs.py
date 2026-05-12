@@ -293,7 +293,7 @@ def _run_s2_steps(query, statuses, times):
                 sentinel2_video(query, ds_sentinel2=ds_sentinel2)
             elif i == 4:
                 import geopandas as gpd
-                gpkg_path = f'{query.tmp_dir}/{query.stub}_paddocks.gpkg'
+                gpkg_path = f'{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg'
                 if exists(gpkg_path):
                     paddocks = gpd.read_file(gpkg_path)
                 else:
@@ -309,11 +309,11 @@ def _run_s2_steps(query, statuses, times):
                 from PaddockTS.Plotting.fractional_cover_paddocks_video import fractional_cover_paddocks_video
                 fractional_cover_paddocks_video(query, paddocks, ds_fractional_cover=ds_fractional_cover, ds_sentinel2=ds_sentinel2)
             elif i == 8:
-                from PaddockTS.PaddockTimeSeries.make_paddock_time_series import make_paddock_time_series
-                ds_paddockTS = make_paddock_time_series(query, ds_sentinel2=ds_sentinel2, paddocks=paddocks)
+                from PaddockTS.Phenology.make_paddock_time_series import make_paddock_time_series
+                ds_paddockTS = make_paddock_time_series(query, ds_sentinel2=ds_sentinel2, paddocks_filepath=gpkg_path)
             elif i == 9:
-                from PaddockTS.PaddockTimeSeries.make_yearly_paddock_time_series import make_yearly_paddock_time_series
-                ds_yearly = make_yearly_paddock_time_series(query, ds_paddockTS=ds_paddockTS)
+                from PaddockTS.Phenology.make_yearly_paddock_time_series import make_yearly_paddock_time_series
+                ds_yearly = make_yearly_paddock_time_series(query, ds_paddockTS=ds_paddockTS, paddocks_filepath=gpkg_path)
             elif i == 10:
                 from PaddockTS.Phenology.estimate_phenology import estimate_phenology
                 phenology_results = estimate_phenology(query, ds_yearly=ds_yearly)

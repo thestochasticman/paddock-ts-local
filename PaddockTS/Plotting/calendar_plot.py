@@ -65,7 +65,7 @@ def calendar_plot(query: Query, ds_sentinel2: xr.Dataset | None = None, paddocks
         ds_sentinel2 = xr.open_zarr(query.sentinel2_path, chunks=None)
 
     if paddocks is None:
-        gpkg_path = f'{query.tmp_dir}/{query.stub}_paddocks.gpkg'
+        gpkg_path = f'{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg'
         if os.path.exists(gpkg_path):
             paddocks = gpd.read_file(gpkg_path)
         else:

@@ -32,7 +32,7 @@ def _band_medians(band_array, mask_flat, paddock_ids):
 
     return out
 
-def make_paddock_time_series(query, ds_sentinel2=None, paddocks=None, crs="epsg:6933"):
+def make_paddock_time_series(query, ds_sentinel2=None, paddocks_filepath=None, crs="epsg:6933"):
     """Compute per-paddock medians for every band at every timestep.
 
     Steps:
@@ -45,16 +45,16 @@ def make_paddock_time_series(query, ds_sentinel2=None, paddocks=None, crs="epsg:
        per-paddock NaN-aware median across pixels at every timestep.
     4. Stitch results back into an xarray Dataset on dims
        ``(paddock, time)`` and persist as Zarr v2 to
-       ``{query.tmp_dir}/{query.stub}_paddockTS.zarr``.
+       ``{paddocks_filepath stem}_timeseries.zarr``.
 
     Args:
         query: The :class:`PaddockTS.query.Query`.
         ds_sentinel2: Optional in-memory Sentinel-2 dataset. If ``None``,
             ``query.sentinel2_path`` is opened (or downloaded first).
-        paddocks: Optional :class:`geopandas.GeoDataFrame` of paddock
+        paddocks_filepath: Path to a GeoPackage (.gpkg) containing paddock
             polygons (must include a ``paddock`` column for IDs). If
-            ``None``, loaded from the cached gpkg or generated via
-            :func:`PaddockTS.PaddockSegmentation.get_paddocks`.
+            ``None``, defaults to ``{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg``
+            (loaded or generated via :func:`PaddockTS.PaddockSegmentation.get_paddocks`).
         crs: Equal-area CRS to write onto the dataset for
             georeferencing the rasterised mask. Defaults to EPSG:6933
             (WGS84 / NSIDC EASE-Grid 2.0 Global).
@@ -62,12 +62,14 @@ def make_paddock_time_series(query, ds_sentinel2=None, paddocks=None, crs="epsg:
     Returns:
         xarray.Dataset: Per-paddock medians on dims ``(paddock, time)``
         with one data variable per Sentinel-2 band and per spectral
-        index. Also persisted to ``{query.tmp_dir}/{query.stub}_paddockTS.zarr``.
+        index. Also persisted to ``{paddocks_filepath stem}_timeseries.zarr``.
     """
     import rasterio.features
     from affine import Affine
     import pandas as pd
     from os.path import exists
+    from pathlib import Path
+    import geopandas as gpd
 
     if ds_sentinel2 is None:
         if not exists(query.sentinel2_path):
@@ -79,14 +81,13 @@ def make_paddock_time_series(query, ds_sentinel2=None, paddocks=None, crs="epsg:
     from PaddockTS.SpectralIndices.indices import compute_indices
     ds_sentinel2 = compute_indices(query, ds_sentinel2=ds_sentinel2)
 
-    if paddocks is None:
-        import geopandas as gpd
-        gpkg_path = f'{query.tmp_dir}/{query.stub}_paddocks.gpkg'
-        if exists(gpkg_path):
-            paddocks = gpd.read_file(gpkg_path)
-        else:
+    if paddocks_filepath is None:
+        paddocks_filepath = f'{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg'
+        if not exists(paddocks_filepath):
             from PaddockTS.PaddockSegmentation.get_paddocks import get_paddocks
-            paddocks = get_paddocks(query)
+            get_paddocks(query)
+
+    paddocks = gpd.read_file(paddocks_filepath)
 
     ds = ds_sentinel2
     pol = paddocks
@@ -147,7 +148,8 @@ def make_paddock_time_series(query, ds_sentinel2=None, paddocks=None, crs="epsg:
     }
     result = xr.Dataset(data_vars, coords=coords)
 
-    zarr_path = f'{query.tmp_dir}/{query.stub}_paddockTS.zarr'
+    paddocks_path = Path(paddocks_filepath)
+    zarr_path = str(paddocks_path.parent / f'{paddocks_path.stem}_timeseries.zarr')
     result.to_zarr(zarr_path, mode='w', zarr_format=2)
     print(f'Saved to {zarr_path}')
     return result

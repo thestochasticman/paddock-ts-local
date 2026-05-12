@@ -44,7 +44,7 @@ def get_paddocks(
 
     Caches each stage's output under ``query.tmp_dir`` so reruns reuse
     work: ``{stub}_preseg.tif``, ``{stub}_sam_mask.tif``,
-    ``{stub}_sam_raw.gpkg``, and the final ``{stub}_paddocks.gpkg``.
+    ``{stub}_sam_raw.gpkg``, and the final ``{stub}_sam_paddocks.gpkg``.
 
     Args:
         query: The :class:`PaddockTS.query.Query`.
@@ -66,7 +66,7 @@ def get_paddocks(
         geopandas.GeoDataFrame: One row per paddock, sorted by
         ``area_ha`` descending, with columns ``geometry``, ``area_ha``,
         ``compactness``, and a 1-based ``paddock`` integer ID. Also
-        written to ``{query.tmp_dir}/{query.stub}_paddocks.gpkg``.
+        written to ``{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg``.
     """
     # 1. Presegmentation image
     _log("  Preseg: computing NDWI Fourier features...")
@@ -123,7 +123,7 @@ def get_paddocks(
     paddocks = paddocks.sort_values("area_ha", ascending=False).reset_index(drop=True)
     paddocks["paddock"] = range(1, len(paddocks) + 1)
 
-    gpkg_path = f"{query.tmp_dir}/{query.stub}_paddocks.gpkg"
+    gpkg_path = f"{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg"
     paddocks.to_file(gpkg_path, driver="GPKG")
     _log(f"  {len(paddocks)} paddocks saved")
 

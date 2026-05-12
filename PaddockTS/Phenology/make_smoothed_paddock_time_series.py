@@ -17,7 +17,7 @@ from scipy.interpolate import PchipInterpolator
 from scipy.signal import savgol_filter
 
 
-def make_smoothed_paddock_time_series(query, ds_paddockTS=None, days=10, window_length=7, polyorder=2):
+def make_smoothed_paddock_time_series(query, ds_paddockTS=None, paddocks_filepath=None, days=10, window_length=7, polyorder=2):
     """Resample-then-interpolate-then-smooth all time-dependent variables.
 
     Pipeline applied to each paddock × variable series:
@@ -29,13 +29,15 @@ def make_smoothed_paddock_time_series(query, ds_paddockTS=None, days=10, window_
     4. Smooth with a Savitzky-Golay filter
        (``window_length`` and ``polyorder`` configurable).
     5. Re-attach static variables and persist as Zarr v2 to
-       ``{query.tmp_dir}/{query.stub}_paddockTS_smoothed.zarr``.
+       ``{paddocks_filepath stem}_timeseries_smoothed.zarr``.
 
     Args:
         query: The :class:`PaddockTS.query.Query`.
         ds_paddockTS: Optional in-memory paddockTS dataset. If ``None``,
-            opens (or generates, then opens) the cached
-            ``{query.stub}_paddockTS.zarr``.
+            opens (or generates, then opens) the cached timeseries zarr.
+        paddocks_filepath: Path to the paddocks GeoPackage. Used to derive
+            the timeseries zarr path. If ``None``, defaults to
+            ``{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg``.
         days: Resampling cadence in days. Default 10.
         window_length: Savitzky-Golay window size in number of resampled
             samples. Coerced to the next odd integer if even and clipped
@@ -46,16 +48,22 @@ def make_smoothed_paddock_time_series(query, ds_paddockTS=None, days=10, window_
     Returns:
         xarray.Dataset: Smoothed dataset on dims ``(paddock, time)``
         with the same data variables as the input. Also persisted to
-        ``{query.tmp_dir}/{query.stub}_paddockTS_smoothed.zarr``.
+        ``{paddocks_filepath stem}_timeseries_smoothed.zarr``.
     """
     from os.path import exists
+    from pathlib import Path
+
+    if paddocks_filepath is None:
+        paddocks_filepath = f'{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg'
+
+    paddocks_path = Path(paddocks_filepath)
+    timeseries_zarr = paddocks_path.parent / f'{paddocks_path.stem}_timeseries.zarr'
 
     if ds_paddockTS is None:
-        zarr_path = f'{query.tmp_dir}/{query.stub}_paddockTS.zarr'
-        if not exists(zarr_path):
-            from PaddockTS.PaddockTimeSeries.make_paddock_time_series import make_paddock_time_series
-            make_paddock_time_series(query)
-        ds_paddockTS = xr.open_zarr(zarr_path, chunks=None)
+        if not exists(timeseries_zarr):
+            from PaddockTS.Phenology.make_paddock_time_series import make_paddock_time_series
+            make_paddock_time_series(query, paddocks_filepath=paddocks_filepath)
+        ds_paddockTS = xr.open_zarr(timeseries_zarr, chunks=None)
 
     ds = ds_paddockTS
 
@@ -111,7 +119,7 @@ def make_smoothed_paddock_time_series(query, ds_paddockTS=None, days=10, window_
         if c not in ds_new.coords:
             ds_new = ds_new.assign_coords({c: ds[c]})
 
-    smoothed_path = f'{query.tmp_dir}/{query.stub}_paddockTS_smoothed.zarr'
+    smoothed_path = str(paddocks_path.parent / f'{paddocks_path.stem}_timeseries_smoothed.zarr')
     ds_new.to_zarr(smoothed_path, mode='w', zarr_format=2)
     print(f'Saved to {smoothed_path}')
     return ds_new

@@ -71,6 +71,7 @@ class Query:
     centre_lat.default(lambda s: (s.bbox[1] + s.bbox[3])/2)
     sentinel2_path.default(lambda s: f'{s.tmp_dir}/{s.stub}_sentinel2.zarr')
     fractional_cover_path.default(lambda s: f'{s.tmp_dir}/{s.stub}_fractional_cover.zarr')
+    
 
     def __post_init__(s: Self):
         makedirs(s.tmp_dir, exist_ok=True)
@@ -129,6 +130,102 @@ class Query:
             lon + lon_buffer,  # east (maxX)
             lat + lat_buffer   # north (maxY)
         ]
+
+        if stub is not None:
+            return cls(bbox=bbox, start=start, end=end, stub=stub)
+        else:
+            return cls(bbox=bbox, start=start, end=end)
+
+    @classmethod
+    def build_from_paddocks(
+        cls,
+        paddocks_filepath: str,
+        start: date,
+        end: date,
+        stub: str = None,
+        label_col: str = None,
+        geometry_col: str = None,
+        crs: str = 'EPSG:4326',
+    ):
+        """Build a Query from a paddocks file, enveloping all geometries into a bbox.
+
+        Reads paddock geometries from a GeoPackage, Shapefile, or GeoJSON
+        and computes a bounding box that contains all features.
+
+        Args:
+            paddocks_filepath: Path to the paddocks file. Supported formats:
+                - GeoPackage (``.gpkg``)
+                - Shapefile (``.shp``)
+                - GeoJSON (``.geojson``, ``.json``)
+            start: Inclusive start date.
+            end: Inclusive end date.
+            stub: Optional human-readable stub identifier. If omitted, a
+                SHA-256 hash of the inputs is used.
+            label_col: Column name containing paddock labels/names (e.g.
+                ``'title'``, ``'name'``, ``'paddock'``). If provided, the
+                column is renamed to ``'paddock'`` for downstream compatibility.
+            geometry_col: Column name containing geometry data. For standard
+                geo formats this is auto-detected.
+            crs: Coordinate reference system to assume if the file has none.
+                Default ``'EPSG:4326'``. The bbox is always returned in EPSG:4326.
+
+        Returns:
+            Query: Instance with ``bbox = [west, south, east, north]``
+            encompassing all paddock geometries.
+
+        Example:
+            ```python
+            from datetime import date
+            from PaddockTS.query import Query
+
+            # From GeoJSON with custom label column
+            q = Query.build_from_paddocks(
+                paddocks_filepath='/path/to/paddocks.json',
+                start=date(2023, 1, 1),
+                end=date(2023, 12, 31),
+                label_col='title',
+                stub='my_farm',
+            )
+            ```
+        """
+        import geopandas as gpd
+        from pathlib import Path
+
+        filepath = Path(paddocks_filepath)
+        suffix = filepath.suffix.lower()
+
+        if suffix in ('.gpkg', '.shp', '.geojson', '.json'):
+            gdf = gpd.read_file(paddocks_filepath)
+        else:
+            raise ValueError(
+                f"Unsupported file format: '{suffix}'. "
+                f"Supported: .gpkg, .shp, .geojson, .json"
+            )
+
+        # Set geometry column if specified
+        if geometry_col is not None and geometry_col in gdf.columns:
+            gdf = gdf.set_geometry(geometry_col)
+
+        # Rename label column to 'paddock' if specified
+        if label_col is not None:
+            if label_col not in gdf.columns:
+                raise ValueError(
+                    f"Label column '{label_col}' not found. "
+                    f"Available columns: {list(gdf.columns)}"
+                )
+            gdf = gdf.rename(columns={label_col: 'paddock'})
+
+        # Set CRS if missing
+        if gdf.crs is None:
+            gdf = gdf.set_crs(crs)
+
+        # Reproject to EPSG:4326 if needed
+        if gdf.crs.to_epsg() != 4326:
+            gdf = gdf.to_crs('EPSG:4326')
+
+        # Get total bounds: (minx, miny, maxx, maxy)
+        minx, miny, maxx, maxy = gdf.total_bounds
+        bbox = [float(minx), float(miny), float(maxx), float(maxy)]
 
         if stub is not None:
             return cls(bbox=bbox, start=start, end=end, stub=stub)

@@ -13,18 +13,18 @@ def run(query: Query, reload: bool = False):
             if exists(path):
                 shutil.rmtree(path)
         for pattern in [
-            f'{query.tmp_dir}/{query.stub}_paddocks.gpkg',
+            f'{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg',
             f'{query.tmp_dir}/{query.stub}_preseg.tif',
             f'{query.tmp_dir}/{query.stub}_sam_mask.tif',
             f'{query.tmp_dir}/{query.stub}_sam_raw.gpkg',
-            f'{query.tmp_dir}/{query.stub}_paddockTS.zarr',
+            f'{query.tmp_dir}/{query.stub}_paddocks_timeseries.zarr',
         ]:
             if exists(pattern):
                 if os.path.isdir(pattern):
                     shutil.rmtree(pattern)
                 else:
                     os.remove(pattern)
-        for path in glob.glob(f'{query.tmp_dir}/{query.stub}_paddockTS_*.zarr'):
+        for path in glob.glob(f'{query.tmp_dir}/{query.stub}_paddocks_timeseries_*.zarr'):
             shutil.rmtree(path)
         for path in glob.glob(f'{query.out_dir}/{query.stub}_calendar_*.png'):
             os.remove(path)
@@ -77,7 +77,7 @@ def run(query: Query, reload: bool = False):
     print('[5/13] Segment paddocks...', flush=True)
     t0 = time.time()
     import geopandas as gpd
-    gpkg_path = f'{query.tmp_dir}/{query.stub}_paddocks.gpkg'
+    gpkg_path = f'{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg'
     if exists(gpkg_path):
         paddocks = gpd.read_file(gpkg_path)
         print('  skipped (cached)')
@@ -111,16 +111,17 @@ def run(query: Query, reload: bool = False):
     # 9. Make paddock time series
     print('[9/13] Make paddock time series...', flush=True)
     t0 = time.time()
-    from PaddockTS.PaddockTimeSeries.make_paddock_time_series import make_paddock_time_series
-    ds_paddockTS = make_paddock_time_series(query, ds_sentinel2=ds_sentinel2, paddocks=paddocks)
+    from PaddockTS.Phenology.make_paddock_time_series import make_paddock_time_series
+    gpkg_path = f'{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg'
+    ds_paddockTS = make_paddock_time_series(query, ds_sentinel2=ds_sentinel2, paddocks_filepath=gpkg_path)
     print(f'  done ({time.time() - t0:.1f}s)', flush=True)
     gc.collect()
 
     # 10. Make yearly paddock time series
     print('[10/13] Make yearly paddock time series...', flush=True)
     t0 = time.time()
-    from PaddockTS.PaddockTimeSeries.make_yearly_paddock_time_series import make_yearly_paddock_time_series
-    ds_yearly = make_yearly_paddock_time_series(query, ds_paddockTS=ds_paddockTS)
+    from PaddockTS.Phenology.make_yearly_paddock_time_series import make_yearly_paddock_time_series
+    ds_yearly = make_yearly_paddock_time_series(query, ds_paddockTS=ds_paddockTS, paddocks_filepath=gpkg_path)
     print(f'  done ({time.time() - t0:.1f}s)', flush=True)
 
     # 11. Estimate phenology

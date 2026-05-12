@@ -39,36 +39,44 @@ def split_paddock_time_series_by_year(ds):
     return datasets_by_year
 
 
-def make_yearly_paddock_time_series(query, ds_paddockTS=None):
+def make_yearly_paddock_time_series(query, ds_paddockTS=None, paddocks_filepath=None):
     """Persist one Zarr per year and return the same data as a dict.
 
     Loads the paddockTS Zarr if not provided, calls
     :func:`split_paddock_time_series_by_year`, and writes each per-year slice as
-    Zarr v2 to ``{query.tmp_dir}/{query.stub}_paddockTS_{year}.zarr``.
+    Zarr v2 to ``{paddocks_filepath stem}_timeseries_{year}.zarr``.
 
     Args:
         query: The :class:`PaddockTS.query.Query`.
         ds_paddockTS: Optional in-memory paddockTS dataset. If ``None``,
-            opens (or generates, then opens) the cached
-            ``{query.stub}_paddockTS.zarr``.
+            opens (or generates, then opens) the cached timeseries zarr.
+        paddocks_filepath: Path to the paddocks GeoPackage. Used to derive
+            the timeseries zarr path. If ``None``, defaults to
+            ``{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg``.
 
     Returns:
         dict[int, xarray.Dataset]: Mapping ``{year: ds_year}``. Each
         per-year slice is also persisted to disk.
     """
     from os.path import exists
+    from pathlib import Path
+
+    if paddocks_filepath is None:
+        paddocks_filepath = f'{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg'
+
+    paddocks_path = Path(paddocks_filepath)
+    timeseries_zarr = paddocks_path.parent / f'{paddocks_path.stem}_timeseries.zarr'
 
     if ds_paddockTS is None:
-        zarr_path = f'{query.tmp_dir}/{query.stub}_paddockTS.zarr'
-        if not exists(zarr_path):
-            from PaddockTS.PaddockTimeSeries.make_paddock_time_series import make_paddock_time_series
-            make_paddock_time_series(query)
-        ds_paddockTS = xr.open_zarr(zarr_path, chunks=None)
+        if not exists(timeseries_zarr):
+            from PaddockTS.Phenology.make_paddock_time_series import make_paddock_time_series
+            make_paddock_time_series(query, paddocks_filepath=paddocks_filepath)
+        ds_paddockTS = xr.open_zarr(timeseries_zarr, chunks=None)
 
     datasets_by_year = split_paddock_time_series_by_year(ds_paddockTS)
 
     for year, ds_year in datasets_by_year.items():
-        year_path = f'{query.tmp_dir}/{query.stub}_paddockTS_{year}.zarr'
+        year_path = str(paddocks_path.parent / f'{paddocks_path.stem}_timeseries_{year}.zarr')
         ds_year.to_zarr(year_path, mode='w', zarr_format=2)
         print(f'Saved {year}: {ds_year.sizes["time"]} time steps -> {year_path}')
 
