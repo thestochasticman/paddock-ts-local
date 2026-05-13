@@ -16,12 +16,12 @@ import xarray as xr
 from PaddockTS.query import Query
 
 
-def phenology_plot(query: Query, phenology_results: dict[int, pd.DataFrame] | None = None, ds_yearly: dict[int, xr.Dataset] | None = None, ds_paddockTS: xr.Dataset | None = None, variable: str = 'NDVI') -> str:
+def phenology_plot(query: Query, phenology_results: dict[int, pd.DataFrame] | None = None, ds_yearly: dict[int, xr.Dataset] | None = None, ds_paddockTS: xr.Dataset | None = None, variable: str = 'NDVI', paddocks_filepath: str | None = None) -> str:
     """Plot per-paddock × per-year phenology curves with SoS / PoS / EoS markers.
 
     Args:
         query: The :class:`PaddockTS.query.Query`. Output is written to
-            ``{query.out_dir}/{query.stub}_phenology.png``.
+            ``{query.out_dir}/{paddocks_stem}_phenology.png``.
         phenology_results: Optional ``{year: DataFrame}`` from
             :func:`PaddockTS.Phenology.estimate_phenology`. If ``None``,
             recomputed on demand using ``variable``.
@@ -33,12 +33,22 @@ def phenology_plot(query: Query, phenology_results: dict[int, pd.DataFrame] | No
             Used to plot the un-resampled raw observations.
         variable: Vegetation index column to plot. Default ``'NDVI'``;
             ``'NIRv'`` and ``'CFI'`` also work.
+        paddocks_filepath: Path to the paddocks file. Used to derive
+            the output filename stem. If ``None``, defaults to
+            ``{query.stub}_sam_paddocks``.
 
     Returns:
         str: Filesystem path of the generated PNG.
     """
     import os
+    from pathlib import Path
     os.makedirs(query.out_dir, exist_ok=True)
+
+    # Derive output filename stem from paddocks_filepath
+    if paddocks_filepath is not None:
+        out_stem = Path(paddocks_filepath).stem
+    else:
+        out_stem = f'{query.stub}_sam_paddocks'
 
     if phenology_results is None:
         from PaddockTS.Phenology.estimate_phenology import estimate_phenology
@@ -121,7 +131,7 @@ def phenology_plot(query: Query, phenology_results: dict[int, pd.DataFrame] | No
     fig.legend(handles, labels, loc='upper center', ncol=4)
 
     fig.tight_layout(rect=[0, 0, 1, 0.95])
-    out_path = f'{query.out_dir}/{query.stub}_phenology.png'
+    out_path = f'{query.out_dir}/{out_stem}_phenology.png'
     plt.savefig(out_path, dpi=300)
     plt.close()
     print(f'Saved to {out_path}')

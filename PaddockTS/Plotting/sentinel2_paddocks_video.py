@@ -15,12 +15,12 @@ from PaddockTS.query import Query
 from .sentinel2_video import _to_rgb
 
 
-def sentinel2_video_with_paddocks(query: Query, paddocks, ds_sentinel2=None, fps: int = 4, min_size: int = 1080, suffix: str = ''):
+def sentinel2_video_with_paddocks(query: Query, paddocks, ds_sentinel2=None, fps: int = 4, min_size: int = 1080, paddocks_filepath: str | None = None):
     """Encode a true-colour Sentinel-2 video with paddock outlines + labels.
 
     Args:
         query: The :class:`PaddockTS.query.Query`. Output is written to
-            ``{query.out_dir}/{query.stub}_sentinel2_paddocks{suffix}.mp4``.
+            ``{query.out_dir}/{paddocks_stem}_sentinel2_paddocks.mp4``.
         paddocks: :class:`geopandas.GeoDataFrame` of paddock polygons,
             with a ``paddock`` integer ID column. Typically the output
             of :func:`PaddockTS.PaddockSegmentation.get_paddocks`.
@@ -29,7 +29,9 @@ def sentinel2_video_with_paddocks(query: Query, paddocks, ds_sentinel2=None, fps
         fps: Frames per second. Default 4.
         min_size: Minimum dimension (height or width) of the output
             video. See :func:`sentinel2_video` for sizing notes.
-        suffix: Optional suffix appended to the output filename (e.g. '_user').
+        paddocks_filepath: Path to the paddocks file. Used to derive
+            the output filename stem. If ``None``, defaults to
+            ``{query.stub}_sam_paddocks``.
 
     Returns:
         str: Filesystem path of the generated MP4.
@@ -38,6 +40,13 @@ def sentinel2_video_with_paddocks(query: Query, paddocks, ds_sentinel2=None, fps
         RuntimeError: If the ``ffmpeg`` invocation returns a non-zero
             exit code.
     """
+    from pathlib import Path
+
+    # Derive output filename stem from paddocks_filepath
+    if paddocks_filepath is not None:
+        out_stem = Path(paddocks_filepath).stem
+    else:
+        out_stem = f'{query.stub}_sam_paddocks'
     if ds_sentinel2 is None:
         import os
         if not os.path.exists(query.sentinel2_path):
@@ -52,6 +61,11 @@ def sentinel2_video_with_paddocks(query: Query, paddocks, ds_sentinel2=None, fps
 
     scale = max(1, min_size / max(h, w))
     out_h, out_w = int(h * scale) // 2 * 2, int(w * scale) // 2 * 2
+
+    # Reproject paddocks to match the dataset CRS
+    ds_crs = ds.rio.crs
+    if paddocks.crs != ds_crs:
+        paddocks = paddocks.to_crs(ds_crs)
 
     # rasterize boundaries once
     transform = ds.rio.transform()
@@ -74,7 +88,7 @@ def sentinel2_video_with_paddocks(query: Query, paddocks, ds_sentinel2=None, fps
     import tempfile
 
     os.makedirs(query.out_dir, exist_ok=True)
-    out_path = f'{query.out_dir}/{query.stub}_sentinel2_paddocks{suffix}.mp4'
+    out_path = f'{query.out_dir}/{out_stem}_sentinel2_paddocks.mp4'
 
     with tempfile.TemporaryDirectory() as tmpdir:
         for i in range(n_times):

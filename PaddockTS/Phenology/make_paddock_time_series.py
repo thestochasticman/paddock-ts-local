@@ -92,10 +92,15 @@ def make_paddock_time_series(query, ds_sentinel2=None, paddocks_filepath=None, c
     paddocks = load_user_paddocks(paddocks_filepath)
 
     ds = ds_sentinel2
-    pol = paddocks
 
     # 1) Ensure CRS is written
     ds = ds.rio.write_crs(crs, inplace=False)
+
+    # Reproject paddocks to match the dataset CRS
+    if paddocks.crs != ds.rio.crs:
+        paddocks = paddocks.to_crs(ds.rio.crs)
+
+    pol = paddocks
     transform = ds.rio.transform()
     H, W = ds.rio.height, ds.rio.width
 

@@ -31,7 +31,7 @@ def _to_rgb(ds, time_idx):
     return rgb
 
 
-def calendar_plot(query: Query, ds_sentinel2: xr.Dataset | None = None, paddocks: gpd.GeoDataFrame | None = None, thumb_size: int = 64) -> list[str]:
+def calendar_plot(query: Query, ds_sentinel2: xr.Dataset | None = None, paddocks: gpd.GeoDataFrame | None = None, thumb_size: int = 64, paddocks_filepath: str | None = None) -> list[str]:
     """Generate one calendar PNG per year of paddock × time-slot thumbnails.
 
     The image is composited directly as a PIL image (no matplotlib
@@ -41,22 +41,32 @@ def calendar_plot(query: Query, ds_sentinel2: xr.Dataset | None = None, paddocks
 
     Args:
         query: The :class:`PaddockTS.query.Query`. Outputs are written
-            to ``{query.out_dir}/{query.stub}_calendar_{year}.png``.
+            to ``{query.out_dir}/{paddocks_stem}_calendar_{year}.png``.
         ds_sentinel2: Optional in-memory Sentinel-2 dataset. If ``None``,
             ``query.sentinel2_path`` is opened (or downloaded first).
         paddocks: Optional :class:`geopandas.GeoDataFrame` of paddock
             polygons. If ``None``, loaded from cache or generated.
         thumb_size: Edge length of each thumbnail in pixels. Default 64.
             Larger values produce sharper but heavier images.
+        paddocks_filepath: Path to the paddocks file. Used to derive
+            the output filename stem. If ``None``, defaults to
+            ``{query.stub}_sam_paddocks``.
 
     Returns:
         list[str]: Filesystem paths of the generated PNGs (one per
         year that has at least one observation).
     """
     import os
+    from pathlib import Path
     from PIL import Image, ImageDraw, ImageFont
 
     os.makedirs(query.out_dir, exist_ok=True)
+
+    # Derive output filename stem from paddocks_filepath
+    if paddocks_filepath is not None:
+        out_stem = Path(paddocks_filepath).stem
+    else:
+        out_stem = f'{query.stub}_sam_paddocks'
 
     if ds_sentinel2 is None:
         if not os.path.exists(query.sentinel2_path):
@@ -72,13 +82,18 @@ def calendar_plot(query: Query, ds_sentinel2: xr.Dataset | None = None, paddocks
             from PaddockTS.PaddockSegmentation.get_paddocks import get_paddocks
             paddocks = get_paddocks(query, ds_sentinel2=ds_sentinel2)
 
+    # Reproject paddocks to match the dataset CRS
+    import rioxarray  # noqa: F401
+    ds_crs = ds_sentinel2.rio.crs
+    if paddocks.crs != ds_crs:
+        paddocks = paddocks.to_crs(ds_crs)
+
     # Sort paddocks largest to smallest
     paddocks_sorted = paddocks.sort_values('area_ha', ascending=False).reset_index(drop=True)
     n_paddocks = len(paddocks_sorted)
     paddock_ids = [int(row['paddock']) for _, row in paddocks_sorted.iterrows()]
 
     # Rasterize paddocks to pixel mask
-    import rioxarray  # noqa: F401
     transform = ds_sentinel2.rio.transform()
     h, w = ds_sentinel2.sizes['y'], ds_sentinel2.sizes['x']
     shapes = [(geom, pid) for geom, pid in zip(paddocks_sorted.geometry, paddock_ids)]
@@ -188,7 +203,7 @@ def calendar_plot(query: Query, ds_sentinel2: xr.Dataset | None = None, paddocks
                 x_pos = label_w + j * (thumb_size + gap)
                 canvas.paste(Image.fromarray(thumb), (x_pos, y_pos))
 
-        out_path = f'{query.out_dir}/{query.stub}_calendar_{year}.png'
+        out_path = f'{query.out_dir}/{out_stem}_calendar_{year}.png'
         canvas.save(out_path)
         print(f'Saved to {out_path}')
         out_paths.append(out_path)

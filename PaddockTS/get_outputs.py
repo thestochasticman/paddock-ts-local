@@ -51,6 +51,7 @@ S2_STEPS = [
     'Calendar plot (user)',             # 17 - skipped if no paddocks_filepath
     'Phenology plot (SAM)',             # 18 - skipped if skip_sam
     'Phenology plot (user)',            # 19 - skipped if no paddocks_filepath
+    'Make PDF report',                  # 20
 ]
 
 
@@ -337,7 +338,7 @@ def _run_s2_steps(query, statuses, times, paddocks_filepath=None, skip_sam=False
                     times[i] = time.time() - t0
                     continue
                 from PaddockTS.Plotting.sentinel2_paddocks_video import sentinel2_video_with_paddocks
-                sentinel2_video_with_paddocks(query, paddocks, ds_sentinel2=ds_sentinel2)
+                sentinel2_video_with_paddocks(query, paddocks, ds_sentinel2=ds_sentinel2, paddocks_filepath=gpkg_path)
 
             # Step 6: S2 + paddocks video (user)
             elif i == 6:
@@ -346,7 +347,7 @@ def _run_s2_steps(query, statuses, times, paddocks_filepath=None, skip_sam=False
                     times[i] = time.time() - t0
                     continue
                 from PaddockTS.Plotting.sentinel2_paddocks_video import sentinel2_video_with_paddocks
-                sentinel2_video_with_paddocks(query, user_paddocks, ds_sentinel2=ds_sentinel2, suffix='_user')
+                sentinel2_video_with_paddocks(query, user_paddocks, ds_sentinel2=ds_sentinel2, paddocks_filepath=paddocks_filepath)
 
             # Step 7: Fractional cover video
             elif i == 7:
@@ -360,7 +361,7 @@ def _run_s2_steps(query, statuses, times, paddocks_filepath=None, skip_sam=False
                     times[i] = time.time() - t0
                     continue
                 from PaddockTS.Plotting.fractional_cover_paddocks_video import fractional_cover_paddocks_video
-                fractional_cover_paddocks_video(query, paddocks, ds_fractional_cover=ds_fractional_cover, ds_sentinel2=ds_sentinel2)
+                fractional_cover_paddocks_video(query, paddocks, ds_fractional_cover=ds_fractional_cover, ds_sentinel2=ds_sentinel2, paddocks_filepath=gpkg_path)
 
             # Step 9: FC + paddocks video (user)
             elif i == 9:
@@ -369,7 +370,7 @@ def _run_s2_steps(query, statuses, times, paddocks_filepath=None, skip_sam=False
                     times[i] = time.time() - t0
                     continue
                 from PaddockTS.Plotting.fractional_cover_paddocks_video import fractional_cover_paddocks_video
-                fractional_cover_paddocks_video(query, user_paddocks, ds_fractional_cover=ds_fractional_cover, ds_sentinel2=ds_sentinel2, suffix='_user')
+                fractional_cover_paddocks_video(query, user_paddocks, ds_fractional_cover=ds_fractional_cover, ds_sentinel2=ds_sentinel2, paddocks_filepath=paddocks_filepath)
 
             # Step 10: Make paddock TS (SAM)
             elif i == 10:
@@ -432,7 +433,7 @@ def _run_s2_steps(query, statuses, times, paddocks_filepath=None, skip_sam=False
                     times[i] = time.time() - t0
                     continue
                 from PaddockTS.Plotting.calendar_plot import calendar_plot
-                calendar_plot(query, ds_sentinel2=ds_sentinel2, paddocks=paddocks)
+                calendar_plot(query, ds_sentinel2=ds_sentinel2, paddocks=paddocks, paddocks_filepath=gpkg_path)
 
             # Step 17: Calendar plot (user)
             elif i == 17:
@@ -441,7 +442,7 @@ def _run_s2_steps(query, statuses, times, paddocks_filepath=None, skip_sam=False
                     times[i] = time.time() - t0
                     continue
                 from PaddockTS.Plotting.calendar_plot import calendar_plot
-                calendar_plot(query, ds_sentinel2=ds_sentinel2, paddocks=user_paddocks)
+                calendar_plot(query, ds_sentinel2=ds_sentinel2, paddocks=user_paddocks, paddocks_filepath=paddocks_filepath)
 
             # Step 18: Phenology plot (SAM)
             elif i == 18:
@@ -450,7 +451,7 @@ def _run_s2_steps(query, statuses, times, paddocks_filepath=None, skip_sam=False
                     times[i] = time.time() - t0
                     continue
                 from PaddockTS.Plotting.phenology_plot import phenology_plot
-                phenology_plot(query, phenology_results=phenology_results, ds_yearly=ds_yearly, ds_paddockTS=ds_paddockTS)
+                phenology_plot(query, phenology_results=phenology_results, ds_yearly=ds_yearly, ds_paddockTS=ds_paddockTS, paddocks_filepath=gpkg_path)
 
             # Step 19: Phenology plot (user)
             elif i == 19:
@@ -459,7 +460,12 @@ def _run_s2_steps(query, statuses, times, paddocks_filepath=None, skip_sam=False
                     times[i] = time.time() - t0
                     continue
                 from PaddockTS.Plotting.phenology_plot import phenology_plot
-                phenology_plot(query, phenology_results=phenology_results_user, ds_yearly=ds_yearly_user, ds_paddockTS=ds_paddockTS_user)
+                phenology_plot(query, phenology_results=phenology_results_user, ds_yearly=ds_yearly_user, ds_paddockTS=ds_paddockTS_user, paddocks_filepath=paddocks_filepath)
+
+            # Step 20: Make PDF report
+            elif i == 20:
+                from PaddockTS.Plotting.make_pdf import make_pdf
+                make_pdf(query, paddocks_filepath=paddocks_filepath)
 
             statuses[i] = 'done'
         except Exception:
@@ -591,5 +597,5 @@ if __name__ == '__main__':
     from PaddockTS.query import Query
     from datetime import date
 
-    query = Query.build_from_paddocks('/borevitz_projects/data/manual_downloads/Milgadara_paddock-polygons_2024-12-17_12-45-58.json', date(2024, 1, 1), date(2025, 1, 1), stub='Milgadara')
+    query = Query.build_from_paddocks('/borevitz_projects/data/manual_downloads/Milgadara_paddock-polygons_2024-12-17_12-45-58.json', date(2024, 1, 1), date(2025, 1, 1), 'Milgadara')
     get_outputs(query, reload='--reload' in sys.argv, paddocks_filepath='/borevitz_projects/data/manual_downloads/Milgadara_paddock-polygons_2024-12-17_12-45-58.json')

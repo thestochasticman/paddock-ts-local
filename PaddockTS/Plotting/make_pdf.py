@@ -1,6 +1,7 @@
 import glob
 import os
 from os.path import exists
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
@@ -11,6 +12,7 @@ from PaddockTS.query import Query
 
 # Ordered sections: (section_title, file_patterns)
 # Each section gets a header page followed by its plots.
+# Patterns use {sam_stem} for SAM paddocks and {user_stem} for user paddocks
 SECTIONS = [
     ('Landscape', [
         ('Topography', '{stub}_topography.png'),
@@ -28,11 +30,17 @@ SECTIONS = [
         ('Wind', '{stub}_ozwald_daily_wind.png'),
         ('Radiation', '{stub}_ozwald_daily_radiation.png'),
     ]),
-    ('Satellite Calendar', [
-        ('Calendar *', '{stub}_calendar_*.png'),
+    ('Satellite Calendar (SAM)', [
+        ('Calendar *', '{sam_stem}_calendar_*.png'),
     ]),
-    ('Phenology', [
-        ('Phenology', '{stub}_phenology.png'),
+    ('Satellite Calendar (User)', [
+        ('Calendar *', '{user_stem}_calendar_*.png'),
+    ]),
+    ('Phenology (SAM)', [
+        ('Phenology', '{sam_stem}_phenology.png'),
+    ]),
+    ('Phenology (User)', [
+        ('Phenology', '{user_stem}_phenology.png'),
     ]),
 ]
 
@@ -73,10 +81,28 @@ def _add_image_page(pdf, image_path):
     img.close()
 
 
-def make_pdf(query: Query):
+def make_pdf(query: Query, paddocks_filepath: str | None = None):
+    """Generate a PDF report combining all plots for a query.
+
+    Args:
+        query: The :class:`PaddockTS.query.Query`.
+        paddocks_filepath: Optional path to the user-provided paddocks file.
+            If provided, includes user paddock calendar and phenology plots
+            in the report.
+
+    Returns:
+        str: Filesystem path of the generated PDF.
+    """
     out_dir = query.out_dir
     pdf_path = f'{out_dir}/{query.stub}_report.pdf'
     os.makedirs(out_dir, exist_ok=True)
+
+    # Derive stems for SAM and user paddocks
+    sam_stem = f'{query.stub}_sam_paddocks'
+    if paddocks_filepath is not None:
+        user_stem = Path(paddocks_filepath).stem
+    else:
+        user_stem = ''  # Will result in no matches for user sections
 
     with PdfPages(pdf_path) as pdf:
         # Title page
@@ -88,10 +114,16 @@ def make_pdf(query: Query):
         )
 
         for section_title, plots in SECTIONS:
+            # Skip user sections if no user paddocks provided
+            if 'User' in section_title and paddocks_filepath is None:
+                continue
+
             # Collect all files for this section
             section_files = []
             for label, pattern in plots:
                 pat = pattern.replace('{stub}', query.stub)
+                pat = pat.replace('{sam_stem}', sam_stem)
+                pat = pat.replace('{user_stem}', user_stem)
                 matches = sorted(glob.glob(f'{out_dir}/{pat}'))
                 for m in matches:
                     section_files.append(m)

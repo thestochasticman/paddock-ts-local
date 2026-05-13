@@ -16,12 +16,12 @@ from PaddockTS.query import Query
 from .fractional_cover_video import _to_rgb
 
 
-def fractional_cover_paddocks_video(query: Query, paddocks, ds_fractional_cover=None, ds_sentinel2=None, fps: int = 4, min_size: int = 1080, suffix: str = ''):
+def fractional_cover_paddocks_video(query: Query, paddocks, ds_fractional_cover=None, ds_sentinel2=None, fps: int = 4, min_size: int = 1080, paddocks_filepath: str | None = None):
     """Encode a fractional-cover video with paddock outlines + labels.
 
     Args:
         query: The :class:`PaddockTS.query.Query`. Output is written to
-            ``{query.out_dir}/{query.stub}_fractional_cover_paddocks{suffix}.mp4``.
+            ``{query.out_dir}/{paddocks_stem}_fractional_cover_paddocks.mp4``.
         paddocks: :class:`geopandas.GeoDataFrame` of paddock polygons,
             with a ``paddock`` integer ID column.
         ds_fractional_cover: Optional in-memory fractional cover dataset.
@@ -32,7 +32,9 @@ def fractional_cover_paddocks_video(query: Query, paddocks, ds_fractional_cover=
             ``query.sentinel2_path``.
         fps: Frames per second. Default 4.
         min_size: Minimum dimension of the output video in pixels.
-        suffix: Optional suffix appended to the output filename (e.g. '_user').
+        paddocks_filepath: Path to the paddocks file. Used to derive
+            the output filename stem. If ``None``, defaults to
+            ``{query.stub}_sam_paddocks``.
 
     Returns:
         str: Filesystem path of the generated MP4.
@@ -41,6 +43,13 @@ def fractional_cover_paddocks_video(query: Query, paddocks, ds_fractional_cover=
         RuntimeError: If the ``ffmpeg`` invocation returns a non-zero
             exit code.
     """
+    from pathlib import Path
+
+    # Derive output filename stem from paddocks_filepath
+    if paddocks_filepath is not None:
+        out_stem = Path(paddocks_filepath).stem
+    else:
+        out_stem = f'{query.stub}_sam_paddocks'
     if ds_fractional_cover is None:
         import os
         if not os.path.exists(query.fractional_cover_path):
@@ -61,6 +70,12 @@ def fractional_cover_paddocks_video(query: Query, paddocks, ds_fractional_cover=
         s2 = xr.open_zarr(query.sentinel2_path, chunks=None)
     else:
         s2 = ds_sentinel2
+
+    # Reproject paddocks to match the dataset CRS
+    ds_crs = s2.rio.crs
+    if paddocks.crs != ds_crs:
+        paddocks = paddocks.to_crs(ds_crs)
+
     transform = s2.rio.transform()
     shapes = [(geom.boundary, 1) for geom in paddocks.geometry]
     boundary_mask = rasterize(shapes, out_shape=(h, w), transform=transform, fill=0,
@@ -81,7 +96,7 @@ def fractional_cover_paddocks_video(query: Query, paddocks, ds_fractional_cover=
     import tempfile
 
     os.makedirs(query.out_dir, exist_ok=True)
-    out_path = f'{query.out_dir}/{query.stub}_fractional_cover_paddocks{suffix}.mp4'
+    out_path = f'{query.out_dir}/{out_stem}_fractional_cover_paddocks.mp4'
 
     with tempfile.TemporaryDirectory() as tmpdir:
         for i in range(n_times):
