@@ -10,13 +10,15 @@ DOYs drawn as vertical reference lines.
 from __future__ import annotations
 
 import matplotlib.pyplot as plt
+from matplotlib.gridspec import GridSpec
+import numpy as np
 import pandas as pd
 import xarray as xr
 
 from PaddockTS.query import Query
 
 
-def phenology_plot(query: Query, phenology_results: dict[int, pd.DataFrame] | None = None, ds_yearly: dict[int, xr.Dataset] | None = None, ds_paddockTS: xr.Dataset | None = None, variable: str = 'NDVI', paddocks_filepath: str | None = None) -> str:
+def phenology_plot(query: Query, phenology_results: dict[int, pd.DataFrame] | None = None, ds_yearly: dict[int, xr.Dataset] | None = None, ds_paddockTS: xr.Dataset | None = None, variable: str = 'NDVI', paddocks_filepath: str | None = None, max_paddocks_per_page: int = 8, label_col: str | None = None) -> list[str]:
     """Plot per-paddock × per-year phenology curves with SoS / PoS / EoS markers.
 
     Args:
@@ -36,9 +38,14 @@ def phenology_plot(query: Query, phenology_results: dict[int, pd.DataFrame] | No
         paddocks_filepath: Path to the paddocks file. Used to derive
             the output filename stem. If ``None``, defaults to
             ``{query.stub}_sam_paddocks``.
+        max_paddocks_per_page: Maximum number of paddocks per output image.
+            Default 8. Prevents images from becoming too tall with many
+            paddocks.
+        label_col: Column name to use for paddock labels. If ``None``,
+            uses the ``paddock`` column (numeric ID).
 
     Returns:
-        str: Filesystem path of the generated PNG.
+        list[str]: Filesystem paths of the generated PNGs.
     """
     import os
     from pathlib import Path
@@ -49,6 +56,15 @@ def phenology_plot(query: Query, phenology_results: dict[int, pd.DataFrame] | No
         out_stem = Path(paddocks_filepath).stem
     else:
         out_stem = f'{query.stub}_sam_paddocks'
+
+    # Build paddock label mapping
+    if label_col is not None:
+        from PaddockTS.utils import load_user_paddocks
+        label_filepath = paddocks_filepath if paddocks_filepath else f'{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg'
+        gdf = load_user_paddocks(label_filepath)
+        paddock_labels = dict(zip(gdf['paddock'].astype(str), gdf[label_col].astype(str)))
+    else:
+        paddock_labels = None
 
     if phenology_results is None:
         from PaddockTS.Phenology.estimate_phenology import estimate_phenology
@@ -70,72 +86,105 @@ def phenology_plot(query: Query, phenology_results: dict[int, pd.DataFrame] | No
     years = sorted(set(ds_yearly.keys()) & set(phenology_results.keys()))
     if not years:
         print('No years with phenology results to plot')
-        return
+        return []
     paddocks = list(ds_yearly[years[0]].paddock.values)
-    n_rows, n_cols = len(paddocks), len(years)
+    n_paddocks = len(paddocks)
+    n_cols = len(years)
 
-    fig, axes = plt.subplots(n_rows, n_cols,
-                             figsize=(4 * n_cols, 1.5 * n_rows),
-                             squeeze=False)
+    # Clean up any existing phenology files for this stem
+    import glob
+    for old_file in glob.glob(f'{query.out_dir}/{out_stem}_phenology*.png'):
+        os.remove(old_file)
 
-    for i, paddock in enumerate(paddocks):
-        for j, year in enumerate(years):
-            ax = axes[i, j]
-            df_year = phenology_results[year]
-            ds_year = ds_yearly[year]
+    # Split paddocks into pages
+    n_pages = (n_paddocks + max_paddocks_per_page - 1) // max_paddocks_per_page
+    paddock_pages = [paddocks[i * max_paddocks_per_page:(i + 1) * max_paddocks_per_page] for i in range(n_pages)]
 
-            # Interpolated series
-            da_res = ds_year[variable].sel(paddock=str(paddock))
-            res_doy = ds_year['doy'].values
-            ax.scatter(res_doy, da_res.values,
-                       facecolors='white', edgecolors='blue',
-                       s=20, label='interpolated')
+    out_paths = []
 
-            # Raw series
-            ds_raw_year = ds_paddockTS.sel(
-                time=slice(f"{year}-01-01", f"{year}-12-31")
-            )
-            da_raw = ds_raw_year[variable].sel(paddock=str(paddock))
-            raw_doy = da_raw['time'].dt.dayofyear.values
-            ax.scatter(raw_doy, da_raw.values,
-                       color='blue', s=20, label='raw')
+    # Fixed row height for consistent sizing across pages
+    row_height = 2.5
+    fig_height = row_height * max_paddocks_per_page
 
-            # Phenology lines
-            row = df_year[df_year['paddock'].astype(str) == str(paddock)]
-            if not row.empty:
-                r = row.iloc[0]
-                ax.axvline(r['sos_times'], color='green', linestyle='--', label='SoS')
-                ax.axvline(r['pos_times'], color='blue', linestyle='-.', label='PoS')
-                ax.axvline(r['eos_times'], color='red', linestyle=':', label='EoS')
+    for page_idx, page_paddocks in enumerate(paddock_pages):
+        n_rows = len(page_paddocks)
 
-            ax.set_ylim(0, 1)
-            if j == 0:
-                ax.tick_params(labelleft=True)
-                ax.set_ylabel(variable)
-            else:
-                ax.tick_params(labelleft=False)
+        fig = plt.figure(figsize=(8 * n_cols, fig_height))
 
-            if i == n_rows - 1:
-                ax.set_xlabel("DOY")
-            else:
-                ax.tick_params(labelbottom=False)
+        # Use GridSpec to position axes at the top, leaving empty space at bottom if needed
+        gs = GridSpec(max_paddocks_per_page, n_cols, figure=fig)
 
-            if i == 0:
-                ax.set_title(f"{year}", pad=8)
+        axes = []
+        for i in range(n_rows):
+            row_axes = []
+            for j in range(n_cols):
+                ax = fig.add_subplot(gs[i, j])
+                row_axes.append(ax)
+            axes.append(row_axes)
+        axes = np.array(axes)
 
-            if j == n_cols - 1:
-                ax.text(1.02, 0.5, f"Paddock {paddock}",
-                        transform=ax.transAxes, va='center')
+        for i, paddock in enumerate(page_paddocks):
+            for j, year in enumerate(years):
+                ax = axes[i, j]
+                df_year = phenology_results[year]
+                ds_year = ds_yearly[year]
 
-    handles, labels = axes[0, 0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc='upper center', ncol=4)
+                # Interpolated series
+                da_res = ds_year[variable].sel(paddock=str(paddock))
+                res_doy = ds_year['doy'].values
+                ax.scatter(res_doy, da_res.values,
+                           facecolors='white', edgecolors='blue',
+                           s=20, label='interpolated')
 
-    fig.tight_layout(rect=[0, 0, 1, 0.95])
-    out_path = f'{query.out_dir}/{out_stem}_phenology.png'
-    plt.savefig(out_path, dpi=300)
-    plt.close()
-    print(f'Saved to {out_path}')
-    return out_path
+                # Raw series
+                ds_raw_year = ds_paddockTS.sel(
+                    time=slice(f"{year}-01-01", f"{year}-12-31")
+                )
+                da_raw = ds_raw_year[variable].sel(paddock=str(paddock))
+                raw_doy = da_raw['time'].dt.dayofyear.values
+                ax.scatter(raw_doy, da_raw.values,
+                           color='blue', s=20, label='raw')
+
+                # Phenology lines
+                row = df_year[df_year['paddock'].astype(str) == str(paddock)]
+                if not row.empty:
+                    r = row.iloc[0]
+                    ax.axvline(r['sos_times'], color='green', linestyle='--', label='SoS')
+                    ax.axvline(r['pos_times'], color='blue', linestyle='-.', label='PoS')
+                    ax.axvline(r['eos_times'], color='red', linestyle=':', label='EoS')
+
+                ax.set_ylim(0, 1)
+                if j == 0:
+                    ax.tick_params(labelleft=True)
+                    ax.set_ylabel(variable)
+                else:
+                    ax.tick_params(labelleft=False)
+
+                if i == n_rows - 1:
+                    ax.set_xlabel("DOY")
+                else:
+                    ax.tick_params(labelbottom=False)
+
+                if i == 0:
+                    ax.set_title(f"{year}", pad=8)
+
+                if j == n_cols - 1:
+                    label = paddock_labels[str(paddock)] if paddock_labels else f"Paddock {paddock}"
+                    ax.text(1.02, 0.5, label, transform=ax.transAxes, va='center')
+
+        handles, labels = axes[0, 0].get_legend_handles_labels()
+        fig.legend(handles, labels, loc='upper center', ncol=4)
+
+        fig.tight_layout(rect=[0, 0, 1, 0.95])
+
+        # Output filename always includes page number
+        out_path = f'{query.out_dir}/{out_stem}_phenology_p{page_idx + 1:02d}.png'
+        plt.savefig(out_path, dpi=300)
+        plt.close()
+        print(f'Saved to {out_path}')
+        out_paths.append(out_path)
+
+    return out_paths
 
 
 def test():

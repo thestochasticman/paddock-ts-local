@@ -16,14 +16,14 @@ from PaddockTS.query import Query
 from .fractional_cover_video import _to_rgb
 
 
-def fractional_cover_paddocks_video(query: Query, paddocks, ds_fractional_cover=None, ds_sentinel2=None, fps: int = 4, min_size: int = 1080, paddocks_filepath: str | None = None):
+def fractional_cover_paddocks_video(query: Query, paddocks_filepath: str | None = None, ds_fractional_cover=None, ds_sentinel2=None, fps: int = 4, min_size: int = 1080, label_col: str | None = None):
     """Encode a fractional-cover video with paddock outlines + labels.
 
     Args:
         query: The :class:`PaddockTS.query.Query`. Output is written to
             ``{query.out_dir}/{paddocks_stem}_fractional_cover_paddocks.mp4``.
-        paddocks: :class:`geopandas.GeoDataFrame` of paddock polygons,
-            with a ``paddock`` integer ID column.
+        paddocks_filepath: Path to the paddocks file. If ``None``, uses
+            SAM paddocks from ``{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg``.
         ds_fractional_cover: Optional in-memory fractional cover dataset.
             If ``None``, opens (or generates, then opens)
             ``query.fractional_cover_path``.
@@ -32,9 +32,6 @@ def fractional_cover_paddocks_video(query: Query, paddocks, ds_fractional_cover=
             ``query.sentinel2_path``.
         fps: Frames per second. Default 4.
         min_size: Minimum dimension of the output video in pixels.
-        paddocks_filepath: Path to the paddocks file. Used to derive
-            the output filename stem. If ``None``, defaults to
-            ``{query.stub}_sam_paddocks``.
 
     Returns:
         str: Filesystem path of the generated MP4.
@@ -43,15 +40,18 @@ def fractional_cover_paddocks_video(query: Query, paddocks, ds_fractional_cover=
         RuntimeError: If the ``ffmpeg`` invocation returns a non-zero
             exit code.
     """
+    import os
     from pathlib import Path
+    from PaddockTS.utils import load_user_paddocks
 
-    # Derive output filename stem from paddocks_filepath
-    if paddocks_filepath is not None:
-        out_stem = Path(paddocks_filepath).stem
-    else:
-        out_stem = f'{query.stub}_sam_paddocks'
+    # Default to SAM paddocks if no filepath provided
+    if paddocks_filepath is None:
+        paddocks_filepath = f'{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg'
+
+    out_stem = Path(paddocks_filepath).stem
+    paddocks = load_user_paddocks(paddocks_filepath)
+
     if ds_fractional_cover is None:
-        import os
         if not os.path.exists(query.fractional_cover_path):
             from PaddockTS.FractionalCover.compute_fractional_cover import compute_fractional_cover
             compute_fractional_cover(query)
@@ -89,7 +89,8 @@ def fractional_cover_paddocks_video(query: Query, paddocks, ds_fractional_cover=
     for _, row in paddocks.iterrows():
         cx, cy = row.geometry.representative_point().x, row.geometry.representative_point().y
         px, py = inv_transform * (cx, cy)
-        label_positions.append((int(row.paddock), int(px * scale), int(py * scale)))
+        label = str(row[label_col]) if label_col else str(int(row.paddock))
+        label_positions.append((label, int(px * scale), int(py * scale)))
 
     import os
     import subprocess
@@ -142,20 +143,13 @@ def fractional_cover_paddocks_video(query: Query, paddocks, ds_fractional_cover=
 
 
 def test():
-    import geopandas as gpd
     from os.path import exists
     from PaddockTS.utils import get_example_query
     query = get_example_query()
     if not exists(query.fractional_cover_path):
         from PaddockTS.FractionalCover.compute_fractional_cover import compute_fractional_cover
         compute_fractional_cover(query)
-    gpkg_path = f'{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg'
-    if exists(gpkg_path):
-        paddocks = gpd.read_file(gpkg_path)
-    else:
-        from PaddockTS.PaddockSegmentation.get_paddocks import get_paddocks
-        paddocks = get_paddocks(query)
-    fractional_cover_paddocks_video(query, paddocks)
+    fractional_cover_paddocks_video(query)
 
 if __name__ == '__main__':
     test()

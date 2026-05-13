@@ -15,23 +15,19 @@ from PaddockTS.query import Query
 from .sentinel2_video import _to_rgb
 
 
-def sentinel2_video_with_paddocks(query: Query, paddocks, ds_sentinel2=None, fps: int = 4, min_size: int = 1080, paddocks_filepath: str | None = None):
+def sentinel2_video_with_paddocks(query: Query, paddocks_filepath: str | None = None, ds_sentinel2=None, fps: int = 4, min_size: int = 1080, label_col: str | None = None):
     """Encode a true-colour Sentinel-2 video with paddock outlines + labels.
 
     Args:
         query: The :class:`PaddockTS.query.Query`. Output is written to
             ``{query.out_dir}/{paddocks_stem}_sentinel2_paddocks.mp4``.
-        paddocks: :class:`geopandas.GeoDataFrame` of paddock polygons,
-            with a ``paddock`` integer ID column. Typically the output
-            of :func:`PaddockTS.PaddockSegmentation.get_paddocks`.
+        paddocks_filepath: Path to the paddocks file. If ``None``, uses
+            SAM paddocks from ``{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg``.
         ds_sentinel2: Optional in-memory Sentinel-2 dataset. If ``None``,
             ``query.sentinel2_path`` is opened (or downloaded first).
         fps: Frames per second. Default 4.
         min_size: Minimum dimension (height or width) of the output
             video. See :func:`sentinel2_video` for sizing notes.
-        paddocks_filepath: Path to the paddocks file. Used to derive
-            the output filename stem. If ``None``, defaults to
-            ``{query.stub}_sam_paddocks``.
 
     Returns:
         str: Filesystem path of the generated MP4.
@@ -40,15 +36,18 @@ def sentinel2_video_with_paddocks(query: Query, paddocks, ds_sentinel2=None, fps
         RuntimeError: If the ``ffmpeg`` invocation returns a non-zero
             exit code.
     """
+    import os
     from pathlib import Path
+    from PaddockTS.utils import load_user_paddocks
 
-    # Derive output filename stem from paddocks_filepath
-    if paddocks_filepath is not None:
-        out_stem = Path(paddocks_filepath).stem
-    else:
-        out_stem = f'{query.stub}_sam_paddocks'
+    # Default to SAM paddocks if no filepath provided
+    if paddocks_filepath is None:
+        paddocks_filepath = f'{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg'
+
+    out_stem = Path(paddocks_filepath).stem
+    paddocks = load_user_paddocks(paddocks_filepath)
+
     if ds_sentinel2 is None:
-        import os
         if not os.path.exists(query.sentinel2_path):
             from PaddockTS.Sentinel2.download_sentinel2 import download_sentinel2
             download_sentinel2(query)
@@ -81,7 +80,8 @@ def sentinel2_video_with_paddocks(query: Query, paddocks, ds_sentinel2=None, fps
     for _, row in paddocks.iterrows():
         cx, cy = row.geometry.representative_point().x, row.geometry.representative_point().y
         px, py = inv_transform * (cx, cy)
-        label_positions.append((int(row.paddock), int(px * scale), int(py * scale)))
+        label = str(row[label_col]) if label_col else str(int(row.paddock))
+        label_positions.append((label, int(px * scale), int(py * scale)))
 
     import os
     import subprocess
@@ -134,17 +134,9 @@ def sentinel2_video_with_paddocks(query: Query, paddocks, ds_sentinel2=None, fps
 
 
 def test():
-    import geopandas as gpd
-    from os.path import exists
     from PaddockTS.utils import get_example_query
     query = get_example_query()
-    gpkg_path = f'{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg'
-    if exists(gpkg_path):
-        paddocks = gpd.read_file(gpkg_path)
-    else:
-        from PaddockTS.PaddockSegmentation.get_paddocks import get_paddocks
-        paddocks = get_paddocks(query)
-    sentinel2_video_with_paddocks(query, paddocks)
+    sentinel2_video_with_paddocks(query)
 
 if __name__ == '__main__':
     test()

@@ -1,9 +1,8 @@
 """Diagnostic plots for OzWALD daily and 8-day climate / vegetation data.
 
 Each plot file is a single panel covering the full date range of a
-``Query``. Variables are grouped thematically (temperature, rainfall,
-vegetation index, etc.); precipitation/rainfall groups use a monthly
-bar plot and other groups use thin-line time-series.
+``Query``. Variables are grouped thematically (temperature, precipitation,
+vegetation index, etc.) and plotted as thin-line time-series.
 """
 
 from matplotlib import pyplot as plt
@@ -23,8 +22,7 @@ DAILY_GROUPS = {
     'precipitation': {
         'vars': ['Pg'],
         'ylabel': 'Precipitation (mm)',
-        'title': 'OzWALD Monthly Precipitation',
-        'kind': 'bar',
+        'title': 'OzWALD Daily Precipitation',
     },
     'wind': {
         'vars': ['Uavg', 'Ueff'],

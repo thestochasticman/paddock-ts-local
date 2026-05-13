@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import numpy as np
 import xarray as xr
-import geopandas as gpd
 from rasterio.features import rasterize
 
 from PaddockTS.query import Query
@@ -31,7 +30,7 @@ def _to_rgb(ds, time_idx):
     return rgb
 
 
-def calendar_plot(query: Query, ds_sentinel2: xr.Dataset | None = None, paddocks: gpd.GeoDataFrame | None = None, thumb_size: int = 64, paddocks_filepath: str | None = None) -> list[str]:
+def calendar_plot(query: Query, ds_sentinel2: xr.Dataset | None = None, paddocks_filepath: str | None = None, thumb_size: int = 64, max_paddocks_per_page: int = 20, label_col: str | None = None) -> list[str]:
     """Generate one calendar PNG per year of paddock × time-slot thumbnails.
 
     The image is composited directly as a PIL image (no matplotlib
@@ -44,17 +43,17 @@ def calendar_plot(query: Query, ds_sentinel2: xr.Dataset | None = None, paddocks
             to ``{query.out_dir}/{paddocks_stem}_calendar_{year}.png``.
         ds_sentinel2: Optional in-memory Sentinel-2 dataset. If ``None``,
             ``query.sentinel2_path`` is opened (or downloaded first).
-        paddocks: Optional :class:`geopandas.GeoDataFrame` of paddock
-            polygons. If ``None``, loaded from cache or generated.
+        paddocks_filepath: Path to the paddocks file. If ``None``, uses
+            SAM paddocks from ``{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg``.
         thumb_size: Edge length of each thumbnail in pixels. Default 64.
             Larger values produce sharper but heavier images.
-        paddocks_filepath: Path to the paddocks file. Used to derive
-            the output filename stem. If ``None``, defaults to
-            ``{query.stub}_sam_paddocks``.
+        max_paddocks_per_page: Maximum number of paddocks per output image.
+            Default 20. Prevents images from becoming too tall with many
+            paddocks.
 
     Returns:
         list[str]: Filesystem paths of the generated PNGs (one per
-        year that has at least one observation).
+        year per page that has at least one observation).
     """
     import os
     from pathlib import Path
@@ -62,11 +61,13 @@ def calendar_plot(query: Query, ds_sentinel2: xr.Dataset | None = None, paddocks
 
     os.makedirs(query.out_dir, exist_ok=True)
 
-    # Derive output filename stem from paddocks_filepath
-    if paddocks_filepath is not None:
-        out_stem = Path(paddocks_filepath).stem
-    else:
-        out_stem = f'{query.stub}_sam_paddocks'
+    from PaddockTS.utils import load_user_paddocks
+
+    # Default to SAM paddocks if no filepath provided
+    if paddocks_filepath is None:
+        paddocks_filepath = f'{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg'
+
+    out_stem = Path(paddocks_filepath).stem
 
     if ds_sentinel2 is None:
         if not os.path.exists(query.sentinel2_path):
@@ -74,13 +75,7 @@ def calendar_plot(query: Query, ds_sentinel2: xr.Dataset | None = None, paddocks
             download_sentinel2(query)
         ds_sentinel2 = xr.open_zarr(query.sentinel2_path, chunks=None)
 
-    if paddocks is None:
-        gpkg_path = f'{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg'
-        if os.path.exists(gpkg_path):
-            paddocks = gpd.read_file(gpkg_path)
-        else:
-            from PaddockTS.PaddockSegmentation.get_paddocks import get_paddocks
-            paddocks = get_paddocks(query, ds_sentinel2=ds_sentinel2)
+    paddocks = load_user_paddocks(paddocks_filepath)
 
     # Reproject paddocks to match the dataset CRS
     import rioxarray  # noqa: F401
@@ -156,6 +151,15 @@ def calendar_plot(query: Query, ds_sentinel2: xr.Dataset | None = None, paddocks
     years = np.unique(ds_sentinel2.time.dt.year.values)
     out_paths = []
 
+    # Clean up any existing calendar files for this stem
+    import glob
+    for old_file in glob.glob(f'{query.out_dir}/{out_stem}_calendar_*.png'):
+        os.remove(old_file)
+
+    # Split paddocks into pages
+    n_pages = (n_paddocks + max_paddocks_per_page - 1) // max_paddocks_per_page
+    paddock_pages = [paddock_ids[i * max_paddocks_per_page:(i + 1) * max_paddocks_per_page] for i in range(n_pages)]
+
     for year in years:
         year_mask = ds_sentinel2.time.dt.year.values == year
         ds_year = ds_sentinel2.isel(time=year_mask)
@@ -171,42 +175,52 @@ def calendar_plot(query: Query, ds_sentinel2: xr.Dataset | None = None, paddocks
             rgb = _to_rgb(ds_year, obs_idx)
             obs_thumbs[obs_idx] = _crop_all(rgb)
 
-        # Composite into one large image
-        canvas_w = label_w + n_slots * (thumb_size + gap)
-        canvas_h = title_h + header_h + n_paddocks * (thumb_size + gap)
-        canvas = Image.new('RGB', (canvas_w, canvas_h), (255, 255, 255))
-        draw = ImageDraw.Draw(canvas)
+        for page_idx, page_paddock_ids in enumerate(paddock_pages):
+            n_paddocks_page = len(page_paddock_ids)
 
-        # Title
-        draw.text((canvas_w // 2, title_h // 2), f'{query.stub} — {year}',
-                  fill=(0, 0, 0), font=font_title, anchor='mm')
+            # Composite into one image per page
+            canvas_w = label_w + n_slots * (thumb_size + gap)
+            canvas_h = title_h + header_h + n_paddocks_page * (thumb_size + gap)
+            canvas = Image.new('RGB', (canvas_w, canvas_h), (255, 255, 255))
+            draw = ImageDraw.Draw(canvas)
 
-        # Month labels
-        for m in range(12):
-            x = label_w + m * 4 * (thumb_size + gap)
-            draw.text((x, title_h + header_h // 2), month_names[m],
-                      fill=(0, 0, 0), font=font, anchor='lm')
+            # Title with page number
+            title_text = f'{query.stub} — {year} (page {page_idx + 1:02d}/{n_pages:02d})'
+            draw.text((canvas_w // 2, title_h // 2), title_text,
+                      fill=(0, 0, 0), font=font_title, anchor='mm')
 
-        # Paddock labels and thumbnails
-        for i, pid in enumerate(paddock_ids):
-            row = paddocks_sorted.iloc[i]
-            y_pos = title_h + header_h + i * (thumb_size + gap)
+            # Month labels
+            for m in range(12):
+                x = label_w + m * 4 * (thumb_size + gap)
+                draw.text((x, title_h + header_h // 2), month_names[m],
+                          fill=(0, 0, 0), font=font, anchor='lm')
 
-            # Label
-            draw.text((label_w - 4, y_pos + thumb_size // 2),
-                      f'P{row["paddock"]}  {row["area_ha"]:.0f}ha',
-                      fill=(0, 0, 0), font=font_small, anchor='rm')
+            # Paddock labels and thumbnails for this page
+            for i, pid in enumerate(page_paddock_ids):
+                # Find the original index in paddocks_sorted
+                orig_idx = paddock_ids.index(pid)
+                row = paddocks_sorted.iloc[orig_idx]
+                y_pos = title_h + header_h + i * (thumb_size + gap)
 
-            # Thumbnails
-            for j in range(n_slots):
-                thumb = obs_thumbs[slot_to_obs[j]][pid]
-                x_pos = label_w + j * (thumb_size + gap)
-                canvas.paste(Image.fromarray(thumb), (x_pos, y_pos))
+                # Label
+                if label_col is not None:
+                    label_text = str(row[label_col])
+                else:
+                    label_text = f'P{row["paddock"]}  {row["area_ha"]:.0f}ha'
+                draw.text((label_w - 4, y_pos + thumb_size // 2),
+                          label_text, fill=(0, 0, 0), font=font_small, anchor='rm')
 
-        out_path = f'{query.out_dir}/{out_stem}_calendar_{year}.png'
-        canvas.save(out_path)
-        print(f'Saved to {out_path}')
-        out_paths.append(out_path)
+                # Thumbnails
+                for j in range(n_slots):
+                    thumb = obs_thumbs[slot_to_obs[j]][pid]
+                    x_pos = label_w + j * (thumb_size + gap)
+                    canvas.paste(Image.fromarray(thumb), (x_pos, y_pos))
+
+            # Output filename always includes page number
+            out_path = f'{query.out_dir}/{out_stem}_calendar_{year}_p{page_idx + 1:02d}.png'
+            canvas.save(out_path)
+            print(f'Saved to {out_path}')
+            out_paths.append(out_path)
 
     return out_paths
 
@@ -215,8 +229,15 @@ def test():
     from PaddockTS.utils import get_example_query
 
     query = get_example_query()
-    calendar_plot(query)
+    # calendar_plot(query)
+    from datetime import date
 
+    query = Query.build_from_paddocks('/borevitz_projects/data/manual_downloads/Milgadara_paddock-polygons_2024-12-17_12-45-58.json', date(2024, 1, 1), date(2025, 1, 1), 'Milgadara')
+    # get_outputs(query, reload='--reload' in sys.argv, paddocks_filepath='/borevitz_projects/data/manual_downloads/Milgadara_paddock-polygons_2024-12-17_12-45-58.json')
+
+    calendar_plot(query, paddocks_filepath='/borevitz_projects/data/manual_downloads/Milgadara_paddock-polygons_2024-12-17_12-45-58.json')
+    
+    calendar_plot(query)
 
 if __name__ == '__main__':
     test()

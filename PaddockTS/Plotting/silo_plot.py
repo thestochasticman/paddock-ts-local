@@ -2,8 +2,7 @@
 
 Reads the cached SILO CSV and writes one PNG per group of related
 variables (temperature, rainfall, radiation, evapotranspiration, vapour
-pressure). Rainfall is summarised as monthly totals; everything else is
-plotted as a daily line.
+pressure). All variables are plotted as daily time-series.
 """
 
 from matplotlib import pyplot as plt
@@ -22,8 +21,7 @@ PLOT_GROUPS = {
     'rainfall': {
         'vars': ['daily_rain'],
         'ylabel': 'Rainfall (mm)',
-        'title': 'Monthly Rainfall',
-        'kind': 'bar',
+        'title': 'Daily Rainfall',
     },
     'radiation': {
         'vars': ['radiation'],

@@ -7,7 +7,7 @@ from os.path import exists
 from PaddockTS.query import Query
 
 
-def run(query: Query, reload: bool = False, paddocks_filepath: str = None, skip_sam: bool = False):
+def run(query: Query, reload: bool = False, paddocks_filepath: str = None, skip_sam: bool = False, label_col: str | None = None):
     if skip_sam and paddocks_filepath is None:
         raise ValueError("skip_sam=True requires a valid paddocks_filepath")
 
@@ -35,7 +35,6 @@ def run(query: Query, reload: bool = False, paddocks_filepath: str = None, skip_
             os.remove(path)
 
     gpkg_path = f'{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg'
-    user_paddocks = None
 
     # Count total steps based on mode
     total_steps = 21  # Max steps when running both SAM and user
@@ -85,21 +84,13 @@ def run(query: Query, reload: bool = False, paddocks_filepath: str = None, skip_
     # 5. Segment paddocks (SAM)
     print(f'[5/{total_steps}] Segment paddocks (SAM)...', flush=True)
     t0 = time.time()
-    import geopandas as gpd
     if skip_sam:
-        from PaddockTS.utils import load_user_paddocks
-        paddocks = load_user_paddocks(paddocks_filepath)
         print('  skipped (SAM disabled)')
     elif exists(gpkg_path):
-        paddocks = gpd.read_file(gpkg_path)
         print('  skipped (cached)')
     else:
         from PaddockTS.PaddockSegmentation.get_paddocks import get_paddocks
-        paddocks = get_paddocks(query, ds_sentinel2=ds_sentinel2)
-    # Load user paddocks if filepath provided (for dual mode)
-    if paddocks_filepath is not None and not skip_sam:
-        from PaddockTS.utils import load_user_paddocks
-        user_paddocks = load_user_paddocks(paddocks_filepath)
+        get_paddocks(query, ds_sentinel2=ds_sentinel2)
     print(f'  done ({time.time() - t0:.1f}s)', flush=True)
     gc.collect()
 
@@ -110,7 +101,7 @@ def run(query: Query, reload: bool = False, paddocks_filepath: str = None, skip_
         print('  skipped')
     else:
         from PaddockTS.Plotting.sentinel2_paddocks_video import sentinel2_video_with_paddocks
-        sentinel2_video_with_paddocks(query, paddocks, ds_sentinel2=ds_sentinel2, paddocks_filepath=gpkg_path)
+        sentinel2_video_with_paddocks(query, paddocks_filepath=gpkg_path, ds_sentinel2=ds_sentinel2)
         print(f'  done ({time.time() - t0:.1f}s)', flush=True)
 
     # 7. S2 + paddocks video (user)
@@ -120,7 +111,7 @@ def run(query: Query, reload: bool = False, paddocks_filepath: str = None, skip_
         print('  skipped')
     else:
         from PaddockTS.Plotting.sentinel2_paddocks_video import sentinel2_video_with_paddocks
-        sentinel2_video_with_paddocks(query, user_paddocks if user_paddocks is not None else paddocks, ds_sentinel2=ds_sentinel2, paddocks_filepath=paddocks_filepath)
+        sentinel2_video_with_paddocks(query, paddocks_filepath=paddocks_filepath, ds_sentinel2=ds_sentinel2, label_col=label_col)
         print(f'  done ({time.time() - t0:.1f}s)', flush=True)
 
     # 8. Fractional cover video
@@ -137,7 +128,7 @@ def run(query: Query, reload: bool = False, paddocks_filepath: str = None, skip_
         print('  skipped')
     else:
         from PaddockTS.Plotting.fractional_cover_paddocks_video import fractional_cover_paddocks_video
-        fractional_cover_paddocks_video(query, paddocks, ds_fractional_cover=ds_fractional_cover, ds_sentinel2=ds_sentinel2, paddocks_filepath=gpkg_path)
+        fractional_cover_paddocks_video(query, paddocks_filepath=gpkg_path, ds_fractional_cover=ds_fractional_cover, ds_sentinel2=ds_sentinel2)
         print(f'  done ({time.time() - t0:.1f}s)', flush=True)
 
     # 10. FC + paddocks video (user)
@@ -147,7 +138,7 @@ def run(query: Query, reload: bool = False, paddocks_filepath: str = None, skip_
         print('  skipped')
     else:
         from PaddockTS.Plotting.fractional_cover_paddocks_video import fractional_cover_paddocks_video
-        fractional_cover_paddocks_video(query, user_paddocks if user_paddocks is not None else paddocks, ds_fractional_cover=ds_fractional_cover, ds_sentinel2=ds_sentinel2, paddocks_filepath=paddocks_filepath)
+        fractional_cover_paddocks_video(query, paddocks_filepath=paddocks_filepath, ds_fractional_cover=ds_fractional_cover, ds_sentinel2=ds_sentinel2, label_col=label_col)
         print(f'  done ({time.time() - t0:.1f}s)', flush=True)
 
     # 11. Make paddock TS (SAM)
@@ -225,7 +216,7 @@ def run(query: Query, reload: bool = False, paddocks_filepath: str = None, skip_
         print('  skipped')
     else:
         from PaddockTS.Plotting.calendar_plot import calendar_plot
-        calendar_plot(query, ds_sentinel2=ds_sentinel2, paddocks=paddocks, paddocks_filepath=gpkg_path)
+        calendar_plot(query, ds_sentinel2=ds_sentinel2, paddocks_filepath=gpkg_path)
         print(f'  done ({time.time() - t0:.1f}s)', flush=True)
 
     # 18. Calendar plot (user)
@@ -235,7 +226,7 @@ def run(query: Query, reload: bool = False, paddocks_filepath: str = None, skip_
         print('  skipped')
     else:
         from PaddockTS.Plotting.calendar_plot import calendar_plot
-        calendar_plot(query, ds_sentinel2=ds_sentinel2, paddocks=user_paddocks if user_paddocks is not None else paddocks, paddocks_filepath=paddocks_filepath)
+        calendar_plot(query, ds_sentinel2=ds_sentinel2, paddocks_filepath=paddocks_filepath, label_col=label_col)
         print(f'  done ({time.time() - t0:.1f}s)', flush=True)
 
     # 19. Phenology plot (SAM)
@@ -255,7 +246,7 @@ def run(query: Query, reload: bool = False, paddocks_filepath: str = None, skip_
         print('  skipped')
     else:
         from PaddockTS.Plotting.phenology_plot import phenology_plot
-        phenology_plot(query, phenology_results=phenology_results_user, ds_yearly=ds_yearly_user, ds_paddockTS=ds_paddockTS_user, paddocks_filepath=paddocks_filepath)
+        phenology_plot(query, phenology_results=phenology_results_user, ds_yearly=ds_yearly_user, ds_paddockTS=ds_paddockTS_user, paddocks_filepath=paddocks_filepath, label_col=label_col)
         print(f'  done ({time.time() - t0:.1f}s)', flush=True)
 
     # 21. Make PDF report

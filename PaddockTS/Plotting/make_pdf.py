@@ -1,5 +1,6 @@
 import glob
 import os
+import re
 from os.path import exists
 from pathlib import Path
 
@@ -8,6 +9,11 @@ from matplotlib.backends.backend_pdf import PdfPages
 from PIL import Image
 
 from PaddockTS.query import Query
+
+
+def _natural_sort_key(s):
+    """Sort strings with embedded numbers in natural order."""
+    return [int(c) if c.isdigit() else c.lower() for c in re.split(r'(\d+)', s)]
 
 
 # Ordered sections: (section_title, file_patterns)
@@ -37,10 +43,10 @@ SECTIONS = [
         ('Calendar *', '{user_stem}_calendar_*.png'),
     ]),
     ('Phenology (SAM)', [
-        ('Phenology', '{sam_stem}_phenology.png'),
+        ('Phenology', '{sam_stem}_phenology*.png'),
     ]),
     ('Phenology (User)', [
-        ('Phenology', '{user_stem}_phenology.png'),
+        ('Phenology', '{user_stem}_phenology*.png'),
     ]),
 ]
 
@@ -124,7 +130,7 @@ def make_pdf(query: Query, paddocks_filepath: str | None = None):
                 pat = pattern.replace('{stub}', query.stub)
                 pat = pat.replace('{sam_stem}', sam_stem)
                 pat = pat.replace('{user_stem}', user_stem)
-                matches = sorted(glob.glob(f'{out_dir}/{pat}'))
+                matches = sorted(glob.glob(f'{out_dir}/{pat}'), key=_natural_sort_key)
                 for m in matches:
                     section_files.append(m)
 
@@ -143,3 +149,9 @@ def make_pdf(query: Query, paddocks_filepath: str | None = None):
 if __name__ == '__main__':
     from PaddockTS.utils import get_example_query
     make_pdf(get_example_query())
+    from datetime import date
+
+    query = Query.build_from_paddocks('/borevitz_projects/data/manual_downloads/Milgadara_paddock-polygons_2024-12-17_12-45-58.json', date(2024, 1, 1), date(2025, 1, 1), 'Milgadara')
+    # get_outputs(query, reload='--reload' in sys.argv, paddocks_filepath='/borevitz_projects/data/manual_downloads/Milgadara_paddock-polygons_2024-12-17_12-45-58.json')
+
+    make_pdf(query, '/borevitz_projects/data/manual_downloads/Milgadara_paddock-polygons_2024-12-17_12-45-58.json')
