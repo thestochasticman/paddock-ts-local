@@ -31,10 +31,10 @@ odc.stac.configure_rio(cloud_defaults=True, aws={"aws_unsigned": True})
 
 def download_sentinel2(
     query: Query,
-    num_workers: int = 4,
-    threads_per_worker: int = 2,
-    chunk_x: int = 1024,
-    chunk_y: int = 1024,
+    num_workers: int = 1,
+    threads_per_worker: int = 8,
+    chunk_x: int = 256,
+    chunk_y: int = 256,
     chunk_time: int = 1,
     max_nan_fraction: float = 0.20,
     sentinel2: Sentinel2 = defaultsentinel2
@@ -148,7 +148,12 @@ def download_sentinel2(
 
 def test():
     from PaddockTS.utils import get_example_query
-    download_sentinel2(get_example_query())
-
+    # download_sentinel2(get_example_query())
+    from PaddockTS.query import Query
+    from datetime import date
+    fp = 'artifacts/Milgadara_paddock-polygons_2024-12-17_12-45-58.json'
+    query = Query.build_from_paddocks(fp, date(2024, 1, 1), date(2025, 1, 1), 'Milgadara')
+    # get_outputs(query, reload='--reload' in sys.argv, paddocks_filepath=fp, label_col='title', show_log=True)
+    download_sentinel2(query)
 if __name__ == '__main__':
     test()

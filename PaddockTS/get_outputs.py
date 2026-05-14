@@ -1,3 +1,6 @@
+import matplotlib
+matplotlib.use('Agg')
+
 import gc
 import io
 import logging
@@ -18,7 +21,6 @@ from rich.table import Table
 from rich.text import Text
 
 from PaddockTS.query import Query
-
 
 ENV_STEPS = [
     'Download terrain',
@@ -570,6 +572,7 @@ def get_outputs(query: Query, reload: bool = False, show_log: bool = False,
             redirect_stdout=False,
             redirect_stderr=False,
             refresh_per_second=10,
+            screen=show_log,
         ) as live:
             while t_env.is_alive() or t_s2.is_alive():
                 live.update(view())
@@ -586,6 +589,6 @@ if __name__ == '__main__':
     from PaddockTS.utils import get_example_query
     from PaddockTS.query import Query
     from datetime import date
-
-    query = Query.build_from_paddocks('/borevitz_projects/data/manual_downloads/Milgadara_paddock-polygons_2024-12-17_12-45-58.json', date(2024, 1, 1), date(2025, 1, 1), 'Milgadara')
-    get_outputs(query, reload='--reload' in sys.argv, paddocks_filepath='/borevitz_projects/data/manual_downloads/Milgadara_paddock-polygons_2024-12-17_12-45-58.json', label_col='title')
+    fp = 'artifacts/Milgadara_paddock-polygons_2024-12-17_12-45-58.json'
+    query = Query.build_from_paddocks(fp, date(2024, 1, 1), date(2025, 1, 1), 'Milgadara')
+    get_outputs(query, reload='--reload' in sys.argv, paddocks_filepath=fp, label_col='title', show_log=True)
