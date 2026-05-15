@@ -65,7 +65,8 @@ def make_yearly_paddock_time_series(query, ds_paddockTS=None, paddocks_filepath=
         paddocks_filepath = f'{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg'
 
     paddocks_path = Path(paddocks_filepath)
-    timeseries_zarr = paddocks_path.parent / f'{paddocks_path.stem}_timeseries.zarr'
+    # timeseries_zarr = paddocks_path.parent / f'{paddocks_path.stem}_timeseries.zarr'
+    timeseries_zarr = f'{query.tmp_dir}/{paddocks_path.stem}_timeseries.zarr'
 
     if ds_paddockTS is None:
         if not exists(timeseries_zarr):
@@ -76,7 +77,7 @@ def make_yearly_paddock_time_series(query, ds_paddockTS=None, paddocks_filepath=
     datasets_by_year = split_paddock_time_series_by_year(ds_paddockTS)
 
     for year, ds_year in datasets_by_year.items():
-        year_path = str(paddocks_path.parent / f'{paddocks_path.stem}_timeseries_{year}.zarr')
+        year_path = f'paddocks_path.parent / {paddocks_path.stem}_timeseries_{year}.zarr'
         ds_year.to_zarr(year_path, mode='w', zarr_format=2)
         print(f'Saved {year}: {ds_year.sizes["time"]} time steps -> {year_path}')
 

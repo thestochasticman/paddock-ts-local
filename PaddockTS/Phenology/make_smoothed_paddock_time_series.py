@@ -57,7 +57,8 @@ def make_smoothed_paddock_time_series(query, ds_paddockTS=None, paddocks_filepat
         paddocks_filepath = f'{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg'
 
     paddocks_path = Path(paddocks_filepath)
-    timeseries_zarr = paddocks_path.parent / f'{paddocks_path.stem}_timeseries.zarr'
+    # timeseries_zarr = paddocks_path.parent / f'{paddocks_path.stem}_timeseries.zarr'
+    timeseries_zarr = f'{query.tmp_dir}/{paddocks_path.stem}_timeseries.zarr'
 
     if ds_paddockTS is None:
         if not exists(timeseries_zarr):
@@ -119,7 +120,8 @@ def make_smoothed_paddock_time_series(query, ds_paddockTS=None, paddocks_filepat
         if c not in ds_new.coords:
             ds_new = ds_new.assign_coords({c: ds[c]})
 
-    smoothed_path = str(paddocks_path.parent / f'{paddocks_path.stem}_timeseries_smoothed.zarr')
+    # smoothed_path = str(paddocks_path.parent / f'{paddocks_path.stem}_timeseries_smoothed.zarr')
+    smoothed_path = f'{query.tmp_dir}/{paddocks_path.stem}_timeseries_smoothed.zarr'
     ds_new.to_zarr(smoothed_path, mode='w', zarr_format=2)
     print(f'Saved to {smoothed_path}')
     return ds_new

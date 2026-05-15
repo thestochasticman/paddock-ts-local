@@ -9,6 +9,7 @@ downstream stages (yearly split, smoothing, phenology, plotting) consume.
 import numpy as np
 import xarray as xr
 from concurrent.futures import ProcessPoolExecutor
+from PaddockTS.query import Query
 import os
 
 def _band_medians(band_array, mask_flat, paddock_ids):
@@ -32,7 +33,7 @@ def _band_medians(band_array, mask_flat, paddock_ids):
 
     return out
 
-def make_paddock_time_series(query, ds_sentinel2=None, paddocks_filepath=None, crs="epsg:6933"):
+def make_paddock_time_series(query: Query, ds_sentinel2=None, paddocks_filepath=None, crs="epsg:6933"):
     """Compute per-paddock medians for every band at every timestep.
 
     Steps:
@@ -156,7 +157,7 @@ def make_paddock_time_series(query, ds_sentinel2=None, paddocks_filepath=None, c
     result = xr.Dataset(data_vars, coords=coords)
 
     paddocks_path = Path(paddocks_filepath)
-    zarr_path = str(paddocks_path.parent / f'{paddocks_path.stem}_timeseries.zarr')
+    zarr_path = f'{query.tmp_dir}/{paddocks_path.stem}_timeseries.zarr'
     result.to_zarr(zarr_path, mode='w', zarr_format=2)
     print(f'Saved to {zarr_path}')
     return result

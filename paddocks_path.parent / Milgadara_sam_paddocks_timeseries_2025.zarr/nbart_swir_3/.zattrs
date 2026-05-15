@@ -1,0 +1,7 @@
+{
+  "coordinates": "doy spatial_ref",
+  "_ARRAY_DIMENSIONS": [
+    "paddock",
+    "time"
+  ]
+}
