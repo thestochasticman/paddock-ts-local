@@ -21,10 +21,8 @@ from PaddockTS.query import Query
 from .sentinel2 import defaultsentinel2
 from dask.distributed import Client as DaskClient
 
-def _s3_to_https(url: str) -> str:
-    """Convert S3 URLs to HTTPS to avoid AWS auth issues."""
-    if url.startswith('s3://dea-public-data/'):
-        return url.replace('s3://dea-public-data/', 'https://data.dea.ga.gov.au/')
+def _patch_url(url: str) -> str:
+    """Pass through URLs unchanged - S3 with unsigned requests works globally."""
     return url
 
 odc.stac.configure_rio(cloud_defaults=True, aws={"aws_unsigned": True})
@@ -120,7 +118,7 @@ def download_sentinel2(
                 groupby=sentinel2.groupby,
                 bbox=query.bbox,
                 chunks={'time': chunk_time, 'x': chunk_x, 'y': chunk_y},
-                patch_url=_s3_to_https,
+                patch_url=_patch_url,
             )
             ds = client.compute(ds).result()
         except Exception as e:
@@ -154,6 +152,6 @@ def test():
     fp = 'artifacts/Milgadara_paddock-polygons_2024-12-17_12-45-58.json'
     query = Query.build_from_paddocks(fp, date(2024, 1, 1), date(2025, 1, 1), 'Milgadara')
     # get_outputs(query, reload='--reload' in sys.argv, paddocks_filepath=fp, label_col='title', show_log=True)
-    download_sentinel2(query)
+    download_sentinel2(get_example_query())
 if __name__ == '__main__':
     test()
