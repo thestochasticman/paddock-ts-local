@@ -21,10 +21,6 @@ from PaddockTS.query import Query
 from .sentinel2 import defaultsentinel2
 from dask.distributed import Client as DaskClient
 
-def _patch_url(url: str) -> str:
-    """Pass through URLs unchanged - S3 with unsigned requests works globally."""
-    return url
-
 odc.stac.configure_rio(cloud_defaults=True, aws={"aws_unsigned": True})
 
 def download_sentinel2(
@@ -118,7 +114,6 @@ def download_sentinel2(
                 groupby=sentinel2.groupby,
                 bbox=query.bbox,
                 chunks={'time': chunk_time, 'x': chunk_x, 'y': chunk_y},
-                patch_url=_patch_url,
             )
             ds = client.compute(ds).result()
         except Exception as e:
