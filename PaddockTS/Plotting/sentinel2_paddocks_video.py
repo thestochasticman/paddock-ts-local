@@ -42,7 +42,7 @@ def sentinel2_video_with_paddocks(query: Query, paddocks_filepath: str | None = 
 
     # Default to SAM paddocks if no filepath provided
     if paddocks_filepath is None:
-        paddocks_filepath = f'{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg'
+        paddocks_filepath = query.sam_paddocks_path
 
     out_stem = Path(paddocks_filepath).stem
     paddocks = load_user_paddocks(paddocks_filepath)
@@ -51,7 +51,7 @@ def sentinel2_video_with_paddocks(query: Query, paddocks_filepath: str | None = 
         if not os.path.exists(query.sentinel2_path):
             from PaddockTS.Sentinel2.download_sentinel2 import download_sentinel2
             download_sentinel2(query)
-        ds = xr.open_zarr(query.sentinel2_path, chunks=None)
+        ds = xr.open_zarr(query.sentinel2_path, chunks=None, decode_coords='all')
     else:
         ds = ds_sentinel2
     n_times = ds.sizes['time']

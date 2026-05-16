@@ -200,7 +200,7 @@ def downscale_smips(
             f'Sentinel-2 data not found at {query.sentinel2_path}. '
             'Run download_sentinel2() first.'
         )
-    s2_ds = xr.open_zarr(query.sentinel2_path, chunks=None)
+    s2_ds = xr.open_zarr(query.sentinel2_path, chunks=None, decode_coords="all")
 
     s2_times = s2_ds.time.values
     print(f'  found {len(s2_times)} S2 timesteps')
@@ -317,7 +317,7 @@ def test():
     print(f'Original SMIPS range: {float(smips.min()):.2f} - {float(smips.max()):.2f} mm')
 
     # Load S2 data for NDVI/NDWI computation
-    s2_ds = xr.open_zarr(test_q.sentinel2_path, chunks=None)
+    s2_ds = xr.open_zarr(test_q.sentinel2_path, chunks=None, decode_coords="all")
 
     # Compute NDVI and NDWI for all timesteps
     def _band(ds, name):

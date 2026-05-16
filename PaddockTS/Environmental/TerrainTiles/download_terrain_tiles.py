@@ -12,12 +12,13 @@ Used downstream by :mod:`PaddockTS.Environmental.TerrainTiles.utils`
 """
 
 from .download_cog import download_cogs
+from .check_if_valid_terrain_exists import check_if_valid_terrain_exists
 from PaddockTS.query import Query
+from datetime import datetime
 from itertools import product as cartesian
 from math import floor, ceil
 from os import makedirs
-
-get_filename = lambda q: f'{q.tmp_dir}/Environmental/{q.stub}_terrain.tif'
+from os.path import dirname
 
 BASE_URL = 'https://copernicus-dem-30m.s3.amazonaws.com'
 
@@ -48,15 +49,23 @@ def get_cog_urls(bbox):
 def download_terrain(query: Query):
     """Download and merge the Copernicus DEM tiles for ``query.bbox``.
 
-    Args:
-        query: The :class:`PaddockTS.query.Query`. The merged DEM is
-            written to
-            ``{query.tmp_dir}/Environmental/{query.stub}_terrain.tif``.
+    The merged DEM is written to ``query.terrain_path`` (an AOI-keyed
+    location, since elevation doesn't depend on the time range). A
+    sibling ``.tif._SUCCESS`` marker is touched after the write to mark
+    the cache as complete; subsequent calls with the same bbox skip the
+    download.
     """
-    makedirs(f'{query.tmp_dir}/Environmental', exist_ok=True)
+    if check_if_valid_terrain_exists(query.terrain_path):
+        return query.terrain_path
+
+    makedirs(dirname(query.terrain_path), exist_ok=True)
     urls = get_cog_urls(query.bbox)
-    filename = get_filename(query)
-    download_cogs(query.bbox, urls, filename)
+    download_cogs(query.bbox, urls, query.terrain_path)
+    # Touch ``<tif>._SUCCESS`` *after* the merge completes; its presence
+    # is what the next call uses as the cache-validity check.
+    with open(f'{query.terrain_path}._SUCCESS', 'w') as f:
+        f.write(datetime.utcnow().isoformat() + 'Z')
+    return query.terrain_path
 
 
 def test():

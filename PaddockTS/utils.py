@@ -1,6 +1,15 @@
 from PaddockTS.query import Query
 from datetime import date
+from urllib import request
+from urllib.error import URLError
 
+def test_internet(s):
+    try:
+        request.urlopen('https://www.google.com/', timeout=2)
+        return True
+    except URLError as error:
+        # google.com is not reachable. Check if internet is working or whether google is down'
+        return False
 
 def load_user_paddocks(paddocks_filepath: str):
     """Load user-provided paddocks and ensure required columns exist.

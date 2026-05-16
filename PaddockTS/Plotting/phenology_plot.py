@@ -60,7 +60,7 @@ def phenology_plot(query: Query, phenology_results: dict[int, pd.DataFrame] | No
     # Build paddock label mapping
     if label_col is not None:
         from PaddockTS.utils import load_user_paddocks
-        label_filepath = paddocks_filepath if paddocks_filepath else f'{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg'
+        label_filepath = paddocks_filepath if paddocks_filepath else query.sam_paddocks_path
         gdf = load_user_paddocks(label_filepath)
         paddock_labels = dict(zip(gdf['paddock'].astype(str), gdf[label_col].astype(str)))
     else:
@@ -75,12 +75,12 @@ def phenology_plot(query: Query, phenology_results: dict[int, pd.DataFrame] | No
         ds_yearly = make_yearly_paddock_time_series(query)
 
     if ds_paddockTS is None:
-        paddocks_filepath = f'{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg'
+        paddocks_filepath = query.sam_paddocks_path
         zarr_path = f'{query.tmp_dir}/{query.stub}_paddocks_timeseries.zarr'
         if not os.path.exists(zarr_path):
             from PaddockTS.Phenology.make_paddock_time_series import make_paddock_time_series
             make_paddock_time_series(query, paddocks_filepath=paddocks_filepath)
-        ds_paddockTS = xr.open_zarr(zarr_path, chunks=None)
+        ds_paddockTS = xr.open_zarr(zarr_path, chunks=None, decode_coords="all")
 
     # Only plot years that have phenology results (some may be skipped due to insufficient data)
     years = sorted(set(ds_yearly.keys()) & set(phenology_results.keys()))

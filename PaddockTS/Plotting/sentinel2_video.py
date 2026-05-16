@@ -50,7 +50,7 @@ def sentinel2_video(query: Query, ds_sentinel2=None, fps: int = 4, min_size: int
         if not os.path.exists(query.sentinel2_path):
             from PaddockTS.Sentinel2.download_sentinel2 import download_sentinel2
             download_sentinel2(query)
-        ds = xr.open_zarr(query.sentinel2_path, chunks=None)
+        ds = xr.open_zarr(query.sentinel2_path, chunks=None, decode_coords="all")
     else:
         ds = ds_sentinel2
     n_times = ds.sizes['time']

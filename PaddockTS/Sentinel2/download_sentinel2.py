@@ -2,26 +2,32 @@
 
 The default STAC source is Geoscience Australia's
 `Digital Earth Australia <https://explorer.dea.ga.gov.au/>`_ ARD
-collection (``ga_s2am_ard_3`` / ``ga_s2bm_ard_3``); both raw S3 and HTTPS
-endpoints are handled. The downloaded cube is cloud-masked using the DEA
-fmask band, sparsely-clear scenes are dropped via a NaN-fraction
-threshold, and the result is written to ``query.sentinel2_path`` as a
-Zarr v2 store.
+collection (``ga_s2am_ard_3`` / ``ga_s2bm_ard_3``). The fetched cube
+(raw bands including fmask, no cloud masking applied) is written to
+``query.sentinel2_path`` as a Zarr v2 store. The path is keyed by
+``(bbox, time)`` — same query re-runs reuse the cached file; different
+bbox or different time range gets its own folder.
 """
 
 import os
 import odc.stac
 import rioxarray
 import numpy as np
+import xarray as xr
 import pystac_client
 from os import makedirs
+from os.path import exists
+from datetime import datetime
 from xarray import Dataset
-from .sentinel2 import Sentinel2
 from PaddockTS.query import Query
-from .sentinel2 import defaultsentinel2
-from dask.distributed import Client as DaskClient
+from dask.distributed import Client as DaskClient, progress
+from PaddockTS.Sentinel2.sentinel2 import Sentinel2
+from PaddockTS.Sentinel2.sentinel2 import defaultsentinel2
+from PaddockTS.Sentinel2.check_if_valid_zarr_exists import check_if_valid_zarr_exists
+
 
 odc.stac.configure_rio(cloud_defaults=True, aws={"aws_unsigned": True})
+
 
 def download_sentinel2(
     query: Query,
@@ -30,21 +36,16 @@ def download_sentinel2(
     chunk_x: int = 256,
     chunk_y: int = 256,
     chunk_time: int = 1,
-    max_nan_fraction: float = 0.20,
     sentinel2: Sentinel2 = defaultsentinel2
 ) -> Dataset:
-    """Fetch, cloud-mask, and persist a Sentinel-2 ARD cube for ``query``.
+    """Fetch and persist a Sentinel-2 ARD cube for ``query``.
 
-    Searches the configured STAC catalog for items intersecting
-    ``query.bbox`` over ``[query.start, query.end]``, lazily loads the
-    requested bands with `odc.stac <https://odc-stac.readthedocs.io/>`_,
-    materialises the cube on a local Dask cluster, then:
-
-    1. Builds a clear-pixel mask from the fmask band (drops cloud and
-       cloud-shadow pixels).
-    2. Drops scenes whose remaining NaN fraction (across all bands and
-       pixels) exceeds ``max_nan_fraction``.
-    3. Writes the result to ``query.sentinel2_path`` as Zarr v2.
+    If ``query.sentinel2_path`` already exists (same bbox + time range
+    has been downloaded before), opens and returns it. Otherwise searches
+    the STAC catalog, materialises the requested bands via odc.stac on a
+    local Dask cluster, and writes the result as a Zarr v2 store at
+    ``query.sentinel2_path``. Raw bands — including the fmask band —
+    are written as-is; cloud masking is a downstream concern.
 
     The function temporarily restores ``OMP_NUM_THREADS`` after Dask sets
     it to ``1``, since downstream stages (PyTorch in segmentation,
@@ -52,7 +53,7 @@ def download_sentinel2(
 
     Args:
         query: The :class:`PaddockTS.query.Query` describing the region
-            and time range. ``query.tmp_dir`` is created if missing.
+            and time range. ``query.query_dir`` is created if missing.
         num_workers: Number of Dask processes. Each holds its own copy
             of GDAL/PROJ state, so memory grows roughly linearly. Tune
             down on small machines.
@@ -62,38 +63,29 @@ def download_sentinel2(
         chunk_time: Chunk size along the ``time`` dimension (scenes).
             Keep at ``1`` unless you know what you're doing — most
             downstream operations are per-timestep.
-        max_nan_fraction: Drop any scene whose fraction of NaN pixels
-            (after cloud masking, across all bands and the AOI) exceeds
-            this value. ``0.20`` keeps mostly-clear scenes only.
         sentinel2: A :class:`PaddockTS.Sentinel2.sentinel2.Sentinel2`
             config object specifying the STAC URL, collections, bands,
             CRS, resolution, and fmask values. Defaults to the bundled
             DEA Sentinel-2 config.
 
     Returns:
-        xarray.Dataset: The cloud-masked, scene-filtered cube with dims
-        ``(time, y, x)`` and the requested bands as data variables.
-        Also persisted to ``query.sentinel2_path``.
+        xarray.Dataset: The raw cube with dims ``(time, y, x)`` and the
+        requested bands as data variables. Also persisted to
+        ``query.sentinel2_path``.
 
     Raises:
+        RuntimeError: STAC returned no scenes for the query.
         Exception: Re-raises any error from the underlying ``odc.stac``
             load or Dask compute, after printing a diagnostic.
-
-    Example:
-        ```python
-        from datetime import date
-        from PaddockTS.query import Query
-        from PaddockTS.Sentinel2.download_sentinel2 import download_sentinel2
-
-        q = Query(
-            bbox=[148.46, -34.39, 148.50, -34.36],
-            start=date(2023, 1, 1),
-            end=date(2023, 12, 31),
-            stub='milgadara',
-        )
-        ds = download_sentinel2(q)
-        ```
     """
+    success_marker = f'{query.sentinel2_path}/_SUCCESS'
+    if check_if_valid_zarr_exists(query.sentinel2_path):
+        try:
+            return xr.open_zarr(query.sentinel2_path, chunks=None, decode_coords='all')
+        except Exception as e:
+            print(f'Cache at {query.sentinel2_path} unreadable ({e}); refetching')
+        # Marker present but zarr unreadable → fall through and refetch.
+
     bands = sentinel2.bands
     catalog = pystac_client.Client.open(sentinel2.stac_url)
     result = catalog.search(
@@ -102,12 +94,20 @@ def download_sentinel2(
         datetime=f'{query.start}/{query.end}',
         filter=sentinel2.cloud_cover_filter
     )
+    items = list(result.items())
+
+    if not items:
+        raise RuntimeError(
+            f'No Sentinel-2 scenes found for bbox {query.bbox} between '
+            f'{query.start} and {query.end}.'
+        )
+
     omp_before = os.environ.get('OMP_NUM_THREADS')
     with DaskClient(n_workers=num_workers, threads_per_worker=threads_per_worker) as client:
         odc.stac.configure_rio(cloud_defaults=True, aws={"aws_unsigned": True}, client=client)
         try:
             ds: Dataset = odc.stac.load(
-                list(result.items()),
+                items,
                 bands=bands,
                 crs=sentinel2.crs,
                 resolution=sentinel2.resolution,
@@ -115,7 +115,9 @@ def download_sentinel2(
                 bbox=query.bbox,
                 chunks={'time': chunk_time, 'x': chunk_x, 'y': chunk_y},
             )
-            ds = client.compute(ds).result()
+            future = client.compute(ds)
+            progress(future)
+            ds = future.result()
         except Exception as e:
             print(f'Creating dataset using dask failed due to: {e}')
             raise
@@ -126,27 +128,166 @@ def download_sentinel2(
         os.environ.pop('OMP_NUM_THREADS', None)
     else:
         os.environ['OMP_NUM_THREADS'] = omp_before
-    
-    #creating cloud mask
-    fmask = ds[sentinel2.cloud_mask_band]
-    clear_mask = (fmask != sentinel2.fmask_cloud) & (fmask != sentinel2.fmask_shadow)
-    ds = ds.drop_vars(sentinel2.cloud_mask_band).where(clear_mask)
-    #dropping frames using a nan percentage threshold
-    nan_frac = ds.to_array().isnull().mean(dim=['variable', 'x', 'y'])
-    ds = ds.sel(time=nan_frac < max_nan_fraction)
-    makedirs(query.tmp_dir, exist_ok=True)
+
+    makedirs(os.path.dirname(query.sentinel2_path), exist_ok=True)
+    timestamp = datetime.utcnow().isoformat() + 'Z'
+    # Pin the CRS in a form rioxarray reliably picks up on re-open;
+    # without this the spatial_ref coord round-trips but ds.rio.crs comes
+    # back as None, which breaks downstream stages (preseg, SAM, paddocks).
+    ds = ds.rio.write_crs(sentinel2.crs, inplace=False)
+    ds = ds.assign_attrs(downloaded_at=timestamp)
     ds.to_zarr(query.sentinel2_path, mode='w', zarr_format=2)
+    # Touch the _SUCCESS marker *after* the zarr write completes; its presence
+    # is what the next call uses as the cache-validity check, so a kill-9
+    # mid-write leaves the cache invalidated.
+    with open(success_marker, 'w') as f:
+        f.write(timestamp)
     return ds
 
 
-def test():
-    from PaddockTS.utils import get_example_query
-    # download_sentinel2(get_example_query())
-    from PaddockTS.query import Query
+from PaddockTS.utils import test_internet
+
+
+def test_download_writes_zarr():
+    """First call for a (bbox, time) writes the zarr at query.sentinel2_path."""
+    import tempfile
     from datetime import date
-    fp = 'artifacts/Milgadara_paddock-polygons_2024-12-17_12-45-58.json'
-    query = Query.build_from_paddocks(fp, date(2024, 1, 1), date(2025, 1, 1), 'Milgadara')
-    # get_outputs(query, reload='--reload' in sys.argv, paddocks_filepath=fp, label_col='title', show_log=True)
-    download_sentinel2(get_example_query())
+    from PaddockTS.config import Config
+
+    tmpdir = tempfile.mkdtemp(prefix='paddockts_s2_test_')
+    cfg = Config(out_dir=tmpdir, tmp_dir=tmpdir)
+    q = Query(
+        bbox=[148.36265, -33.52606, 148.38265, -33.50606],
+        start=date(2024, 1, 1), end=date(2024, 1, 21),
+        stub='s2_write', config=cfg,
+    )
+    ds = download_sentinel2(q)
+    return exists(q.sentinel2_path) and ds.time.size > 0
+
+
+def test_repeated_query_uses_cache():
+    """Second call with the same query reuses the zarr (no rewrite)."""
+    import tempfile
+    from datetime import date
+    from PaddockTS.config import Config
+
+    tmpdir = tempfile.mkdtemp(prefix='paddockts_s2_test_')
+    cfg = Config(out_dir=tmpdir, tmp_dir=tmpdir)
+    q = Query(
+        bbox=[148.36265, -33.52606, 148.38265, -33.50606],
+        start=date(2024, 1, 1), end=date(2024, 1, 21),
+        stub='s2_reuse', config=cfg,
+    )
+    download_sentinel2(q)
+    mtime_before = os.path.getmtime(q.sentinel2_path)
+
+    # Same query → cache hit, no write
+    download_sentinel2(q)
+    mtime_after = os.path.getmtime(q.sentinel2_path)
+    return mtime_before == mtime_after
+
+
+def test_different_stub_same_attrs_reuses_cache():
+    """Different stub but same (bbox, time) → same sentinel2_path → cache hit."""
+    import tempfile
+    from datetime import date
+    from PaddockTS.config import Config
+
+    tmpdir = tempfile.mkdtemp(prefix='paddockts_s2_test_')
+    cfg = Config(out_dir=tmpdir, tmp_dir=tmpdir)
+    bbox = [148.36265, -33.52606, 148.38265, -33.50606]
+    start, end = date(2024, 1, 1), date(2024, 1, 21)
+
+    qa = Query(bbox=bbox, start=start, end=end, stub='stub_aaa', config=cfg)
+    download_sentinel2(qa)
+    mtime_before = os.path.getmtime(qa.sentinel2_path)
+
+    qb = Query(bbox=bbox, start=start, end=end, stub='stub_bbb', config=cfg)
+    if qa.sentinel2_path != qb.sentinel2_path:
+        return False
+
+    download_sentinel2(qb)
+    mtime_after = os.path.getmtime(qb.sentinel2_path)
+    return mtime_before == mtime_after
+
+
+def test_different_time_different_path():
+    """Same bbox + different time range → different sentinel2_path."""
+    import tempfile
+    from datetime import date
+    from PaddockTS.config import Config
+
+    tmpdir = tempfile.mkdtemp(prefix='paddockts_s2_test_')
+    cfg = Config(out_dir=tmpdir, tmp_dir=tmpdir)
+    bbox = [148.36265, -33.52606, 148.38265, -33.50606]
+    qa = Query(bbox=bbox, start=date(2024, 1, 1), end=date(2024, 1, 21),
+               stub='s2_t1', config=cfg)
+    qb = Query(bbox=bbox, start=date(2024, 2, 1), end=date(2024, 2, 21),
+               stub='s2_t2', config=cfg)
+    # Same bbox → shared aoi_dir
+    if qa.aoi_dir != qb.aoi_dir:
+        return False
+    # Different time → different query_dir and sentinel2_path
+    return qa.sentinel2_path != qb.sentinel2_path
+
+
+def test_success_marker_written():
+    """A successful download leaves a _SUCCESS file inside the zarr and a
+    ``downloaded_at`` attribute on the dataset."""
+    import tempfile
+    from datetime import date
+    from PaddockTS.config import Config
+
+    tmpdir = tempfile.mkdtemp(prefix='paddockts_s2_test_')
+    cfg = Config(out_dir=tmpdir, tmp_dir=tmpdir)
+    q = Query(
+        bbox=[148.36265, -33.52606, 148.38265, -33.50606],
+        start=date(2024, 1, 1), end=date(2024, 1, 21),
+        stub='s2_marker', config=cfg,
+    )
+    download_sentinel2(q)
+    marker = f'{q.sentinel2_path}/_SUCCESS'
+    persisted = xr.open_zarr(q.sentinel2_path, chunks=None)
+    return exists(marker) and 'downloaded_at' in persisted.attrs
+
+
+def test_missing_marker_triggers_refetch():
+    """A cache with the zarr present but no _SUCCESS file is re-downloaded."""
+    import tempfile
+    from datetime import date
+    from PaddockTS.config import Config
+
+    tmpdir = tempfile.mkdtemp(prefix='paddockts_s2_test_')
+    cfg = Config(out_dir=tmpdir, tmp_dir=tmpdir)
+    q = Query(
+        bbox=[148.36265, -33.52606, 148.38265, -33.50606],
+        start=date(2024, 1, 1), end=date(2024, 1, 21),
+        stub='s2_refetch', config=cfg,
+    )
+    download_sentinel2(q)
+
+    # Simulate a crash mid-write: zarr exists but _SUCCESS was never touched
+    marker = f'{q.sentinel2_path}/_SUCCESS'
+    os.remove(marker)
+    mtime_before = os.path.getmtime(q.sentinel2_path)
+
+    # Next call should treat the cache as invalid and re-download
+    download_sentinel2(q)
+    mtime_after = os.path.getmtime(q.sentinel2_path)
+    return exists(marker) and mtime_after > mtime_before
+
+
+def test():
+    return all([
+        test_internet(None),
+        test_different_time_different_path(),
+        test_download_writes_zarr(),
+        test_repeated_query_uses_cache(),
+        test_different_stub_same_attrs_reuses_cache(),
+        test_success_marker_written(),
+        test_missing_marker_triggers_refetch(),
+    ])
+
+
 if __name__ == '__main__':
-    test()
+    print(test())

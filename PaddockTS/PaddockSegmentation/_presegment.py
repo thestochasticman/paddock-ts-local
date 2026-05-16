@@ -1,8 +1,12 @@
 import numpy as np
 import xarray as xr
 from numpy.typing import NDArray
-from os.path import exists
+from datetime import datetime
+from os import makedirs
+from os.path import exists, dirname
 from PaddockTS.query import Query
+from PaddockTS.Sentinel2.check_if_valid_zarr_exists import check_if_valid_zarr_exists
+from PaddockTS.PaddockSegmentation.check_if_valid_preseg_exists import check_if_valid_preseg_exists
 
 
 def completion(arr):
@@ -102,20 +106,24 @@ def presegment(query: Query, ds_sentinel2=None) -> str:
     Create a 3-band uint8 NDWI Fourier GeoTIFF from Sentinel-2 data.
     Returns the path to the saved preseg GeoTIFF.
     """
-    preseg_path = f"{query.tmp_dir}/{query.stub}_preseg.tif"
-    if exists(preseg_path):
-        return preseg_path
+    if check_if_valid_preseg_exists(query.preseg_path):
+        return query.preseg_path
 
     if ds_sentinel2 is None:
-        if not exists(query.sentinel2_path):
+        if not check_if_valid_zarr_exists(query.sentinel2_path):
             from PaddockTS.Sentinel2.download_sentinel2 import download_sentinel2
             download_sentinel2(query)
-        ds = xr.open_zarr(query.sentinel2_path, chunks=None)
+        ds = xr.open_zarr(query.sentinel2_path, chunks=None, decode_coords='all')
     else:
         ds = ds_sentinel2
     features = compute_ndwi_fourier(ds)
     uint8_image = rescale_uint8(features)
 
-    save_geotiff(ds, uint8_image, preseg_path)
-    print(f"Saved preseg to {preseg_path}")
-    return preseg_path
+    makedirs(dirname(query.preseg_path), exist_ok=True)
+    save_geotiff(ds, uint8_image, query.preseg_path)
+    # Touch ``<tif>._SUCCESS`` *after* the TIFF write completes; its presence
+    # is what the next call uses as the cache-validity check.
+    with open(f'{query.preseg_path}._SUCCESS', 'w') as f:
+        f.write(datetime.utcnow().isoformat() + 'Z')
+    print(f"Saved preseg to {query.preseg_path}")
+    return query.preseg_path

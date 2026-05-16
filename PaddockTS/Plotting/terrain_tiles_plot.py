@@ -25,7 +25,6 @@ from rasterio.enums import Resampling
 from scipy.ndimage import gaussian_filter
 from PaddockTS.Environmental.TerrainTiles.utils import pysheds_accumulation, calculate_slope, calculate_twi
 from PaddockTS.query import Query
-from PaddockTS.Environmental.TerrainTiles.download_terrain_tiles import get_filename
 from os import makedirs
 import tempfile
 import os
@@ -63,7 +62,7 @@ def terrain_tiles_plot(query: Query, ds_sentinel2=None, sigma: int = 10):
     """
     makedirs(query.out_dir, exist_ok=True)
 
-    terrain_path = get_filename(query)
+    terrain_path = query.terrain_path
 
     with rasterio.open(terrain_path) as src:
         dem_raw = src.read(1)
@@ -104,7 +103,7 @@ def terrain_tiles_plot(query: Query, ds_sentinel2=None, sigma: int = 10):
         if not os.path.exists(query.sentinel2_path):
             from PaddockTS.Sentinel2.download_sentinel2 import download_sentinel2
             download_sentinel2(query)
-        ds_ref = xr.open_zarr(query.sentinel2_path, chunks=None).isel(time=0)
+        ds_ref = xr.open_zarr(query.sentinel2_path, chunks=None, decode_coords='all').isel(time=0)
     else:
         ds_ref = ds_sentinel2.isel(time=0) if 'time' in ds_sentinel2.dims else ds_sentinel2
 

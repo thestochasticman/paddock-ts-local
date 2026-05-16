@@ -68,22 +68,25 @@ def make_paddock_time_series(query: Query, ds_sentinel2=None, paddocks_filepath=
     import rasterio.features
     from affine import Affine
     import pandas as pd
+    from datetime import datetime
+    from os import makedirs
     from os.path import exists
     from pathlib import Path
     import geopandas as gpd
+    from PaddockTS.Sentinel2.check_if_valid_zarr_exists import check_if_valid_zarr_exists
 
     if ds_sentinel2 is None:
-        if not exists(query.sentinel2_path):
+        if not check_if_valid_zarr_exists(query.sentinel2_path):
             from PaddockTS.Sentinel2.download_sentinel2 import download_sentinel2
             download_sentinel2(query)
-        ds_sentinel2 = xr.open_zarr(query.sentinel2_path, chunks=None)
+        ds_sentinel2 = xr.open_zarr(query.sentinel2_path, chunks=None, decode_coords='all')
 
     # Compute vegetation indices (NDVI, CFI, NIRv, NDTI, CAI)
     from PaddockTS.SpectralIndices.indices import compute_indices
     ds_sentinel2 = compute_indices(query, ds_sentinel2=ds_sentinel2)
 
     if paddocks_filepath is None:
-        paddocks_filepath = f'{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg'
+        paddocks_filepath = query.sam_paddocks_path
         if not exists(paddocks_filepath):
             from PaddockTS.PaddockSegmentation.get_paddocks import get_paddocks
             get_paddocks(query)
@@ -158,7 +161,14 @@ def make_paddock_time_series(query: Query, ds_sentinel2=None, paddocks_filepath=
 
     paddocks_path = Path(paddocks_filepath)
     zarr_path = f'{query.tmp_dir}/{paddocks_path.stem}_timeseries.zarr'
+    makedirs(query.tmp_dir, exist_ok=True)
+    timestamp = datetime.utcnow().isoformat() + 'Z'
+    result = result.assign_attrs(paddock_timeseries_computed_at=timestamp)
     result.to_zarr(zarr_path, mode='w', zarr_format=2)
+    # _SUCCESS marker for cache-validity check (matches the contract used by
+    # download_sentinel2 / compute_indices / compute_fractional_cover).
+    with open(f'{zarr_path}/_SUCCESS', 'w') as f:
+        f.write(timestamp)
     print(f'Saved to {zarr_path}')
     return result
 

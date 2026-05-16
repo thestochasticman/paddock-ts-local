@@ -65,7 +65,7 @@ def calendar_plot(query: Query, ds_sentinel2: xr.Dataset | None = None, paddocks
 
     # Default to SAM paddocks if no filepath provided
     if paddocks_filepath is None:
-        paddocks_filepath = f'{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg'
+        paddocks_filepath = query.sam_paddocks_path
 
     out_stem = Path(paddocks_filepath).stem
 
@@ -73,7 +73,7 @@ def calendar_plot(query: Query, ds_sentinel2: xr.Dataset | None = None, paddocks
         if not os.path.exists(query.sentinel2_path):
             from PaddockTS.Sentinel2.download_sentinel2 import download_sentinel2
             download_sentinel2(query)
-        ds_sentinel2 = xr.open_zarr(query.sentinel2_path, chunks=None)
+        ds_sentinel2 = xr.open_zarr(query.sentinel2_path, chunks=None, decode_coords="all")
 
     paddocks = load_user_paddocks(paddocks_filepath)
 

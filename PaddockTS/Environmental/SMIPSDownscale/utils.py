@@ -31,10 +31,7 @@ def compute_terrain_features(
     hli : ndarray
         HLI reprojected to S2 grid, shape (ny, nx).
     """
-    from PaddockTS.Environmental.TerrainTiles.download_terrain_tiles import (
-        download_terrain,
-        get_filename as terrain_get_filename,
-    )
+    from PaddockTS.Environmental.TerrainTiles.download_terrain_tiles import download_terrain
     from PaddockTS.Environmental.TerrainTiles.utils import (
         calculate_slope,
         calculate_aspect,
@@ -43,11 +40,9 @@ def compute_terrain_features(
         pysheds_accumulation,
     )
 
-    # Get terrain file
-    terrain_tif = terrain_get_filename(query)
-    if not exists(terrain_tif):
-        print('    downloading terrain data...')
-        download_terrain(query)
+    # Get terrain file (downloads + caches if not already present)
+    download_terrain(query)
+    terrain_tif = query.terrain_path
 
     # Calculate terrain derivatives
     slope = calculate_slope(terrain_tif)

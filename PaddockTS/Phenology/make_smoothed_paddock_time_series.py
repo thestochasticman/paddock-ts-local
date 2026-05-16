@@ -50,21 +50,22 @@ def make_smoothed_paddock_time_series(query, ds_paddockTS=None, paddocks_filepat
         with the same data variables as the input. Also persisted to
         ``{paddocks_filepath stem}_timeseries_smoothed.zarr``.
     """
-    from os.path import exists
+    from datetime import datetime
+    from os import makedirs
     from pathlib import Path
+    from PaddockTS.Sentinel2.check_if_valid_zarr_exists import check_if_valid_zarr_exists
 
     if paddocks_filepath is None:
-        paddocks_filepath = f'{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg'
+        paddocks_filepath = query.sam_paddocks_path
 
     paddocks_path = Path(paddocks_filepath)
-    # timeseries_zarr = paddocks_path.parent / f'{paddocks_path.stem}_timeseries.zarr'
     timeseries_zarr = f'{query.tmp_dir}/{paddocks_path.stem}_timeseries.zarr'
 
     if ds_paddockTS is None:
-        if not exists(timeseries_zarr):
+        if not check_if_valid_zarr_exists(timeseries_zarr):
             from PaddockTS.Phenology.make_paddock_time_series import make_paddock_time_series
             make_paddock_time_series(query, paddocks_filepath=paddocks_filepath)
-        ds_paddockTS = xr.open_zarr(timeseries_zarr, chunks=None)
+        ds_paddockTS = xr.open_zarr(timeseries_zarr, chunks=None, decode_coords='all')
 
     ds = ds_paddockTS
 
@@ -120,9 +121,13 @@ def make_smoothed_paddock_time_series(query, ds_paddockTS=None, paddocks_filepat
         if c not in ds_new.coords:
             ds_new = ds_new.assign_coords({c: ds[c]})
 
-    # smoothed_path = str(paddocks_path.parent / f'{paddocks_path.stem}_timeseries_smoothed.zarr')
     smoothed_path = f'{query.tmp_dir}/{paddocks_path.stem}_timeseries_smoothed.zarr'
+    makedirs(query.tmp_dir, exist_ok=True)
+    timestamp = datetime.utcnow().isoformat() + 'Z'
+    ds_new = ds_new.assign_attrs(smoothed_computed_at=timestamp)
     ds_new.to_zarr(smoothed_path, mode='w', zarr_format=2)
+    with open(f'{smoothed_path}/_SUCCESS', 'w') as f:
+        f.write(timestamp)
     print(f'Saved to {smoothed_path}')
     return ds_new
 

@@ -26,8 +26,12 @@ warnings.filterwarnings('ignore', module='keras')
 
 import numpy as np
 import xarray as xr
+from os import makedirs
+from os.path import exists
+from datetime import datetime
 from xarray import Dataset
 from PaddockTS.query import Query
+from PaddockTS.FractionalCover.check_if_valid_fractional_cover_exists import check_if_valid_fractional_cover_exists
 
 
 BANDS = ['nbart_blue', 'nbart_green', 'nbart_red', 'nbart_nir_1', 'nbart_swir_2', 'nbart_swir_3']
@@ -63,14 +67,19 @@ def compute_fractional_cover(query: Query, ds_sentinel2=None, model_n: int = 4, 
         on dims ``(time, y, x)``. Also persisted to
         ``query.fractional_cover_path``.
     """
-    from os.path import exists
     from PaddockTS.FractionalCover._unmix import unmix_fractional_cover, get_model
+
+    if check_if_valid_fractional_cover_exists(query.fractional_cover_path):
+        try:
+            return xr.open_zarr(query.fractional_cover_path, chunks=None, decode_coords='all')
+        except Exception as e:
+            print(f'Fractional-cover cache at {query.fractional_cover_path} unreadable ({e}); recomputing')
 
     if ds_sentinel2 is None:
         if not exists(query.sentinel2_path):
             from PaddockTS.Sentinel2.download_sentinel2 import download_sentinel2
             download_sentinel2(query)
-        ds = xr.open_zarr(query.sentinel2_path, chunks=None)
+        ds = xr.open_zarr(query.sentinel2_path, chunks=None, decode_coords='all')
     else:
         ds = ds_sentinel2
     inref = np.stack([ds[b].values for b in BANDS], axis=1).astype(np.float32)
@@ -93,17 +102,70 @@ def compute_fractional_cover(query: Query, ds_sentinel2=None, model_n: int = 4, 
         'npv': xr.DataArray(fractions[:, 2], dims=['time', 'y', 'x'], coords=coords),
     })
 
-    from os import makedirs
-    makedirs(query.tmp_dir, exist_ok=True)
+    makedirs(os.path.dirname(query.fractional_cover_path), exist_ok=True)
+    timestamp = datetime.utcnow().isoformat() + 'Z'
+    frac_ds = frac_ds.assign_attrs(fractional_cover_computed_at=timestamp)
     frac_ds.to_zarr(query.fractional_cover_path, mode='w', zarr_format=2)
+    # Touch _SUCCESS *after* the zarr write completes; its presence is what
+    # the next call uses as the cache-validity check.
+    with open(f'{query.fractional_cover_path}/_SUCCESS', 'w') as f:
+        f.write(timestamp)
     return frac_ds
 
 
+def _temp_query():
+    import tempfile
+    from datetime import date
+    from PaddockTS.config import Config
+    tmpdir = tempfile.mkdtemp(prefix='paddockts_fc_test_')
+    cfg = Config(out_dir=tmpdir, tmp_dir=tmpdir)
+    return Query(
+        bbox=[148.36265, -33.52606, 148.38265, -33.50606],
+        start=date(2024, 1, 1), end=date(2024, 1, 21),
+        stub=f'fc_{os.path.basename(tmpdir)}', config=cfg,
+    )
+
+
+def test_compute_writes_zarr_and_marker():
+    """First call computes, writes fractional_cover.zarr, and touches _SUCCESS."""
+    q = _temp_query()
+    ds = compute_fractional_cover(q)
+    if not exists(q.fractional_cover_path):
+        return False
+    if not exists(f'{q.fractional_cover_path}/_SUCCESS'):
+        return False
+    return all(name in ds.data_vars for name in ('bg', 'pv', 'npv'))
+
+
+def test_repeated_call_uses_cache():
+    """Second call with same query reuses the zarr (no rewrite)."""
+    q = _temp_query()
+    compute_fractional_cover(q)
+    mtime_before = os.path.getmtime(q.fractional_cover_path)
+    compute_fractional_cover(q)
+    mtime_after = os.path.getmtime(q.fractional_cover_path)
+    return mtime_before == mtime_after
+
+
+def test_missing_marker_triggers_recompute():
+    """A cache with the zarr present but no _SUCCESS file is recomputed."""
+    q = _temp_query()
+    compute_fractional_cover(q)
+    marker = f'{q.fractional_cover_path}/_SUCCESS'
+    os.remove(marker)
+    mtime_before = os.path.getmtime(q.fractional_cover_path)
+    compute_fractional_cover(q)
+    mtime_after = os.path.getmtime(q.fractional_cover_path)
+    return exists(marker) and mtime_after > mtime_before
+
+
 def test():
-    from PaddockTS.utils import get_example_query
-    ds = compute_fractional_cover(get_example_query())
-    for name in ['bg', 'pv', 'npv']:
-        print(f'{name} range: {float(ds[name].min()):.3f} to {float(ds[name].max()):.3f}')
+    return all([
+        test_compute_writes_zarr_and_marker(),
+        test_repeated_call_uses_cache(),
+        test_missing_marker_triggers_recompute(),
+    ])
+
 
 if __name__ == '__main__':
-    test()
+    print(test())

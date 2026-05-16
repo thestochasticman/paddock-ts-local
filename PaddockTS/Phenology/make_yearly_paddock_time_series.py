@@ -35,9 +35,7 @@ def split_paddock_time_series_by_year(ds):
         doy = ds_year.time.dt.dayofyear.data
         ds_year = ds_year.assign_coords(doy=('time', doy))
         datasets_by_year[int(year)] = ds_year
-
     return datasets_by_year
-
 
 def make_yearly_paddock_time_series(query, ds_paddockTS=None, paddocks_filepath=None):
     """Persist one Zarr per year and return the same data as a dict.
@@ -58,27 +56,33 @@ def make_yearly_paddock_time_series(query, ds_paddockTS=None, paddocks_filepath=
         dict[int, xarray.Dataset]: Mapping ``{year: ds_year}``. Each
         per-year slice is also persisted to disk.
     """
-    from os.path import exists
+    from datetime import datetime
+    from os import makedirs
     from pathlib import Path
+    from PaddockTS.Sentinel2.check_if_valid_zarr_exists import check_if_valid_zarr_exists
 
     if paddocks_filepath is None:
-        paddocks_filepath = f'{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg'
+        paddocks_filepath = query.sam_paddocks_path
 
     paddocks_path = Path(paddocks_filepath)
-    # timeseries_zarr = paddocks_path.parent / f'{paddocks_path.stem}_timeseries.zarr'
     timeseries_zarr = f'{query.tmp_dir}/{paddocks_path.stem}_timeseries.zarr'
 
     if ds_paddockTS is None:
-        if not exists(timeseries_zarr):
+        if not check_if_valid_zarr_exists(timeseries_zarr):
             from PaddockTS.Phenology.make_paddock_time_series import make_paddock_time_series
             make_paddock_time_series(query, paddocks_filepath=paddocks_filepath)
-        ds_paddockTS = xr.open_zarr(timeseries_zarr, chunks=None)
+        ds_paddockTS = xr.open_zarr(timeseries_zarr, chunks=None, decode_coords='all')
 
     datasets_by_year = split_paddock_time_series_by_year(ds_paddockTS)
 
+    makedirs(query.tmp_dir, exist_ok=True)
+    timestamp = datetime.utcnow().isoformat() + 'Z'
     for year, ds_year in datasets_by_year.items():
-        year_path = f'paddocks_path.parent / {paddocks_path.stem}_timeseries_{year}.zarr'
+        year_path = f'{query.tmp_dir}/{paddocks_path.stem}_timeseries_{year}.zarr'
+        ds_year = ds_year.assign_attrs(yearly_split_computed_at=timestamp)
         ds_year.to_zarr(year_path, mode='w', zarr_format=2)
+        with open(f'{year_path}/_SUCCESS', 'w') as f:
+            f.write(timestamp)
         print(f'Saved {year}: {ds_year.sizes["time"]} time steps -> {year_path}')
 
     return datasets_by_year

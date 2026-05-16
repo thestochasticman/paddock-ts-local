@@ -52,7 +52,7 @@ def fractional_cover_video(query: Query, ds_fractional_cover=None, fps: int = 4,
         if not os.path.exists(query.fractional_cover_path):
             from PaddockTS.FractionalCover.compute_fractional_cover import compute_fractional_cover
             compute_fractional_cover(query)
-        ds = xr.open_zarr(query.fractional_cover_path, chunks=None)
+        ds = xr.open_zarr(query.fractional_cover_path, chunks=None, decode_coords="all")
     else:
         ds = ds_fractional_cover
     n_times = ds.sizes['time']

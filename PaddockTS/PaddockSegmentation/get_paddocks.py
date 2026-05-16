@@ -18,14 +18,18 @@ use to ``{config.tmp_dir}/sam_weights`` and cached.
 """
 
 import gc
+import os
 import sys
 import time
 import numpy as np
 import geopandas as gpd
+from datetime import datetime
+from os import makedirs
 from os.path import exists
 from PaddockTS.query import Query
 from PaddockTS.config import config
-from ._presegment import presegment
+from PaddockTS.PaddockSegmentation._presegment import presegment
+from PaddockTS.PaddockSegmentation.check_if_valid_paddocks_exists import check_if_valid_paddocks_exists
 
 
 def _log(msg):
@@ -68,6 +72,11 @@ def get_paddocks(
         ``compactness``, and a 1-based ``paddock`` integer ID. Also
         written to ``{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg``.
     """
+    # Cache hit: return previously-segmented paddocks for this (bbox, time)
+    if check_if_valid_paddocks_exists(query.sam_paddocks_path):
+        _log(f"  Paddocks cache hit at {query.sam_paddocks_path}")
+        return gpd.read_file(query.sam_paddocks_path)
+
     # 1. Presegmentation image
     _log("  Preseg: computing NDWI Fourier features...")
     t0 = time.time()
@@ -75,10 +84,7 @@ def get_paddocks(
     _log(f"  Preseg: done ({time.time() - t0:.1f}s)")
 
     # 2. SAMGeo segmentation
-    mask_path = f"{query.tmp_dir}/{query.stub}_sam_mask.tif"
-    raw_gpkg_path = f"{query.tmp_dir}/{query.stub}_sam_raw.gpkg"
-
-    if not exists(raw_gpkg_path):
+    if not check_if_valid_paddocks_exists(query.sam_raw_path):
         from samgeo import SamGeo
 
         gc.collect()
@@ -91,17 +97,24 @@ def get_paddocks(
 
         _log("  SAMGeo: generating masks...")
         t0 = time.time()
+        makedirs(os.path.dirname(query.sam_mask_path), exist_ok=True)
         sam.generate(
             preseg_path,
-            mask_path,
+            query.sam_mask_path,
             batch=True,
             foreground=True,
             erosion_kernel=(3, 3),
             mask_multiplier=255,
         )
         _log(f"  SAMGeo: masks generated ({time.time() - t0:.1f}s)")
+        # _SUCCESS marker for the SAM mask TIFF
+        with open(f'{query.sam_mask_path}._SUCCESS', 'w') as f:
+            f.write(datetime.utcnow().isoformat() + 'Z')
 
-        sam.tiff_to_gpkg(mask_path, raw_gpkg_path)
+        sam.tiff_to_gpkg(query.sam_mask_path, query.sam_raw_path)
+        # _SUCCESS marker for the raw polygons GeoPackage
+        with open(f'{query.sam_raw_path}._SUCCESS', 'w') as f:
+            f.write(datetime.utcnow().isoformat() + 'Z')
         del sam
         gc.collect()
     else:
@@ -109,7 +122,19 @@ def get_paddocks(
 
     # 3. Filter polygons
     _log("  Filtering polygons...")
-    gdf = gpd.read_file(raw_gpkg_path)
+    gdf = gpd.read_file(query.sam_raw_path)
+    # SAM's tiff_to_gpkg sometimes drops CRS even when the source mask.tif
+    # carries one; re-attach from the mask (or preseg) if needed so
+    # estimate_utm_crs() doesn't blow up downstream.
+    if gdf.crs is None:
+        import rioxarray
+        for source in (query.sam_mask_path, query.preseg_path):
+            if exists(source):
+                src_crs = rioxarray.open_rasterio(source).rio.crs
+                if src_crs is not None:
+                    gdf = gdf.set_crs(src_crs)
+                    _log(f"  Re-attached CRS {src_crs} from {source}")
+                    break
     gdf = gdf[gdf.geometry.type.isin(["Polygon", "MultiPolygon"])]
     gdf = gdf.explode(index_parts=False).reset_index(drop=True)
     metric = gdf.to_crs(gdf.estimate_utm_crs())
@@ -123,9 +148,13 @@ def get_paddocks(
     paddocks = paddocks.sort_values("area_ha", ascending=False).reset_index(drop=True)
     paddocks["paddock"] = range(1, len(paddocks) + 1)
 
-    gpkg_path = f"{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg"
-    paddocks.to_file(gpkg_path, driver="GPKG")
-    _log(f"  {len(paddocks)} paddocks saved")
+    makedirs(os.path.dirname(query.sam_paddocks_path), exist_ok=True)
+    paddocks.to_file(query.sam_paddocks_path, driver="GPKG")
+    # Touch ``<gpkg>._SUCCESS`` *after* the gpkg write completes; its presence
+    # is what the next call uses as the cache-validity check.
+    with open(f'{query.sam_paddocks_path}._SUCCESS', 'w') as f:
+        f.write(datetime.utcnow().isoformat() + 'Z')
+    _log(f"  {len(paddocks)} paddocks saved to {query.sam_paddocks_path}")
 
     return paddocks
 
@@ -139,7 +168,7 @@ def test():
     query = get_example_query()
     paddocks = get_paddocks(query, device="cpu")
 
-    ds = xr.open_zarr(query.sentinel2_path, chunks=None)
+    ds = xr.open_zarr(query.sentinel2_path, chunks=None, decode_coords="all")
     nir = ds["nbart_nir_1"].transpose("y", "x", "time").values.astype(np.float32)
     red = ds["nbart_red"].transpose("y", "x", "time").values.astype(np.float32)
     nir[nir == 0] = np.nan

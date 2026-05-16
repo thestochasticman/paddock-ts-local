@@ -1,6 +1,14 @@
 import matplotlib
 matplotlib.use('Agg')
 
+# Pre-import dask in the main thread *before* worker threads start.
+# Otherwise the env and S2 workers race to trigger xarray's lazy
+# `from dask.base import is_dask_collection`, which can hit a
+# partially-initialized `dask.base` module and raise ImportError.
+import dask
+import dask.base  # noqa: F401
+import dask.distributed  # noqa: F401
+
 import gc
 import io
 import logging
@@ -265,7 +273,7 @@ def _run_s2_steps(query, statuses, times, paddocks_filepath=None, skip_sam=False
 
     ds_sentinel2 = None
     ds_fractional_cover = None
-    gpkg_path = f'{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg'
+    gpkg_path = query.sam_paddocks_path
 
     # SAM-based datasets
     ds_paddockTS = None
@@ -300,7 +308,7 @@ def _run_s2_steps(query, statuses, times, paddocks_filepath=None, skip_sam=False
                     from PaddockTS.Sentinel2.download_sentinel2 import download_sentinel2
                     ds_sentinel2 = download_sentinel2(query)
                 else:
-                    ds_sentinel2 = xr.open_zarr(query.sentinel2_path, chunks=None)
+                    ds_sentinel2 = xr.open_zarr(query.sentinel2_path, chunks=None, decode_coords="all")
             elif i == 1:
                 from PaddockTS.SpectralIndices.indices import compute_indices
                 ds_sentinel2 = compute_indices(query, ds_sentinel2=ds_sentinel2)
@@ -579,6 +587,12 @@ def get_outputs(query: Query, reload: bool = False, show_log: bool = False,
                 time.sleep(0.1)
             live.update(view())
 
+        # Live with screen=True uses the alternate screen buffer, which gets
+        # torn down on exit and wipes the dashboard. Re-emit the final view
+        # to the real terminal so the result persists in scrollback.
+        if show_log:
+            console.print(view())
+
     if errors:
         for label, e in errors:
             print(f'{label}: FAILED — {e}')
@@ -589,6 +603,6 @@ if __name__ == '__main__':
     from PaddockTS.utils import get_example_query
     from PaddockTS.query import Query
     from datetime import date
-    fp = 'artifacts/Milgadara_paddock-polygons_2024-12-17_12-45-58.json'
-    query = Query.build_from_paddocks(fp, date(2024, 1, 1), date(2025, 1, 1), 'Milgadara')
-    get_outputs(query, reload='--reload' in sys.argv, paddocks_filepath=fp, label_col='title', show_log=True)
+    fp = 'artifacts/PaddockSet1.gpkg'
+    query = Query.build_from_paddocks(fp, date(2024, 1, 1), date(2025, 1, 1), 'PaddockSet1.gpkg')
+    get_outputs(query, reload='--reload' in sys.argv, paddocks_filepath=fp, label_col='paddock', show_log=True)
