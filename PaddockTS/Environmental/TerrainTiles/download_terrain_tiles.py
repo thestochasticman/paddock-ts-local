@@ -22,7 +22,7 @@ from os.path import dirname
 
 BASE_URL = 'https://copernicus-dem-30m.s3.amazonaws.com'
 
-def get_cog_urls(bbox):
+def _get_cog_urls(bbox):
     """Return the list of Copernicus DEM 30 m tile URLs covering ``bbox``.
 
     The DEM is tiled at 1° × 1° resolution. This walks every
@@ -59,7 +59,7 @@ def download_terrain(query: Query):
         return query.terrain_path
 
     makedirs(dirname(query.terrain_path), exist_ok=True)
-    urls = get_cog_urls(query.bbox)
+    urls = _get_cog_urls(query.bbox)
     download_cogs(query.bbox, urls, query.terrain_path)
     # Touch ``<tif>._SUCCESS`` *after* the merge completes; its presence
     # is what the next call uses as the cache-validity check.

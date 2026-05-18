@@ -146,9 +146,7 @@ get_outputs(query)
 ```
 
 This kicks off both pipelines in parallel and renders a live dashboard.
-On a typical workstation (8 cores, no GPU) the example takes 10–25
-minutes the first time; subsequent runs of the same `Query` skip every
-cached step.
+Subsequent runs of the same `Query` skip every cached step.
 
 Outputs land under `~/Documents/PaddockTS-Outputs/<stub>/`:
 

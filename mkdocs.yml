@@ -49,6 +49,9 @@ plugins:
             merge_init_into_class: true
             separate_signature: true
             show_signature_annotations: true
+            filters:
+              - "!^test"  # Exclude functions starting with 'test'
+              - "!^_"     # Exclude private functions/classes starting with '_'
   - mkdocs-jupyter:
       include_source: true
       execute: false
