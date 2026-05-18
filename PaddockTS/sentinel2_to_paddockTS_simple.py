@@ -12,7 +12,7 @@ def run(query: Query, reload: bool = False, paddocks_filepath: str = None, skip_
         raise ValueError("skip_sam=True requires a valid paddocks_filepath")
 
     if reload:
-        for path in [query.sentinel2_path, query.fractional_cover_path]:
+        for path in [query.sentinel2_path, query.sentinel2_clean_path, query.fractional_cover_path]:
             if exists(path):
                 shutil.rmtree(path)
         for pattern in [
@@ -41,7 +41,7 @@ def run(query: Query, reload: bool = False, paddocks_filepath: str = None, skip_
 
     total_t0 = time.time()
 
-    # 1. Download Sentinel-2
+    # 1. Download + clean Sentinel-2
     print(f'[1/{total_steps}] Download Sentinel-2...', flush=True)
     t0 = time.time()
     if not exists(query.sentinel2_path):
@@ -49,8 +49,10 @@ def run(query: Query, reload: bool = False, paddocks_filepath: str = None, skip_
         ds_sentinel2 = download_sentinel2(query)
     else:
         import xarray as xr
-        ds_sentinel2 = xr.open_zarr(query.sentinel2_path, chunks=None)
+        ds_sentinel2 = xr.open_zarr(query.sentinel2_path, chunks=None, decode_coords='all')
         print('  skipped (cached)')
+    from PaddockTS.Sentinel2.clean_sentinel2 import clean_sentinel2
+    ds_sentinel2 = clean_sentinel2(query, ds_sentinel2=ds_sentinel2)
     print(f'  done ({time.time() - t0:.1f}s)', flush=True)
     gc.collect()
 

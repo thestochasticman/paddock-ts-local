@@ -60,7 +60,7 @@ def run(query: Query, reload: bool = False):
     import xarray as xr
 
     if reload:
-        for path in [query.sentinel2_path, query.fractional_cover_path]:
+        for path in [query.sentinel2_path, query.sentinel2_clean_path, query.fractional_cover_path]:
             if exists(path):
                 shutil.rmtree(path)
         for pattern in [
@@ -126,12 +126,14 @@ def run(query: Query, reload: bool = False):
             try:
                 with redirect_stdout(log), redirect_stderr(log):
                     if i == 0:
-                        # Download Sentinel-2
+                        # Download + clean Sentinel-2
                         if not exists(query.sentinel2_path):
                             from PaddockTS.Sentinel2.download_sentinel2 import download_sentinel2
                             ds_sentinel2 = download_sentinel2(query)
                         else:
-                            ds_sentinel2 = xr.open_zarr(query.sentinel2_path, chunks=None)
+                            ds_sentinel2 = xr.open_zarr(query.sentinel2_path, chunks=None, decode_coords='all')
+                        from PaddockTS.Sentinel2.clean_sentinel2 import clean_sentinel2
+                        ds_sentinel2 = clean_sentinel2(query, ds_sentinel2=ds_sentinel2)
 
                     elif i == 1:
                         # Compute indices

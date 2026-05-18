@@ -168,7 +168,7 @@ def test():
     query = get_example_query()
     paddocks = get_paddocks(query, device="cpu")
 
-    ds = xr.open_zarr(query.sentinel2_path, chunks=None, decode_coords="all")
+    ds = xr.open_zarr(query.sentinel2_clean_path, chunks=None, decode_coords="all")
     nir = ds["nbart_nir_1"].transpose("y", "x", "time").values.astype(np.float32)
     red = ds["nbart_red"].transpose("y", "x", "time").values.astype(np.float32)
     nir[nir == 0] = np.nan

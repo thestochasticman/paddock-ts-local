@@ -195,12 +195,11 @@ def downscale_smips(
     print(f'    SMIPS dims: {smips_cube.dims}, shape: {smips_cube.shape}')
 
     print('  loading Sentinel-2 data...')
-    if not exists(query.sentinel2_path):
-        raise FileNotFoundError(
-            f'Sentinel-2 data not found at {query.sentinel2_path}. '
-            'Run download_sentinel2() first.'
-        )
-    s2_ds = xr.open_zarr(query.sentinel2_path, chunks=None, decode_coords="all")
+    from PaddockTS.Sentinel2.check_if_valid_clean_zarr_exists import check_if_valid_clean_zarr_exists
+    if not check_if_valid_clean_zarr_exists(query.sentinel2_clean_path):
+        from PaddockTS.Sentinel2.clean_sentinel2 import clean_sentinel2
+        clean_sentinel2(query)
+    s2_ds = xr.open_zarr(query.sentinel2_clean_path, chunks=None, decode_coords="all")
 
     s2_times = s2_ds.time.values
     print(f'  found {len(s2_times)} S2 timesteps')
@@ -292,11 +291,12 @@ def test():
 
     test_q = get_example_query2()
 
-    # Ensure S2 data exists
-    if not exists(test_q.sentinel2_path):
-        print('Downloading Sentinel-2 data...')
-        from PaddockTS.Sentinel2.download_sentinel2 import download_sentinel2
-        download_sentinel2(test_q)
+    # Ensure cleaned S2 data exists
+    from PaddockTS.Sentinel2.check_if_valid_clean_zarr_exists import check_if_valid_clean_zarr_exists
+    if not check_if_valid_clean_zarr_exists(test_q.sentinel2_clean_path):
+        print('Preparing cleaned Sentinel-2 data...')
+        from PaddockTS.Sentinel2.clean_sentinel2 import clean_sentinel2
+        clean_sentinel2(test_q)
 
     # Run downscaling
     print('Running downscaling...')
@@ -316,8 +316,8 @@ def test():
     print(f'\nOriginal SMIPS shape: {smips.shape}')
     print(f'Original SMIPS range: {float(smips.min()):.2f} - {float(smips.max()):.2f} mm')
 
-    # Load S2 data for NDVI/NDWI computation
-    s2_ds = xr.open_zarr(test_q.sentinel2_path, chunks=None, decode_coords="all")
+    # Load cleaned S2 data for NDVI/NDWI computation
+    s2_ds = xr.open_zarr(test_q.sentinel2_clean_path, chunks=None, decode_coords="all")
 
     # Compute NDVI and NDWI for all timesteps
     def _band(ds, name):

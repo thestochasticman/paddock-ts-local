@@ -67,7 +67,11 @@ def fractional_cover_paddocks_video(query: Query, paddocks_filepath: str | None 
 
     # rasterize boundaries once
     if ds_sentinel2 is None:
-        s2 = xr.open_zarr(query.sentinel2_path, chunks=None, decode_coords="all")
+        from PaddockTS.Sentinel2.check_if_valid_clean_zarr_exists import check_if_valid_clean_zarr_exists
+        if not check_if_valid_clean_zarr_exists(query.sentinel2_clean_path):
+            from PaddockTS.Sentinel2.clean_sentinel2 import clean_sentinel2
+            clean_sentinel2(query)
+        s2 = xr.open_zarr(query.sentinel2_clean_path, chunks=None, decode_coords="all")
     else:
         s2 = ds_sentinel2
 

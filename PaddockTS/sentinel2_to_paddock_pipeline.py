@@ -54,7 +54,7 @@ def _make_table(statuses, times):
 def run(query: Query, reload: bool = False):
     if reload:
         import shutil
-        for path in [query.sentinel2_path, query.fractional_cover_path]:
+        for path in [query.sentinel2_path, query.sentinel2_clean_path, query.fractional_cover_path]:
             if exists(path):
                 shutil.rmtree(path)
         for suffix in ['_sam_paddocks.gpkg', '_preseg.tif', '_sam_mask.tif', '_sam_raw.gpkg']:
@@ -128,10 +128,13 @@ def run(query: Query, reload: bool = False):
 
 
 def _download_sentinel2(query):
-    if exists(query.sentinel2_path):
-        return
-    from PaddockTS.Sentinel2.download_sentinel2 import download_sentinel2
-    download_sentinel2(query)
+    if not exists(query.sentinel2_path):
+        from PaddockTS.Sentinel2.download_sentinel2 import download_sentinel2
+        download_sentinel2(query)
+    from PaddockTS.Sentinel2.check_if_valid_clean_zarr_exists import check_if_valid_clean_zarr_exists
+    if not check_if_valid_clean_zarr_exists(query.sentinel2_clean_path):
+        from PaddockTS.Sentinel2.clean_sentinel2 import clean_sentinel2
+        clean_sentinel2(query)
 
 
 def _compute_indices(query):

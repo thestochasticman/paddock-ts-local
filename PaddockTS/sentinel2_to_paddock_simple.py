@@ -8,7 +8,7 @@ from PaddockTS.query import Query
 
 def run(query: Query, reload: bool = False):
     if reload:
-        for path in [query.sentinel2_path, query.fractional_cover_path]:
+        for path in [query.sentinel2_path, query.sentinel2_clean_path, query.fractional_cover_path]:
             if exists(path):
                 shutil.rmtree(path)
         for suffix in ['_sam_paddocks.gpkg', '_preseg.tif', '_sam_mask.tif', '_sam_raw.gpkg']:
@@ -18,7 +18,7 @@ def run(query: Query, reload: bool = False):
 
     total_t0 = time.time()
 
-    # 1. Download Sentinel-2
+    # 1. Download + clean Sentinel-2
     print('[1/8] Download Sentinel-2...', flush=True)
     t0 = time.time()
     if not exists(query.sentinel2_path):
@@ -26,6 +26,10 @@ def run(query: Query, reload: bool = False):
         download_sentinel2(query)
     else:
         print('  skipped (cached)')
+    from PaddockTS.Sentinel2.check_if_valid_clean_zarr_exists import check_if_valid_clean_zarr_exists
+    if not check_if_valid_clean_zarr_exists(query.sentinel2_clean_path):
+        from PaddockTS.Sentinel2.clean_sentinel2 import clean_sentinel2
+        clean_sentinel2(query)
     print(f'  done ({time.time() - t0:.1f}s)', flush=True)
     gc.collect()
 

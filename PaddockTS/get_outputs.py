@@ -254,10 +254,11 @@ def _run_env_steps(query: Query, statuses, times, errors=None):
                     silo_plot(query)
             elif i == 6:
                 statuses[i] = 'waiting'
-                while not exists(query.sentinel2_path):
+                from PaddockTS.Sentinel2.check_if_valid_clean_zarr_exists import check_if_valid_clean_zarr_exists
+                while not check_if_valid_clean_zarr_exists(query.sentinel2_clean_path):
                     if errors:
                         raise RuntimeError(
-                            'Sentinel-2 worker failed before sentinel2.zarr was produced; '
+                            'Sentinel-2 worker failed before sentinel2_clean.zarr was produced; '
                             'cannot run terrain plot.'
                         )
                     time.sleep(1)
@@ -313,6 +314,8 @@ def _run_s2_steps(query, statuses, times, paddocks_filepath=None, skip_sam=False
                     ds_sentinel2 = download_sentinel2(query)
                 else:
                     ds_sentinel2 = xr.open_zarr(query.sentinel2_path, chunks=None, decode_coords="all")
+                from PaddockTS.Sentinel2.clean_sentinel2 import clean_sentinel2
+                ds_sentinel2 = clean_sentinel2(query, ds_sentinel2=ds_sentinel2)
             elif i == 1:
                 from PaddockTS.SpectralIndices.indices import compute_indices
                 ds_sentinel2 = compute_indices(query, ds_sentinel2=ds_sentinel2)
@@ -609,5 +612,5 @@ if __name__ == '__main__':
     from PaddockTS.query import Query
     from datetime import date
     fp = 'artifacts/PaddockSet1.gpkg'
-    query = Query.build_from_paddocks(fp, date(2024, 1, 1), date(2025, 1, 1), 'PaddockSet1.gpkg')
+    query = Query.build_from_paddocks(fp, date(2024, 1, 1), date(2025, 1, 1), 'PaddockSet1')
     get_outputs(query, reload='--reload' in sys.argv, paddocks_filepath=fp, label_col='paddock', show_log=True)

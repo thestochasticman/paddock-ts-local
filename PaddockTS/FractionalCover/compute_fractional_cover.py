@@ -76,10 +76,11 @@ def compute_fractional_cover(query: Query, ds_sentinel2=None, model_n: int = 4, 
             print(f'Fractional-cover cache at {query.fractional_cover_path} unreadable ({e}); recomputing')
 
     if ds_sentinel2 is None:
-        if not exists(query.sentinel2_path):
-            from PaddockTS.Sentinel2.download_sentinel2 import download_sentinel2
-            download_sentinel2(query)
-        ds = xr.open_zarr(query.sentinel2_path, chunks=None, decode_coords='all')
+        from PaddockTS.Sentinel2.clean_sentinel2 import clean_sentinel2
+        from PaddockTS.Sentinel2.check_if_valid_clean_zarr_exists import check_if_valid_clean_zarr_exists
+        if not check_if_valid_clean_zarr_exists(query.sentinel2_clean_path):
+            clean_sentinel2(query)
+        ds = xr.open_zarr(query.sentinel2_clean_path, chunks=None, decode_coords='all')
     else:
         ds = ds_sentinel2
     inref = np.stack([ds[b].values for b in BANDS], axis=1).astype(np.float32)

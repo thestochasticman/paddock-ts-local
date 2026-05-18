@@ -70,10 +70,11 @@ def calendar_plot(query: Query, ds_sentinel2: xr.Dataset | None = None, paddocks
     out_stem = Path(paddocks_filepath).stem
 
     if ds_sentinel2 is None:
-        if not os.path.exists(query.sentinel2_path):
-            from PaddockTS.Sentinel2.download_sentinel2 import download_sentinel2
-            download_sentinel2(query)
-        ds_sentinel2 = xr.open_zarr(query.sentinel2_path, chunks=None, decode_coords="all")
+        from PaddockTS.Sentinel2.check_if_valid_clean_zarr_exists import check_if_valid_clean_zarr_exists
+        if not check_if_valid_clean_zarr_exists(query.sentinel2_clean_path):
+            from PaddockTS.Sentinel2.clean_sentinel2 import clean_sentinel2
+            clean_sentinel2(query)
+        ds_sentinel2 = xr.open_zarr(query.sentinel2_clean_path, chunks=None, decode_coords="all")
 
     paddocks = load_user_paddocks(paddocks_filepath)
 

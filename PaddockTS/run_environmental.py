@@ -120,7 +120,8 @@ def run_environmental(query: Query, reload: bool = False, concurrent: bool = Fal
                         if concurrent:
                             statuses[i] = 'waiting'
                             live.update(Group(_make_table(statuses, times), progress))
-                            while not exists(query.sentinel2_path):
+                            from PaddockTS.Sentinel2.check_if_valid_clean_zarr_exists import check_if_valid_clean_zarr_exists
+                            while not check_if_valid_clean_zarr_exists(query.sentinel2_clean_path):
                                 time.sleep(1)
                             statuses[i] = 'running'
                             live.update(Group(_make_table(statuses, times), progress))

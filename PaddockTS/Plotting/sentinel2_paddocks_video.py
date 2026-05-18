@@ -48,10 +48,11 @@ def sentinel2_video_with_paddocks(query: Query, paddocks_filepath: str | None = 
     paddocks = load_user_paddocks(paddocks_filepath)
 
     if ds_sentinel2 is None:
-        if not os.path.exists(query.sentinel2_path):
-            from PaddockTS.Sentinel2.download_sentinel2 import download_sentinel2
-            download_sentinel2(query)
-        ds = xr.open_zarr(query.sentinel2_path, chunks=None, decode_coords='all')
+        from PaddockTS.Sentinel2.check_if_valid_clean_zarr_exists import check_if_valid_clean_zarr_exists
+        if not check_if_valid_clean_zarr_exists(query.sentinel2_clean_path):
+            from PaddockTS.Sentinel2.clean_sentinel2 import clean_sentinel2
+            clean_sentinel2(query)
+        ds = xr.open_zarr(query.sentinel2_clean_path, chunks=None, decode_coords='all')
     else:
         ds = ds_sentinel2
     n_times = ds.sizes['time']
