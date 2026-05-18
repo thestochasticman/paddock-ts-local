@@ -2,7 +2,7 @@ from attrs import frozen, field, Factory as F
 from contextlib import contextmanager
 from typing_extensions import Self
 from PaddockTS.config import Config
-from PaddockTS.config import config
+from PaddockTS.config import config as default_config
 from hashlib import sha256
 from datetime import date, datetime
 from os import makedirs
@@ -80,7 +80,7 @@ class Query:
     start: date
     end: date
     stub: str = field(default=build_from_input)
-    config: Config = config
+    config: Config = default_config
 
     bbox_hash: str = field(init=False)
     time_hash: str = field(init=False)
@@ -179,7 +179,7 @@ class Query:
         )
 
     @classmethod
-    def from_lat_lon(cls, lat: float, lon: float, buffer_km: float, start: date, end: date, stub: str = None):
+    def from_lat_lon(cls, lat: float, lon: float, buffer_km: float, start: date, end: date, stub: str = None, config: Config=default_config):
         """Build a Query from a centre point and a square buffer in kilometres.
 
         Convenience constructor for users who think in "X km around a point"
@@ -230,9 +230,9 @@ class Query:
         ]
 
         if stub is not None:
-            return cls(bbox=bbox, start=start, end=end, stub=stub)
+            return cls(bbox=bbox, start=start, end=end, stub=stub, config=config)
         else:
-            return cls(bbox=bbox, start=start, end=end)
+            return cls(bbox=bbox, start=start, end=end, config=config)
 
     @classmethod
     def build_from_paddocks(
@@ -244,6 +244,7 @@ class Query:
         label_col: str = None,
         geometry_col: str = None,
         crs: str = 'EPSG:4326',
+        config=default_config
     ):
         """Build a Query from a paddocks file, enveloping all geometries into a bbox.
 
@@ -326,9 +327,9 @@ class Query:
         bbox = [float(minx), float(miny), float(maxx), float(maxy)]
 
         if stub is not None:
-            return cls(bbox=bbox, start=start, end=end, stub=stub)
+            return cls(bbox=bbox, start=start, end=end, stub=stub, config=config)
         else:
-            return cls(bbox=bbox, start=start, end=end)
+            return cls(bbox=bbox, start=start, end=end, config=config)
 
 
 import tempfile
