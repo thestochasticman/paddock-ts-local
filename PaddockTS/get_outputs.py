@@ -224,7 +224,7 @@ def _make_view(log_buf, env_statuses, env_times, s2_statuses, s2_times, show_log
 
 # --- step runners ----------------------------------------------------------
 
-def _run_env_steps(query, statuses, times, errors=None):
+def _run_env_steps(query: Query, statuses, times, errors=None):
     os.makedirs(query.tmp_dir, exist_ok=True)
     for i in range(len(ENV_STEPS)):
         statuses[i] = 'running'
@@ -240,14 +240,18 @@ def _run_env_steps(query, statuses, times, errors=None):
                 from PaddockTS.Environmental.SILO.download_silo import download_silo
                 download_silo(query)
             elif i == 3:
-                from PaddockTS.Environmental.SLGASoils.download_slgasoils import download_slga_soils
-                download_slga_soils(query)
+                if query.config.tern_api_key:
+                    from PaddockTS.Environmental.SLGASoils.download_slgasoils import download_slga_soils
+                    download_slga_soils(query)
             elif i == 4:
                 from PaddockTS.Plotting.ozwald_plot import ozwald_daily_plot
                 ozwald_daily_plot(query)
+            
+            
             elif i == 5:
-                from PaddockTS.Plotting.silo_plot import silo_plot
-                silo_plot(query)
+                if query.config.email:
+                    from PaddockTS.Plotting.silo_plot import silo_plot
+                    silo_plot(query)
             elif i == 6:
                 statuses[i] = 'waiting'
                 while not exists(query.sentinel2_path):
@@ -601,6 +605,7 @@ def get_outputs(query: Query, reload: bool = False, show_log: bool = False,
 
 if __name__ == '__main__':
     from PaddockTS.utils import get_example_query
+    from PaddockTS.config import Config
     from PaddockTS.query import Query
     from datetime import date
     fp = 'artifacts/PaddockSet1.gpkg'
