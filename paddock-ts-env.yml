@@ -32,4 +32,5 @@ dependencies:
   - datacube
   - netcdf4
   - statsmodels
+  - tabulate
  

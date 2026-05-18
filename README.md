@@ -93,9 +93,38 @@ creating `~/.config/PaddockTS.json`:
 }
 ```
 
-`email` is required only by the SILO climate stage; `tern_api_key` is
-required only by the SLGA soils stage. The Sentinel-2 → PaddockTS
-chain itself works without any credentials.
+**Credentials:**
+- `email` is required only by the SILO climate stage
+- `tern_api_key` is required only by the SLGA soils stage
+- **Get your TERN API key:** Generate one at <https://account.tern.org.au/>
+
+The Sentinel-2 → PaddockTS chain itself works without any credentials.
+
+**Alternative: Pass config directly**
+
+Instead of creating a config file, you can pass configuration directly
+to the `Query` constructor:
+
+```python
+from PaddockTS.config import Config
+from PaddockTS.query import Query
+from datetime import date
+
+custom_config = Config(
+    out_dir="/data/paddockts/outputs",
+    tmp_dir="/data/paddockts/tmp",
+    email="you@example.org",
+    tern_api_key="<your-tern-key>"
+)
+
+query = Query(
+    bbox=[148.36265, -33.52606, 148.38265, -33.50606],
+    start=date(2020, 1, 1),
+    end=date(2021, 12, 31),
+    stub="my_run",
+    config=custom_config  # Pass config directly
+)
+```
 
 ---
 
@@ -206,7 +235,7 @@ PaddockTS is **MIT-licensed** — see [LICENSE](LICENSE).
 Third-party code shipped inside the package; see
 [`PaddockTS/LICENSES/`](PaddockTS/LICENSES/) for full license texts:
 
-- [`fractionalcover3`](https://github.com/jrsrp/fractionalcover3) by
+- [`fractionalcover3`](https://gitlab.com/jrsrp/themes/cover/fractionalcover3) by
   Robert Denham — MIT. The TFLite unmixing models and the unmixing
   routine in `PaddockTS.FractionalCover._unmix` are adapted from
   this work.
@@ -215,6 +244,10 @@ Third-party code shipped inside the package; see
   `PaddockTS.Phenology._phenolopy` (with minor NumPy 2.0 compatibility
   fixes documented in the file header) and used through
   `PaddockTS.Phenology.estimate_phenology`.
+- [`DAESIM_preprocess`](https://github.com/ChristopherBradley/DAESIM_preprocess) by
+  Christopher Bradley — MIT. Environmental data harvesting functions
+  adapted in `PaddockTS.Environmental` for downloading
+  and processing climate, vegetation, soil, and topographic datasets.
 
 ### Key runtime dependencies
 
