@@ -73,7 +73,7 @@ If you already have GDAL, PROJ, GEOS, and (optionally) CUDA installed
 system-wide:
 
 ```bash
-pip install PaddockTS
+pip install -e.
 ```
 
 PaddockTS targets Python ≥ 3.11.
