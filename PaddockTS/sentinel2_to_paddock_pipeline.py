@@ -64,7 +64,7 @@ def run(query: Query, reload: bool = False):
 
     statuses = ['pending'] * len(STEPS)
     times = [None] * len(STEPS)
-    paddocks = None
+    step_errors = []
 
     progress = Progress(
         TextColumn('[bold blue]{task.description}'),
@@ -108,23 +108,26 @@ def run(query: Query, reload: bool = False):
             try:
                 with open(os.devnull, 'w') as _null, redirect_stdout(_null), redirect_stderr(_null):
                     if i == 5:
-                        result = _sentinel2_paddocks_video(query, paddocks)
+                        _sentinel2_paddocks_video(query, query.sam_paddocks_path)
                     elif i == 7:
-                        result = _fractional_cover_paddocks_video(query, paddocks)
+                        _fractional_cover_paddocks_video(query, query.sam_paddocks_path)
                     else:
-                        result = fn()
-                if i == 3:
-                    paddocks = result
+                        fn()
                 statuses[i] = 'done'
             except Exception as e:
                 statuses[i] = f'[red]error[/red]'
                 times[i] = time.time() - t0
                 live.update(Group(_make_table(statuses, times), progress))
-                raise
+                step_errors.append((STEPS[i], e))
+                continue
 
             times[i] = time.time() - t0
             progress.update(task_id, completed=i + 1)
             live.update(Group(_make_table(statuses, times), progress))
+
+    # If any steps failed, raise the first error
+    if step_errors:
+        raise step_errors[0][1]
 
 
 def _download_sentinel2(query):
@@ -151,7 +154,7 @@ def _compute_fractional_cover(query):
 
 def _segment_paddocks(query):
     import geopandas as gpd
-    gpkg_path = f'{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg'
+    gpkg_path = query.sam_paddocks_path
     if exists(gpkg_path):
         return gpd.read_file(gpkg_path)
     from PaddockTS.PaddockSegmentation.get_paddocks import get_paddocks
@@ -181,4 +184,7 @@ def _fractional_cover_paddocks_video(query, paddocks):
 if __name__ == '__main__':
     import sys
     from PaddockTS.utils import get_example_query
-    run(get_example_query(), reload='--reload' in sys.argv)
+    from datetime import date
+    fp = 'artifacts/PaddockSet1.gpkg'
+    query = Query.build_from_paddocks(fp, date(2024, 1, 1), date(2025, 1, 1), 'PaddockSet1')
+    run(query, reload='--reload' in sys.argv)
