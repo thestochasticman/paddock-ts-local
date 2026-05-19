@@ -226,6 +226,7 @@ def _make_view(log_buf, env_statuses, env_times, s2_statuses, s2_times, show_log
 
 def _run_env_steps(query: Query, statuses, times, errors=None):
     os.makedirs(query.tmp_dir, exist_ok=True)
+    step_errors = []
     for i in range(len(ENV_STEPS)):
         statuses[i] = 'running'
         t0 = time.time()
@@ -247,8 +248,8 @@ def _run_env_steps(query: Query, statuses, times, errors=None):
             elif i == 4:
                 from PaddockTS.Plotting.ozwald_plot import ozwald_daily_plot
                 ozwald_daily_plot(query)
-            
-            
+
+
             elif i == 5:
                 if query.config.email:
                     from PaddockTS.Plotting.silo_plot import silo_plot
@@ -267,11 +268,16 @@ def _run_env_steps(query: Query, statuses, times, errors=None):
                 from PaddockTS.Plotting.terrain_tiles_plot import terrain_tiles_plot
                 terrain_tiles_plot(query)
             statuses[i] = 'done'
-        except Exception:
+        except Exception as e:
             statuses[i] = 'error'
             times[i] = time.time() - t0
-            raise
+            step_errors.append((ENV_STEPS[i], e))
+            continue
         times[i] = time.time() - t0
+
+    # If any steps failed, raise the first error
+    if step_errors:
+        raise step_errors[0][1]
 
 
 def _run_s2_steps(query, statuses, times, paddocks_filepath=None, skip_sam=False, label_col=None):
@@ -292,6 +298,7 @@ def _run_s2_steps(query, statuses, times, paddocks_filepath=None, skip_sam=False
     phenology_results_user = None
 
     os.makedirs(query.tmp_dir, exist_ok=True)
+    step_errors = []
     for i in range(len(S2_STEPS)):
         # Free memory and let torch own all CPU threads before SAM
         if i == 4:
@@ -474,11 +481,16 @@ def _run_s2_steps(query, statuses, times, paddocks_filepath=None, skip_sam=False
                 make_pdf(query, paddocks_filepath=paddocks_filepath)
 
             statuses[i] = 'done'
-        except Exception:
+        except Exception as e:
             statuses[i] = 'error'
             times[i] = time.time() - t0
-            raise
+            step_errors.append((S2_STEPS[i], e))
+            continue
         times[i] = time.time() - t0
+
+    # If any steps failed, raise the first error
+    if step_errors:
+        raise step_errors[0][1]
 
 
 # --- driver ----------------------------------------------------------------
@@ -605,6 +617,7 @@ def get_outputs(query: Query, reload: bool = False, show_log: bool = False,
         for label, e in errors:
             print(f'{label}: FAILED — {e}')
         raise errors[0][1]
+    
 
 
 if __name__ == '__main__':
