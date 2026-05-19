@@ -36,7 +36,7 @@ class Config:
 
 _out = expanduser('~/Documents/PaddockTS-Outputs')
 _tmp = expanduser('~/Downloads/PaddockTS-Tmp')
-_default = Config(_out, _tmp, None)
+_default = Config(_out, _tmp)
 
 confpath = os.path.expanduser('~/.config/PaddockTS.json')
 config = Config(**load(open(confpath))) if exists(confpath) else _default

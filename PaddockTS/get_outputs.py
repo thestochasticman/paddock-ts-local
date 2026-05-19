@@ -237,8 +237,9 @@ def _run_env_steps(query: Query, statuses, times, errors=None):
                 from PaddockTS.Environmental.OzWALD.download_ozwald_daily import download_ozwald_daily
                 download_ozwald_daily(query)
             elif i == 2:
-                from PaddockTS.Environmental.SILO.download_silo import download_silo
-                download_silo(query)
+                if query.config.email:
+                    from PaddockTS.Environmental.SILO.download_silo import download_silo
+                    download_silo(query)
             elif i == 3:
                 if query.config.tern_api_key:
                     from PaddockTS.Environmental.SLGASoils.download_slgasoils import download_slga_soils
