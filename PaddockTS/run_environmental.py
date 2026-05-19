@@ -48,6 +48,75 @@ def _make_table(statuses, times):
     return table
 
 
+def _run_env_steps(query, statuses, times, log, concurrent, update_callback=None):
+    os.makedirs(query.tmp_dir, exist_ok=True)
+    step_errors = []
+    for i in range(len(STEPS)):
+        statuses[i] = 'running'
+        if update_callback:
+            update_callback()
+        t0 = time.time()
+        try:
+            with redirect_stdout(log):
+                if i == 0:
+                    from PaddockTS.Environmental.TerrainTiles.download_terrain_tiles import download_terrain
+                    download_terrain(query)
+
+                elif i == 1:
+                    from PaddockTS.Environmental.OzWALD.download_ozwald_daily import download_ozwald_daily
+                    download_ozwald_daily(query)
+
+                elif i == 2:
+                    from PaddockTS.Environmental.SILO.download_silo import download_silo
+                    download_silo(query)
+
+                elif i == 3:
+                    from PaddockTS.Environmental.SLGASoils.download_slgasoils import download_slga_soils
+                    download_slga_soils(query)
+
+                elif i == 4:
+                    from PaddockTS.Environmental.daesim_forcing import daesim_forcing
+                    daesim_forcing(query)
+
+                elif i == 5:
+                    from PaddockTS.Plotting.ozwald_plot import ozwald_daily_plot
+                    ozwald_daily_plot(query)
+
+                elif i == 6:
+                    from PaddockTS.Plotting.silo_plot import silo_plot
+                    silo_plot(query)
+
+                elif i == 7:
+                    if concurrent:
+                        statuses[i] = 'waiting'
+                        if update_callback:
+                            update_callback()
+                        from PaddockTS.Sentinel2.check_if_valid_clean_zarr_exists import check_if_valid_clean_zarr_exists
+                        while not check_if_valid_clean_zarr_exists(query.sentinel2_clean_path):
+                            time.sleep(1)
+                        statuses[i] = 'running'
+                        if update_callback:
+                            update_callback()
+                    from PaddockTS.Plotting.terrain_tiles_plot import terrain_tiles_plot
+                    terrain_tiles_plot(query)
+
+            statuses[i] = 'done'
+        except Exception as e:
+            statuses[i] = '[red]error[/red]'
+            times[i] = time.time() - t0
+            if update_callback:
+                update_callback()
+            step_errors.append((STEPS[i], e))
+            continue
+        times[i] = time.time() - t0
+        if update_callback:
+            update_callback()
+
+    # If any steps failed, raise the first error
+    if step_errors:
+        raise step_errors[0][1]
+
+
 def run_environmental(query: Query, reload: bool = False, concurrent: bool = False):
     """Download environmental data and produce plots.
 
@@ -81,64 +150,11 @@ def run_environmental(query: Query, reload: bool = False, concurrent: bool = Fal
     log = open(f'{query.tmp_dir}/{query.stub}_environmental.log', 'w')
 
     with Live(Group(_make_table(statuses, times), progress), console=_console, refresh_per_second=4) as live:
-        for i in range(len(STEPS)):
-            statuses[i] = 'running'
+        def update_display():
+            progress.update(task_id, completed=sum(1 for s in statuses if s in ['done', '[red]error[/red]']))
             live.update(Group(_make_table(statuses, times), progress))
 
-            t0 = time.time()
-            try:
-                with redirect_stdout(log):
-                    if i == 0:
-                        from PaddockTS.Environmental.TerrainTiles.download_terrain_tiles import download_terrain
-                        download_terrain(query)
-
-                    elif i == 1:
-                        from PaddockTS.Environmental.OzWALD.download_ozwald_daily import download_ozwald_daily
-                        download_ozwald_daily(query)
-
-                    elif i == 2:
-                        from PaddockTS.Environmental.SILO.download_silo import download_silo
-                        download_silo(query)
-
-                    elif i == 3:
-                        from PaddockTS.Environmental.SLGASoils.download_slgasoils import download_slga_soils
-                        download_slga_soils(query)
-
-                    elif i == 4:
-                        from PaddockTS.Environmental.daesim_forcing import daesim_forcing
-                        daesim_forcing(query)
-
-                    elif i == 5:
-                        from PaddockTS.Plotting.ozwald_plot import ozwald_daily_plot
-                        ozwald_daily_plot(query)
-
-                    elif i == 6:
-                        from PaddockTS.Plotting.silo_plot import silo_plot
-                        silo_plot(query)
-
-                    elif i == 7:
-                        if concurrent:
-                            statuses[i] = 'waiting'
-                            live.update(Group(_make_table(statuses, times), progress))
-                            from PaddockTS.Sentinel2.check_if_valid_clean_zarr_exists import check_if_valid_clean_zarr_exists
-                            while not check_if_valid_clean_zarr_exists(query.sentinel2_clean_path):
-                                time.sleep(1)
-                            statuses[i] = 'running'
-                            live.update(Group(_make_table(statuses, times), progress))
-                        from PaddockTS.Plotting.terrain_tiles_plot import terrain_tiles_plot
-                        terrain_tiles_plot(query)
-
-                statuses[i] = 'done'
-            except Exception:
-                statuses[i] = '[red]error[/red]'
-                times[i] = time.time() - t0
-                live.update(Group(_make_table(statuses, times), progress))
-                log.close()
-                raise
-
-            times[i] = time.time() - t0
-            progress.update(task_id, completed=i + 1)
-            live.update(Group(_make_table(statuses, times), progress))
+        _run_env_steps(query, statuses, times, log, concurrent, update_callback=update_display)
 
     log.close()
 
