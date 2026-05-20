@@ -63,7 +63,7 @@ and PaddockTS itself.
 git clone https://github.com/thestochasticman/paddock-ts-local.git
 cd paddock-ts-local
 conda env create -f paddock-ts-env.yml
-conda activate paddockts-env
+conda activate paddockts
 pip install -e .
 ```
 
