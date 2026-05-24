@@ -20,7 +20,7 @@ from os.path import exists
 from datetime import datetime
 from xarray import Dataset
 from PaddockTS.query import Query
-from dask.distributed import Client as DaskClient, progress
+from dask.distributed import Client as DaskClient
 from PaddockTS.Sentinel2.sentinel2 import Sentinel2
 from PaddockTS.Sentinel2.sentinel2 import defaultsentinel2
 from PaddockTS.Sentinel2.check_if_valid_zarr_exists import check_if_valid_zarr_exists
@@ -121,47 +121,60 @@ def download_sentinel2(
             f'{query.start} and {query.end}.'
         )
 
-    omp_before = os.environ.get('OMP_NUM_THREADS')
-    with DaskClient(n_workers=num_workers, threads_per_worker=threads_per_worker) as client:
-        odc.stac.configure_rio(cloud_defaults=True, aws={"aws_unsigned": True}, client=client)
-        try:
-            ds: Dataset = odc.stac.load(
-                items,
-                bands=bands,
-                crs=sentinel2.crs,
-                resolution=sentinel2.resolution,
-                groupby=sentinel2.groupby,
-                bbox=query.bbox,
-                chunks={'time': chunk_time, 'x': chunk_x, 'y': chunk_y},
-            )
-            future = client.compute(ds)
-            progress(future)
-            ds = future.result()
-        except Exception as e:
-            print(f'Creating dataset using dask failed due to: {e}')
-            raise
-        finally:
-            client.close()
-    # Dask sets OMP_NUM_THREADS=1 which cripples PyTorch in later pipeline steps
-    if omp_before is None:
-        os.environ.pop('OMP_NUM_THREADS', None)
-    else:
-        os.environ['OMP_NUM_THREADS'] = omp_before
-
+    # Dask sets OMP_NUM_THREADS=1 (and the MKL / OpenBLAS equivalents) on the
+    # parent process when the cluster spins up, which would cripple PyTorch
+    # in the SAM segmentation stage that runs later in the same process.
+    # Snapshot the originals so we can restore them on the way out — and put
+    # the restore in a `finally` so a failed download doesn't poison the env
+    # for the rest of the run.
+    _THREAD_VARS = ('OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS')
+    thread_env_before = {v: os.environ.get(v) for v in _THREAD_VARS}
     makedirs(os.path.dirname(query.sentinel2_path), exist_ok=True)
     timestamp = datetime.utcnow().isoformat() + 'Z'
-    # Pin the CRS in a form rioxarray reliably picks up on re-open;
-    # without this the spatial_ref coord round-trips but ds.rio.crs comes
-    # back as None, which breaks downstream stages (preseg, SAM, paddocks).
-    ds = ds.rio.write_crs(sentinel2.crs, inplace=False)
-    ds = ds.assign_attrs(downloaded_at=timestamp)
-    ds.to_zarr(query.sentinel2_path, mode='w', zarr_format=2)
+    try:
+        with DaskClient(n_workers=num_workers, threads_per_worker=threads_per_worker) as client:
+            odc.stac.configure_rio(cloud_defaults=True, aws={"aws_unsigned": True}, client=client)
+            try:
+                ds: Dataset = odc.stac.load(
+                    items,
+                    bands=bands,
+                    crs=sentinel2.crs,
+                    resolution=sentinel2.resolution,
+                    groupby=sentinel2.groupby,
+                    bbox=query.bbox,
+                    chunks={'time': chunk_time, 'x': chunk_x, 'y': chunk_y},
+                )
+                # Pin the CRS in a form rioxarray reliably picks up on re-open;
+                # without this the spatial_ref coord round-trips but ds.rio.crs
+                # comes back as None, which breaks downstream stages (preseg,
+                # SAM, paddocks).
+                ds = ds.rio.write_crs(sentinel2.crs, inplace=False)
+                ds = ds.assign_attrs(downloaded_at=timestamp)
+                # Stream chunks directly to disk via the active Dask client —
+                # avoids materializing the full cube in the driver process. On
+                # large AOIs the in-driver path (client.compute + .result)
+                # would peak at the whole-cube memory footprint; this path
+                # peaks at ~workers × chunk_size.
+                ds.to_zarr(query.sentinel2_path, mode='w', zarr_format=2)
+            except Exception as e:
+                print(f'Creating dataset using dask failed due to: {e}')
+                raise
+    finally:
+        for var, prev in thread_env_before.items():
+            if prev is None:
+                os.environ.pop(var, None)
+            else:
+                os.environ[var] = prev
+
     # Touch the _SUCCESS marker *after* the zarr write completes; its presence
     # is what the next call uses as the cache-validity check, so a kill-9
     # mid-write leaves the cache invalidated.
     with open(success_marker, 'w') as f:
         f.write(timestamp)
-    return ds
+    # Re-open from disk so the returned dataset is a stable, eager reference
+    # to the persisted store — not a lazy view over the now-shut Dask cluster
+    # that would re-fetch from STAC on any access.
+    return xr.open_zarr(query.sentinel2_path, chunks=None, decode_coords='all')
 
 
 from PaddockTS.utils import test_internet
