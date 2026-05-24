@@ -27,10 +27,10 @@ Give PaddockTS a bounding box and a date range. It returns:
   Qiusheng Wu, over an NDWI Fourier-feature presegmentation image.
   Produces a clean GeoPackage of per-paddock geometry, area (ha), and
   shape compactness.
-- **Per-paddock time series** — for every Sentinel-2 acquisition in your
-  window, the median reflectance and the median NDVI / CFI / NIRv /
-  NDTI / CAI inside each paddock, written as a single Zarr cube on
-  `(paddock, time)`.
+- **Per-paddock time series** — for every Sentinel-2 acquisition in
+  your window, the median reflectance and the median NDVI / CFI /
+  NIRv / NDTI / CAI inside each paddock, written as a single Zarr cube
+  on `(paddock, time)`.
 - **Fractional cover** — pixel-level unmixing of Sentinel-2 surface
   reflectance into bare ground (`bg`), green vegetation (`pv`), and
   non-green vegetation (`npv`), via a TFLite MLP adapted from
@@ -44,10 +44,14 @@ Give PaddockTS a bounding box and a date range. It returns:
   [SILO](https://www.longpaddock.qld.gov.au/silo/) daily climate, and
   [SLGA](https://esoil.io/TERNLandscapes/Public/Pages/SLGA/index.html)
   90 m soil texture / properties, all clipped to the same AOI.
-- **Plots and videos** — true-colour and false-colour MP4 timelines,
-  per-paddock thumbnail calendars, phenology curves with SoS / PoS / EoS
-  markers, climate diagnostic panels.
+- **Plots, videos, and a stitched PDF report** — true-colour and
+  false-colour MP4 timelines, per-paddock thumbnail calendars,
+  phenology curves with SoS / PoS / EoS markers, climate diagnostic
+  panels.
 
+Every output is cache-aware: rerunning the same `Query` is a no-op,
+and partial writes (interrupted by OOM, kill, network drop) are
+automatically detected and re-fetched on the next run.
 
 ---
 
@@ -55,9 +59,8 @@ Give PaddockTS a bounding box and a date range. It returns:
 
 ### Conda (recommended)
 
-The easiest path: a single environment file installs the geospatial
-native stack (GDAL, PROJ, GEOS), the ML stack (PyTorch, TensorFlow),
-and PaddockTS itself.
+A single environment file installs the geospatial native stack (GDAL,
+PROJ, GEOS), the ML stack (PyTorch, TensorFlow), and PaddockTS itself.
 
 ```bash
 git clone https://github.com/thestochasticman/paddock-ts-local.git
@@ -73,7 +76,7 @@ If you already have GDAL, PROJ, GEOS, and (optionally) CUDA installed
 system-wide:
 
 ```bash
-pip install -e.
+pip install -e .
 ```
 
 PaddockTS targets Python ≥ 3.11.
@@ -94,37 +97,16 @@ creating `~/.config/PaddockTS.json`:
 ```
 
 **Credentials:**
+
 - `email` is required only by the SILO climate stage
-- `tern_api_key` is required only by the SLGA soils stage
-- **Get your TERN API key:** Generate one at <https://account.tern.org.au/>
+- `tern_api_key` is required only by the SLGA soils stage — generate
+  one at <https://account.tern.org.au/>
 
 The Sentinel-2 → PaddockTS chain itself works without any credentials.
 
-**Alternative: Pass config directly**
-
-Instead of creating a config file, you can pass configuration directly
-to the `Query` constructor:
-
-```python
-from PaddockTS.config import Config
-from PaddockTS.query import Query
-from datetime import date
-
-custom_config = Config(
-    out_dir="/data/paddockts/outputs",
-    tmp_dir="/data/paddockts/tmp",
-    email="you@example.org",
-    tern_api_key="<your-tern-key>"
-)
-
-query = Query(
-    bbox=[148.36265, -33.52606, 148.38265, -33.50606],
-    start=date(2020, 1, 1),
-    end=date(2021, 12, 31),
-    stub="my_run",
-    config=custom_config  # Pass config directly
-)
-```
+You can also pass configuration directly to `Query` via a `Config`
+object — see the [Getting started](https://thestochasticman.github.io/paddock-ts-local/getting-started/)
+page.
 
 ---
 
@@ -136,7 +118,7 @@ from PaddockTS.query import Query
 from PaddockTS.get_outputs import get_outputs
 
 query = Query(
-    bbox=[148.36265, -33.52606, 148.38265, -33.50606],  # west, south, east, north
+    bbox=[148.36265, -33.52606, 148.38265, -33.50606],  # [W, S, E, N]
     start=date(2020, 1, 1),
     end=date(2021, 12, 31),
     stub="my_first_run",
@@ -145,29 +127,61 @@ query = Query(
 get_outputs(query)
 ```
 
-This kicks off both pipelines in parallel and renders a live dashboard.
-Subsequent runs of the same `Query` skip every cached step.
+This kicks off both pipelines (Sentinel-2 → PaddockTS and Environmental)
+in parallel and renders a live dashboard. The next `get_outputs(query)`
+on the same `Query` skips every cached step.
 
 Outputs land under `~/Documents/PaddockTS-Outputs/<stub>/`:
 
 | File | What's in it |
 |---|---|
-| `<stub>_paddocks.gpkg` | Segmented paddock polygons + area_ha + compactness |
-| `<stub>_paddockTS.zarr` | Per-paddock medians for every band and index, on `(paddock, time)` |
+| `<stub>_paddocks.gpkg` | Segmented paddock polygons + `area_ha` + `compactness` |
+| `<stub>_paddockTS.zarr` | Per-paddock medians for every band + index, on `(paddock, time)` |
 | `<stub>_paddockTS_<year>.zarr` | Yearly slices with a DOY coordinate |
 | `<stub>_sentinel2.mp4` | True-colour Sentinel-2 timeline |
 | `<stub>_fractional_cover.mp4` | Bare/green/non-green RGB timeline |
-| `<stub>_calendar_<year>.png` | Per-paddock thumbnail calendar |
-| `<stub>_phenology.png` | SoS/PoS/EoS curves per paddock per year |
+| `<stub>_calendar_<year>_p01.png` | Per-paddock thumbnail calendar |
+| `<stub>_phenology_p01.png` | SoS/PoS/EoS curves per paddock per year |
 | `<stub>_topography.png` | Elevation, slope, aspect, flow accumulation |
+| `<stub>.pdf` | Stitched report combining every plot |
+
+---
+
+## Bring your own paddocks
+
+If you already have field boundaries (QGIS export, cadastral layer,
+previous run), skip SAM segmentation and use them directly:
+
+```python
+from datetime import date
+from PaddockTS.query import Query
+from PaddockTS.get_outputs import get_outputs
+
+paddocks_fp = "/path/to/paddocks.gpkg"  # .gpkg, .shp, or .geojson
+
+query = Query.build_from_paddocks(
+    paddocks_filepath=paddocks_fp,
+    start=date(2024, 1, 1),
+    end=date(2024, 12, 31),
+    stub="my_farm",
+    label_col="paddock_name",
+)
+
+get_outputs(
+    query,
+    paddocks_filepath=paddocks_fp,
+    skip_sam=True,
+    label_col="paddock_name",
+)
+```
 
 ---
 
 ## Pipeline at a glance
 
-| Sentinel-2 → PaddockTS (13 stages) | Environmental (7 stages) |
+| Sentinel-2 → PaddockTS | Environmental |
 |---|---|
-| Download Sentinel-2 | Download terrain (Copernicus DEM) |
+| Download Sentinel-2 + clean | Download terrain (Copernicus DEM) |
 | Compute spectral indices | Download OzWALD daily climate |
 | Compute fractional cover | Download SILO climate |
 | Sentinel-2 video | Download SLGA soils |
@@ -175,11 +189,12 @@ Outputs land under `~/Documents/PaddockTS-Outputs/<stub>/`:
 | Sentinel-2 + paddocks video | SILO plot |
 | Fractional cover video | Terrain plot |
 | Fractional cover + paddocks video | |
-| Make paddock time series (per-paddock medians) | |
+| Make paddock time series | |
 | Make yearly paddock time series | |
 | Estimate phenology | |
 | Calendar plot | |
 | Phenology plot | |
+| PDF report | |
 
 Every stage is a standalone function — pick any subset, swap in your
 own segmentation, plug in your own phenology library. See the
@@ -196,20 +211,21 @@ from PaddockTS.SpectralIndices.indices import compute_indices
 from PaddockTS.FractionalCover import compute_fractional_cover
 from PaddockTS.PaddockSegmentation.get_paddocks import get_paddocks
 
-ds = download_sentinel2(query)              # Zarr cube on disk
-ds = compute_indices(query, ds_sentinel2=ds)  # NDVI, CFI, NIRv, NDTI, CAI
-fc = compute_fractional_cover(query, ds_sentinel2=ds)  # bg / pv / npv
-paddocks = get_paddocks(query, ds_sentinel2=ds)        # GeoDataFrame
+ds = download_sentinel2(query)                          # Zarr cube on disk
+ds = compute_indices(query, ds_sentinel2=ds)            # NDVI, CFI, NIRv, NDTI, CAI
+fc = compute_fractional_cover(query, ds_sentinel2=ds)   # bg / pv / npv
+paddocks = get_paddocks(query, ds_sentinel2=ds)         # GeoDataFrame
 ```
 
-Every function will load its own inputs from the cache if you don't
-pass them, so you can also call them out of order or in isolation.
+Every function loads its own inputs from the cache if you don't pass
+them, so you can call them out of order or in isolation.
 
 ---
 
 ## Data sources and acknowledgments
 
-PaddockTS does not redistribute upstream data; it queries them on demand:
+PaddockTS does not redistribute upstream data; it queries them on
+demand:
 
 - **Sentinel-2 ARD** — Geoscience Australia
   [Digital Earth Australia](https://explorer.dea.ga.gov.au/) STAC.
@@ -224,6 +240,8 @@ If you publish work that uses PaddockTS, please cite the upstream data
 sources, the third-party libraries listed below, and the PaddockTS
 repository.
 
+---
+
 ## License and attribution
 
 PaddockTS is **MIT-licensed** — see [LICENSE](LICENSE).
@@ -235,8 +253,8 @@ Third-party code shipped inside the package; see
 
 - [`fractionalcover3`](https://gitlab.com/jrsrp/themes/cover/fractionalcover3) by
   Robert Denham — MIT. The TFLite unmixing models and the unmixing
-  routine in `PaddockTS.FractionalCover._unmix` are adapted from
-  this work.
+  routine in `PaddockTS.FractionalCover._unmix` are adapted from this
+  work.
 - [`phenolopy`](https://github.com/lewistrotter/phenolopy) by
   Lewis Trotter — Apache 2.0. Vendored verbatim under
   `PaddockTS.Phenology._phenolopy` (with minor NumPy 2.0 compatibility
@@ -244,8 +262,8 @@ Third-party code shipped inside the package; see
   `PaddockTS.Phenology.estimate_phenology`.
 - [`DAESIM_preprocess`](https://github.com/ChristopherBradley/DAESIM_preprocess) by
   Christopher Bradley — MIT. Environmental data harvesting functions
-  adapted in `PaddockTS.Environmental` for downloading
-  and processing climate, vegetation, soil, and topographic datasets.
+  adapted in `PaddockTS.Environmental` for downloading and processing
+  climate, vegetation, soil, and topographic datasets.
 
 ### Key runtime dependencies
 
@@ -259,10 +277,14 @@ relevant to your work:
 - [Segment Anything Model](https://segment-anything.com/) (SAM) by
   Meta AI Research — Apache 2.0. The underlying segmentation model.
 
+---
+
 ## Contributing & support
 
 - **Bug reports / feature requests:**
   [GitHub Issues](https://github.com/thestochasticman/paddock-ts-local/issues)
 - **Documentation:**
   <https://thestochasticman.github.io/paddock-ts-local/>
+- **Known failure modes:** [`diagnostics.md`](diagnostics.md) (DEA STAC
+  cold-start, GDAL HTTP auth)
 - **Maintainers:** Borevitz Lab, Australian National University

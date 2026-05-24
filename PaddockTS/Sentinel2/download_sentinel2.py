@@ -86,8 +86,27 @@ def download_sentinel2(
             print(f'Cache at {query.sentinel2_path} unreadable ({e}); refetching')
         # Marker present but zarr unreadable → fall through and refetch.
 
+    # Defensive cleanup: a previous run may have written a partial zarr
+    # without the _SUCCESS marker (kill-9, OOM, network drop mid-write).
+    # Wipe it before refetching so we never start a fresh download on top
+    # of stale chunks — that's the failure mode where odc.stac/rasterio
+    # later raises confusing errors on what looks like a clean download.
+    if exists(query.sentinel2_path):
+        from shutil import rmtree
+        rmtree(query.sentinel2_path)
+
     bands = sentinel2.bands
-    catalog = pystac_client.Client.open(sentinel2.stac_url)
+    # DEA STAC's first request after a cold cache often hits a 504; the next
+    # one (~150ms later) succeeds. See diagnostics.md at the repo root.
+    from urllib3 import Retry
+    from pystac_client.stac_api_io import StacApiIO
+    stac_io = StacApiIO(max_retries=Retry(
+        total=5,
+        backoff_factor=1.0,
+        status_forcelist=[408, 429, 502, 503, 504],
+        allowed_methods=['GET', 'POST'],
+    ))
+    catalog = pystac_client.Client.open(sentinel2.stac_url, stac_io=stac_io)
     result = catalog.search(
         bbox=query.bbox,
         collections=sentinel2.collections,
@@ -147,19 +166,30 @@ def download_sentinel2(
 
 from PaddockTS.utils import test_internet
 
+# Shared across the test suite so all tests with the same (bbox, time) reuse
+# one downloaded zarr — cuts test runtime from ~4 downloads to ~2 (the second
+# is the forced refetch in test_missing_marker_triggers_refetch).
+_TEST_BBOX = [148.36265, -33.52606, 148.38265, -33.50606]
+from datetime import date as _date
+_TEST_START, _TEST_END = _date(2024, 1, 1), _date(2024, 1, 21)
+_test_cfg = None
+
+
+def _shared_test_cfg():
+    global _test_cfg
+    if _test_cfg is None:
+        import tempfile
+        from PaddockTS.config import Config
+        tmpdir = tempfile.mkdtemp(prefix='paddockts_s2_test_')
+        _test_cfg = Config(out_dir=tmpdir, tmp_dir=tmpdir)
+    return _test_cfg
+
 
 def test_download_writes_zarr():
     """First call for a (bbox, time) writes the zarr at query.sentinel2_path."""
-    import tempfile
-    from datetime import date
-    from PaddockTS.config import Config
-
-    tmpdir = tempfile.mkdtemp(prefix='paddockts_s2_test_')
-    cfg = Config(out_dir=tmpdir, tmp_dir=tmpdir)
     q = Query(
-        bbox=[148.36265, -33.52606, 148.38265, -33.50606],
-        start=date(2024, 1, 1), end=date(2024, 1, 21),
-        stub='s2_write', config=cfg,
+        bbox=_TEST_BBOX, start=_TEST_START, end=_TEST_END,
+        stub='s2_write', config=_shared_test_cfg(),
     )
     ds = download_sentinel2(q)
     return exists(q.sentinel2_path) and ds.time.size > 0
@@ -167,16 +197,9 @@ def test_download_writes_zarr():
 
 def test_repeated_query_uses_cache():
     """Second call with the same query reuses the zarr (no rewrite)."""
-    import tempfile
-    from datetime import date
-    from PaddockTS.config import Config
-
-    tmpdir = tempfile.mkdtemp(prefix='paddockts_s2_test_')
-    cfg = Config(out_dir=tmpdir, tmp_dir=tmpdir)
     q = Query(
-        bbox=[148.36265, -33.52606, 148.38265, -33.50606],
-        start=date(2024, 1, 1), end=date(2024, 1, 21),
-        stub='s2_reuse', config=cfg,
+        bbox=_TEST_BBOX, start=_TEST_START, end=_TEST_END,
+        stub='s2_reuse', config=_shared_test_cfg(),
     )
     download_sentinel2(q)
     mtime_before = os.path.getmtime(q.sentinel2_path)
@@ -189,20 +212,12 @@ def test_repeated_query_uses_cache():
 
 def test_different_stub_same_attrs_reuses_cache():
     """Different stub but same (bbox, time) → same sentinel2_path → cache hit."""
-    import tempfile
-    from datetime import date
-    from PaddockTS.config import Config
-
-    tmpdir = tempfile.mkdtemp(prefix='paddockts_s2_test_')
-    cfg = Config(out_dir=tmpdir, tmp_dir=tmpdir)
-    bbox = [148.36265, -33.52606, 148.38265, -33.50606]
-    start, end = date(2024, 1, 1), date(2024, 1, 21)
-
-    qa = Query(bbox=bbox, start=start, end=end, stub='stub_aaa', config=cfg)
+    cfg = _shared_test_cfg()
+    qa = Query(bbox=_TEST_BBOX, start=_TEST_START, end=_TEST_END, stub='stub_aaa', config=cfg)
     download_sentinel2(qa)
     mtime_before = os.path.getmtime(qa.sentinel2_path)
 
-    qb = Query(bbox=bbox, start=start, end=end, stub='stub_bbb', config=cfg)
+    qb = Query(bbox=_TEST_BBOX, start=_TEST_START, end=_TEST_END, stub='stub_bbb', config=cfg)
     if qa.sentinel2_path != qb.sentinel2_path:
         return False
 
@@ -213,16 +228,10 @@ def test_different_stub_same_attrs_reuses_cache():
 
 def test_different_time_different_path():
     """Same bbox + different time range → different sentinel2_path."""
-    import tempfile
-    from datetime import date
-    from PaddockTS.config import Config
-
-    tmpdir = tempfile.mkdtemp(prefix='paddockts_s2_test_')
-    cfg = Config(out_dir=tmpdir, tmp_dir=tmpdir)
-    bbox = [148.36265, -33.52606, 148.38265, -33.50606]
-    qa = Query(bbox=bbox, start=date(2024, 1, 1), end=date(2024, 1, 21),
+    cfg = _shared_test_cfg()
+    qa = Query(bbox=_TEST_BBOX, start=_TEST_START, end=_TEST_END,
                stub='s2_t1', config=cfg)
-    qb = Query(bbox=bbox, start=date(2024, 2, 1), end=date(2024, 2, 21),
+    qb = Query(bbox=_TEST_BBOX, start=_date(2024, 2, 1), end=_date(2024, 2, 21),
                stub='s2_t2', config=cfg)
     # Same bbox → shared aoi_dir
     if qa.aoi_dir != qb.aoi_dir:
@@ -234,16 +243,9 @@ def test_different_time_different_path():
 def test_success_marker_written():
     """A successful download leaves a _SUCCESS file inside the zarr and a
     ``downloaded_at`` attribute on the dataset."""
-    import tempfile
-    from datetime import date
-    from PaddockTS.config import Config
-
-    tmpdir = tempfile.mkdtemp(prefix='paddockts_s2_test_')
-    cfg = Config(out_dir=tmpdir, tmp_dir=tmpdir)
     q = Query(
-        bbox=[148.36265, -33.52606, 148.38265, -33.50606],
-        start=date(2024, 1, 1), end=date(2024, 1, 21),
-        stub='s2_marker', config=cfg,
+        bbox=_TEST_BBOX, start=_TEST_START, end=_TEST_END,
+        stub='s2_marker', config=_shared_test_cfg(),
     )
     download_sentinel2(q)
     marker = f'{q.sentinel2_path}/_SUCCESS'
@@ -253,16 +255,9 @@ def test_success_marker_written():
 
 def test_missing_marker_triggers_refetch():
     """A cache with the zarr present but no _SUCCESS file is re-downloaded."""
-    import tempfile
-    from datetime import date
-    from PaddockTS.config import Config
-
-    tmpdir = tempfile.mkdtemp(prefix='paddockts_s2_test_')
-    cfg = Config(out_dir=tmpdir, tmp_dir=tmpdir)
     q = Query(
-        bbox=[148.36265, -33.52606, 148.38265, -33.50606],
-        start=date(2024, 1, 1), end=date(2024, 1, 21),
-        stub='s2_refetch', config=cfg,
+        bbox=_TEST_BBOX, start=_TEST_START, end=_TEST_END,
+        stub='s2_refetch', config=_shared_test_cfg(),
     )
     download_sentinel2(q)
 

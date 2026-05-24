@@ -79,8 +79,8 @@ nav:
   - Getting started: getting-started.md
   - Pipeline: pipeline.md
   - API reference:
-    - api/index.md
-    - Query: api/query.md
+    - Overview: api/index.md
+    - Query & Config: api/query.md
     - Sentinel-2 download: api/sentinel2.md
     - Spectral indices: api/spectral_indices.md
     - Fractional cover: api/fractional_cover.md
