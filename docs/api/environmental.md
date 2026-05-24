@@ -159,14 +159,73 @@ without contacting SILO.
 
 [SLGA](https://esoil.io/TERNLandscapes/Public/Pages/SLGA/index.html)
 provides national-coverage 90 m grids of soil properties (clay, sand,
-silt, organic carbon, pH, bulk density, etc.) at standard depths.
+silt, pH, bulk density, etc.) at standard depths.
 
 `download_slga_soils` fetches the cross-product of `vars × depths`,
 clipped to `query.bbox`, with a matching quick-look PNG per layer.
 
 **Requires** a TERN API key configured at `~/.config/PaddockTS.json`
 (`"tern_api_key": "..."`). Generate one at
-<https://account.tern.org.au/>.
+<https://account.tern.org.au/authenticated_user/apikeys>.
+
+### Where the data lives
+
+PaddockTS pulls from the TERN Datastore Release 2 (2021) COGs:
+
+```
+https://data.tern.org.au/model-derived/slga/NationalMaps/SoilAndLandscapeGrid/{ATTR}/v2/{ATTR}_{depth_start}_{depth_end}_EV_N_P_AU_TRN_N_20210902.tif
+```
+
+For example, Clay 5–15 cm → `.../CLY/v2/CLY_005_015_EV_N_P_AU_TRN_N_20210902.tif`.
+
+Authentication uses an `x-api-key` header supplied to GDAL via the
+`GDAL_HTTP_HEADER_FILE` environment variable; PaddockTS handles this
+automatically inside `_setup_tern_auth` (writes the key to a
+process-local temp file and registers an `atexit` cleanup).
+
+If you need the older Release 1 (2014) layers instead, edit
+`url_template` in [`PaddockTS/Environmental/SLGASoils/slgasoils.py`](https://github.com/thestochasticman/paddock-ts-local/blob/main/PaddockTS/Environmental/SLGASoils/slgasoils.py)
+to use `/v1/{ATTR}_{ds}_{de}_EV_N_P_AU_NAT_C_20140801.tif`.
+
+### Supported attributes
+
+Verified against the v2 directory listing on `data.tern.org.au`:
+
+| Name | Code |
+|---|---|
+| `Clay` | `CLY` |
+| `Silt` | `SLT` |
+| `Sand` | `SND` |
+| `pH_Water` | `PHW` |
+| `Bulk_Density` | `BDW` |
+| `Available_Water_Capacity` | `AWC` |
+| `Cation_Exchange_Capacity` | `CEC` |
+| `Effective_Cation_Exchange_Capacity` | `ECE` |
+| `Total_Nitrogen` | `NTO` |
+| `Total_Phosphorus` | `PTO` |
+| `Available_Phosphorus` | `AVP` |
+| `Coarse_Fragments` | `CFG` |
+| `Drained_Upper_Limit` | `DUL` |
+| `Depth_to_Rock` | `DER` |
+| `Depth_of_Soil` | `DES` |
+| `L15` | `L15` |
+
+The legacy `pH_CaCl2` (`PHC`) and `Organic_Carbon` (`SOC`) entries
+from the older esoil.io tree aren't in the v2 layout. Use `pH_Water`
+for pH; for organic carbon look up the current TERN catalog entry.
+
+### Caching
+
+Per (variable, depth) pair, the TIF is cached and the download is
+skipped on subsequent runs:
+
+- Output TIF: `{query.tmp_dir}/Environmental/{stub}_{var}_{depth}.tif`
+- Cache marker: a sibling `{...}.tif._SUCCESS` file, written **after**
+  the download completes. A kill-9 mid-write leaves the cache invalid
+  and the next run re-fetches cleanly — same contract used by terrain
+  and Sentinel-2.
+
+The quick-look PNG is regenerated only if missing.
 
 ### Example
 
@@ -179,14 +238,15 @@ download_slga_soils(
     vars=["Clay", "Sand", "Silt"],
     depths=["5-15cm"],
 )
-# -> {tmp_dir}/Environmental/<stub>_Clay_5-15cm.tif   (+ quick-look PNG)
+# -> {tmp_dir}/Environmental/<stub>_Clay_5-15cm.tif        (+ ._SUCCESS marker
+# -> {tmp_dir}/Environmental/<stub>_Clay_5-15cm.png         and PNG quick-look)
 # -> {tmp_dir}/Environmental/<stub>_Sand_5-15cm.tif
 # -> {tmp_dir}/Environmental/<stub>_Silt_5-15cm.tif
 
-# Carbon profile through the soil
+# Profile of a single attribute through all standard depths
 download_slga_soils(
     q,
-    vars=["SOC"],
+    vars=["Bulk_Density"],
     depths=["0-5cm", "5-15cm", "15-30cm", "30-60cm", "60-100cm", "100-200cm"],
 )
 ```

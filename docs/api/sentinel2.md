@@ -108,6 +108,35 @@ ds = download_sentinel2(q, sentinel2=custom)
 
 ---
 
+## Streaming write
+
+`download_sentinel2` stages the dataset lazily via `odc.stac.load`
+(returns a Dask-backed `xarray.Dataset`) and writes it to Zarr with
+`ds.to_zarr(...)` while the Dask client is still alive. Chunks are
+fetched, written to disk, and released — **the full cube is never
+held in the driver process's memory**. Peak memory is roughly
+`num_workers × threads_per_worker × chunk_size`, independent of AOI
+size or year count.
+
+If you have a 50 km² AOI over 3 years and ~150 scenes, the old
+`client.compute(ds) → .result()` path would have peaked at the
+whole-cube footprint (multi-GB). The streaming write peaks at a few
+MB per chunk in flight.
+
+After the write completes, the function returns
+`xr.open_zarr(query.sentinel2_path, chunks=None, decode_coords='all')`
+— a stable eager reference to the persisted store, not the lazy Dask
+view (which would re-fetch from STAC the moment the client shut down).
+
+## Thread-env restoration
+
+Dask sets `OMP_NUM_THREADS=1` (and the MKL / OpenBLAS equivalents) on
+the parent process when its cluster spins up. Without restoration
+those values persist into later pipeline steps and would cripple the
+PyTorch threading in SAM segmentation. `download_sentinel2` snapshots
+the originals on entry and restores them in a `finally` block, so
+even a failed download leaves the env exactly as it found it.
+
 ## Failure modes
 
 DEA's STAC fronting load-balancer can return a 504 on cold first

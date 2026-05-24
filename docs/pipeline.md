@@ -47,6 +47,13 @@ caching falls into place. `get_outputs` exists purely to orchestrate
 the full run with progress output — none of the stage functions
 require it.
 
+`get_outputs` also gates downstream Sentinel-2 stages on their
+upstream dependencies: if SAM segmentation (stage 5) fails, the
+SAM-dependent video / TS / phenology / plot stages downstream are
+marked `skipped` rather than running, failing on missing inputs, and
+filling the dashboard with cascading errors. See
+[`get_outputs` — Cascading-skip](api/get_outputs.md#cascading-skip-for-dependent-steps).
+
 ## Sentinel-2 → PaddockTS pipeline
 
 The driver runs each numbered stage in order. Stages marked **(SAM)**
@@ -74,8 +81,8 @@ stages, or no `paddocks_filepath` skips the user stages).
 | 14 | Make yearly paddock TS (user) | `Phenology.make_yearly_paddock_time_series` | `..._timeseries_<year>.zarr` |
 | 15 | Estimate phenology (SAM) | `Phenology.estimate_phenology` | `{year: DataFrame}` in-memory |
 | 16 | Estimate phenology (user) | `Phenology.estimate_phenology` | `{year: DataFrame}` in-memory |
-| 17 | Calendar plot (SAM) | `Plotting.calendar_plot` | `..._calendar_<year>_p01.png` |
-| 18 | Calendar plot (user) | `Plotting.calendar_plot` | `..._calendar_<year>_p01.png` |
+| 17 | Calendar plot (SAM) | `Plotting.calendar_plot` | `..._calendar_<year>_p01.png` (PNG) + vector pages in the PDF report |
+| 18 | Calendar plot (user) | `Plotting.calendar_plot` | `..._calendar_<year>_p01.png` (PNG) + vector pages in the PDF report |
 | 19 | Phenology plot (SAM) | `Plotting.phenology_plot` | `..._phenology_p01.png` |
 | 20 | Phenology plot (user) | `Plotting.phenology_plot` | `..._phenology_p01.png` |
 | 21 | PDF report | `Plotting.make_pdf` | `{stub}.pdf` |
@@ -171,9 +178,13 @@ Stage 7 (terrain plot) waits for the cleaned Sentinel-2 cube
 (`sentinel2_clean.zarr`) to be produced because it overlays the
 terrain rendering on the S2 grid extent.
 
-Stages 3 and 6 are skipped if `config.email` is unset; stage 4 is
-skipped if `config.tern_api_key` is unset. Terrain and OzWALD work
-without any credentials.
+Stages 3 and 6 are **silently skipped** (status: `skipped`, not
+`error`) if `config.email` is unset; stage 4 is skipped the same way
+if `config.tern_api_key` is unset. Terrain and OzWALD work without
+any credentials.
+
+The SLGA stage caches each `(var, depth)` TIF with a sibling
+`._SUCCESS` marker, so a re-run with the same vars/depths is a no-op.
 
 ## Skipping the dashboard
 

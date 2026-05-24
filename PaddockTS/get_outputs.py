@@ -516,7 +516,8 @@ def _run_s2_steps(query, statuses, times, paddocks_filepath=None, skip_sam=False
             # Step 20: Make PDF report
             elif i == 20:
                 from PaddockTS.Plotting.make_pdf import make_pdf
-                make_pdf(query, paddocks_filepath=paddocks_filepath)
+                make_pdf(query, paddocks_filepath=paddocks_filepath,
+                         label_col=label_col)
 
             statuses[i] = 'done'
         except Exception as e:

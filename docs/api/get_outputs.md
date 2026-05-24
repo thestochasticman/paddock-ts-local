@@ -50,17 +50,28 @@ You'll see something like:
 
 ## Reload from scratch
 
-To delete all caches under `query.tmp_dir` and `query.out_dir` and
-force a full rebuild:
+To wipe every cached artifact for this query and force a clean rebuild:
 
 ```python
 get_outputs(q, reload=True)
 ```
 
+This deletes:
+
+- **`query.query_dir`** — per-(bbox, time) caches: Sentinel-2 raw +
+  clean zarrs, indices zarr, fractional cover zarr, presegmentation
+  tif, SAM mask + raw polygons + filtered paddocks gpkg.
+- **`query.terrain_path`** — the Copernicus DEM tile (per-bbox,
+  time-invariant). The wider `aoi_dir` is left alone so other queries
+  with the same bbox but a different time range aren't surprised.
+- **`query.tmp_dir`** — per-stub time-series zarrs (paddockTS,
+  yearly, smoothed).
+- **`query.out_dir`** — every final output (PNGs, MP4s, PDF report).
+
 This is rarely needed — the per-stage `_SUCCESS` markers catch partial
 writes automatically. Use it when you've changed something the cache
-doesn't track (e.g. tweaking a SAM filter threshold) and you want a
-clean run.
+doesn't track (e.g. tweaking a SAM filter threshold) and want a clean
+run.
 
 ---
 
@@ -143,6 +154,38 @@ If a stage fails, its row turns red in the dashboard with the time
 elapsed before the failure. The other thread keeps running so partial
 progress is preserved. After both threads finish, `get_outputs`
 re-raises the first exception encountered.
+
+### Cascading-skip for dependent steps
+
+When an upstream step errors (or is itself skipped), every downstream
+step that depends on it is marked `skipped` rather than running,
+failing on a missing input, and lighting up the dashboard with a wall
+of red. The dependency map (`_S2_STEP_DEPS`) covers the SAM chain
+(steps 5, 8, 10, 12, 14, 16, 18 all depend on step 4 producing a
+valid paddocks gpkg; the TS / yearly / phenology / plot stages
+further depend on each other in order) and the user-paddocks TS chain
+(steps 13 / 15 / 19 depend on step 11 having produced a valid user
+paddockTS zarr).
+
+In practice this means: if SAM segmentation crashes, you'll see one
+red row at step 4 and skipped (cyan) rows for the seven SAM-dependent
+steps that follow — making the actual failure point obvious instead
+of buried.
+
+### Missing-credentials skip
+
+Environmental steps that require credentials are silently skipped
+when the credential isn't configured, rather than raising:
+
+- Step 3 (Download SILO) and step 6 (SILO plot) → skipped if
+  `config.email` is unset.
+- Step 4 (Download SLGA soils) → skipped if `config.tern_api_key` is
+  unset.
+
+Other env steps (terrain, OzWALD) and the entire Sentinel-2 chain
+work without any credentials.
+
+### Terrain-plot wait guard
 
 The terrain plot in the environmental thread synchronously waits for
 `sentinel2_clean.zarr` to appear (it overlays the terrain rendering on

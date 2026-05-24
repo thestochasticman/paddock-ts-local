@@ -10,13 +10,42 @@ review-grade output PaddockTS produces.
 | `fractional_cover_video` | `{stub}_fractional_cover.mp4` | False-colour cover timeline (R=bg, G=pv, B=npv). |
 | `fractional_cover_paddocks_video` | `{stem}_fractional_cover_paddocks.mp4` | Same, with paddock overlays. |
 | `calendar_plot` | `{stem}_calendar_<year>_p01.png` | Per-paddock thumbnail calendar (48 slots/year, paddock-masked). |
+| `iter_calendar_figures` | (no file — yields matplotlib `Figure`s) | Used by `make_pdf` to embed calendar pages with vector text. |
 | `phenology_plot` | `{stem}_phenology_p01.png` | Per-paddock × per-year NDVI curves with SoS / PoS / EoS markers. |
 | `ozwald_daily_plot` | `{stub}_ozwald_daily_*.png` | OzWALD climate panels (temperature, precipitation, wind, radiation). |
 | `silo_plot` | `{stub}_silo_*.png` | SILO climate panels (temperature, rainfall, radiation, ET, humidity). |
 | `terrain_tiles_plot` | `{stub}_topography.png` | 2 × 2 panel: elevation, flow accumulation, aspect, slope. |
-| `make_pdf` | `{stub}.pdf` | Single PDF stitching every plot above, with section headers. |
+| `make_pdf` | `{stub}_report.pdf` | Single PDF stitching every plot above, with section headers + PDF metadata. |
 
 All static plots and videos write to `{query.out_dir}/`.
+
+---
+
+## Global font defaults
+
+Importing any module from `PaddockTS.Plotting` runs the package
+`__init__.py`, which bumps matplotlib's default font sizes so ticks,
+axis labels, titles, and legends remain readable after the PDF
+report's ~0.4× shrink:
+
+```python
+# PaddockTS/Plotting/__init__.py — applied at import time
+matplotlib.rcParams.update({
+    'font.size':       16,
+    'axes.titlesize':  20,
+    'figure.titlesize': 22,
+    'axes.labelsize':  18,
+    'xtick.labelsize': 14,
+    'ytick.labelsize': 14,
+    'legend.fontsize': 14,
+    'legend.title_fontsize': 16,
+})
+```
+
+Override with `plt.rcParams.update(...)` at the call site if you need
+different sizing for a one-off figure. Calendar text is **vector** in
+the PDF (see below) and uses its own fontsize-in-points constants —
+adjusting matplotlib globals there has no effect.
 
 ---
 
@@ -102,23 +131,49 @@ fractional_cover_paddocks_video(q)
 
 ### Calendar plot
 
-One PNG per year (split into pages if there are many paddocks). Rows
-are paddocks (largest area at top); columns are 48 evenly-spaced slots
-across the year (4 per month). Each cell shows the Sentinel-2 RGB
-thumbnail of that paddock at the observation closest to the slot's
-day-of-year, with non-paddock pixels masked black.
+One page per year (split into multiple pages if there are more paddocks
+than `max_paddocks_per_page`). Rows are paddocks (largest area at top);
+columns are 48 evenly-spaced slots across the year (4 per month). Each
+cell shows the Sentinel-2 RGB thumbnail of that paddock at the
+observation closest to the slot's day-of-year, with non-paddock pixels
+masked black.
 
-Useful for spotting cloud problems, cropping events, or stand-out
-paddocks at a glance.
+**Now built with matplotlib** (was PIL in earlier releases). The
+thumbnail grid is composited into a single numpy array and drawn with
+one `imshow`; titles, month names, and paddock labels are matplotlib
+text — *vector* when the page is written into the PDF report, so
+labels remain readable at any zoom and aren't subject to the PNG-embed
+shrink that capped text at ~13 pt in the previous PIL design.
+
+Two public entry points:
+
+- `calendar_plot(query, ...)` — saves one rasterised PNG per page
+  under `query.out_dir` (standalone view).
+- `iter_calendar_figures(query, ...)` — generator yielding
+  `(year, page_idx, fig)` triples without touching disk. Used by
+  `make_pdf` to embed each page directly into the PDF as vector text.
 
 ```python
 from PaddockTS.Plotting.calendar_plot import calendar_plot
 
+# Standalone PNGs (rasterised)
 calendar_plot(q, thumb_size=64, max_paddocks_per_page=20)
-# -> {out_dir}/<stem>_calendar_<year>_p01.png  (one per year × page)
+# -> {out_dir}/<stem>_calendar_<year>_p01.png  (one per year × page chunk)
+```
+
+To consume figures programmatically (e.g. embed in your own PDF):
+
+```python
+from PaddockTS.Plotting.calendar_plot import iter_calendar_figures
+import matplotlib.pyplot as plt
+
+for year, page_idx, fig in iter_calendar_figures(q):
+    fig.savefig(f"/tmp/cal_{year}_p{page_idx}.svg")  # vector
+    plt.close(fig)
 ```
 
 ::: PaddockTS.Plotting.calendar_plot.calendar_plot
+::: PaddockTS.Plotting.calendar_plot.iter_calendar_figures
 
 ### Phenology plot
 
@@ -126,6 +181,9 @@ Multi-panel PNG: rows are paddocks, columns are years. Each panel
 overlays the raw vegetation-index series (filled blue dots) and the
 resampled-and-smoothed series (open blue dots) on a DOY axis, with
 SoS / PoS / EoS DOYs drawn as vertical reference lines.
+
+Font sizes come from the package-wide matplotlib rcParams (see
+[Global font defaults](#global-font-defaults) above).
 
 ```python
 from PaddockTS.Plotting.phenology_plot import phenology_plot
@@ -187,20 +245,62 @@ terrain_tiles_plot(q, sigma=10)
 
 ## PDF report
 
-`make_pdf` stitches every plot produced for a query into a single
+`make_pdf` stitches the plots produced for a query into a single
 A4-landscape PDF with section headers — Landscape (topography),
 Climate (SILO, OzWALD), Satellite Calendar (SAM + user paddocks),
 Phenology (SAM + user paddocks).
+
+Output: `{query.out_dir}/{query.stub}_report.pdf`.
 
 ```python
 from PaddockTS.Plotting.make_pdf import make_pdf
 
 # SAM-only report
 make_pdf(q)
-# -> {out_dir}/<stub>.pdf
 
-# Include user-paddocks sections too
-make_pdf(q, paddocks_filepath="/path/to/paddocks.gpkg")
+# Include user-paddocks sections too, with custom row labels in the
+# user calendar
+make_pdf(q, paddocks_filepath="/path/to/paddocks.gpkg",
+         label_col="paddock_name")
 ```
+
+### What's in the PDF
+
+- **PDF metadata** — `Title`, `Author`, `Subject` (includes bbox +
+  dates), `Keywords`, and `Creator` are set on the document so the
+  report shows up cleanly in viewer tabs and file-manager properties.
+- **Cover page** with the query stub, dates, and bbox.
+- **Sections** — each one has a header page followed by its content.
+  Sections marked `requires_user_paddocks=True` (the User-paddocks
+  calendar + phenology) are skipped if no `paddocks_filepath` is
+  passed.
+- **Calendar pages** are written into the PDF as **matplotlib figures
+  directly** (via `iter_calendar_figures`), so titles, month labels,
+  and paddock labels are **vector text** — full-size in the report,
+  not subject to the PNG-embed shrink that affects other image-based
+  sections.
+- **Other image pages** (topography, climate panels, phenology) are
+  embedded from the PNGs on disk. Rasterised at 220 DPI (was
+  matplotlib's default 100 DPI) so small text stays crisp.
+
+### How sections are declared
+
+The `SECTIONS` module-level list defines the report layout. Each
+entry is a 3-tuple `(title, plot_patterns, requires_user_paddocks)`:
+
+```python
+SECTIONS = [
+    ('Landscape',                 [('Topography', '{stub}_topography.png')], False),
+    ('Climate – SILO',            [...], False),
+    ('Climate – OzWALD',          [...], False),
+    ('Satellite Calendar (SAM)',  [...], False),
+    ('Satellite Calendar (User)', [...], True),   # skipped without paddocks_filepath
+    ('Phenology (SAM)',           [...], False),
+    ('Phenology (User)',          [...], True),
+]
+```
+
+The patterns use `{stub}` / `{sam_stem}` / `{user_stem}` placeholders,
+expanded to filesystem globs against `query.out_dir`.
 
 ::: PaddockTS.Plotting.make_pdf.make_pdf
