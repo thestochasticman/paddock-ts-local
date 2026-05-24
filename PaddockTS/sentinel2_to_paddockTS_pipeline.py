@@ -183,26 +183,33 @@ def run(query: Query, reload: bool = False):
     import xarray as xr
 
     if reload:
-        for path in [query.sentinel2_path, query.sentinel2_clean_path, query.fractional_cover_path]:
+        # Per-query Zarr caches under query_dir
+        for path in [
+            query.sentinel2_path,
+            query.sentinel2_clean_path,
+            query.indices_path,
+            query.fractional_cover_path,
+            query.sam_paddocks_path,
+            query.preseg_path,
+            query.sam_mask_path,
+            query.sam_raw_path,
+        ]:
+            if exists(path):
+                if os.path.isdir(path):
+                    shutil.rmtree(path)
+                else:
+                    os.remove(path)
+        # Time-series zarrs are keyed by the paddocks-file stem (sam_paddocks)
+        sam_stem = 'sam_paddocks'
+        for path in [f'{query.tmp_dir}/{sam_stem}_timeseries.zarr']:
             if exists(path):
                 shutil.rmtree(path)
-        for pattern in [
-            f'{query.tmp_dir}/{query.stub}_sam_paddocks.gpkg',
-            f'{query.tmp_dir}/{query.stub}_preseg.tif',
-            f'{query.tmp_dir}/{query.stub}_sam_mask.tif',
-            f'{query.tmp_dir}/{query.stub}_sam_raw.gpkg',
-            f'{query.tmp_dir}/{query.stub}_paddocks_timeseries.zarr',
-        ]:
-            if exists(pattern):
-                if os.path.isdir(pattern):
-                    shutil.rmtree(pattern)
-                else:
-                    os.remove(pattern)
-        for path in glob.glob(f'{query.tmp_dir}/{query.stub}_paddocks_timeseries_*.zarr'):
+        for path in glob.glob(f'{query.tmp_dir}/{sam_stem}_timeseries_*.zarr'):
             shutil.rmtree(path)
-        for path in glob.glob(f'{query.out_dir}/{query.stub}_calendar_*.png'):
+        # Calendar / phenology PNGs are also keyed by paddocks-file stem
+        for path in glob.glob(f'{query.out_dir}/{sam_stem}_calendar_*.png'):
             os.remove(path)
-        for path in glob.glob(f'{query.out_dir}/{query.stub}_phenology.png'):
+        for path in glob.glob(f'{query.out_dir}/{sam_stem}_phenology*.png'):
             os.remove(path)
 
     statuses = ['pending'] * len(STEPS)

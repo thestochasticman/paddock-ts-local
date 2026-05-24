@@ -238,22 +238,29 @@ def _run_env_steps(query: Query, statuses, times, errors=None):
                 from PaddockTS.Environmental.OzWALD.download_ozwald_daily import download_ozwald_daily
                 download_ozwald_daily(query)
             elif i == 2:
-                if query.config.email:
-                    from PaddockTS.Environmental.SILO.download_silo import download_silo
-                    download_silo(query)
+                if not query.config.email:
+                    statuses[i] = 'skipped'
+                    times[i] = time.time() - t0
+                    continue
+                from PaddockTS.Environmental.SILO.download_silo import download_silo
+                download_silo(query)
             elif i == 3:
-                if query.config.tern_api_key:
-                    from PaddockTS.Environmental.SLGASoils.download_slgasoils import download_slga_soils
-                    download_slga_soils(query)
+                if not query.config.tern_api_key:
+                    statuses[i] = 'skipped'
+                    times[i] = time.time() - t0
+                    continue
+                from PaddockTS.Environmental.SLGASoils.download_slgasoils import download_slga_soils
+                download_slga_soils(query)
             elif i == 4:
                 from PaddockTS.Plotting.ozwald_plot import ozwald_daily_plot
                 ozwald_daily_plot(query)
-
-
             elif i == 5:
-                if query.config.email:
-                    from PaddockTS.Plotting.silo_plot import silo_plot
-                    silo_plot(query)
+                if not query.config.email:
+                    statuses[i] = 'skipped'
+                    times[i] = time.time() - t0
+                    continue
+                from PaddockTS.Plotting.silo_plot import silo_plot
+                silo_plot(query)
             elif i == 6:
                 statuses[i] = 'waiting'
                 from PaddockTS.Sentinel2.check_if_valid_clean_zarr_exists import check_if_valid_clean_zarr_exists
@@ -280,8 +287,31 @@ def _run_env_steps(query: Query, statuses, times, errors=None):
         raise step_errors[0][1]
 
 
+# Each downstream step is gated on the success of these prior step indices.
+# A step is marked 'skipped' (not run) when any of its dependencies has
+# status 'error' or 'skipped', preventing one real failure from cascading
+# into a wall of red errors against every dependent step.
+_S2_STEP_DEPS = {
+    # SAM chain — depend on step 4 producing a valid paddocks gpkg
+    5:  [4],   # SAM S2+paddocks video
+    8:  [4],   # SAM FC+paddocks video
+    10: [4],   # SAM per-paddock TS
+    16: [4],   # SAM calendar plot
+    # SAM TS chain
+    12: [10],  # SAM yearly TS
+    14: [12],  # SAM phenology
+    18: [14],  # SAM phenology plot
+    # User TS chain (user gpkg is user-provided, so step 11 has no upstream)
+    13: [11],  # user yearly TS
+    15: [13],  # user phenology
+    19: [15],  # user phenology plot
+}
+
+
 def _run_s2_steps(query, statuses, times, paddocks_filepath=None, skip_sam=False, label_col=None):
     import xarray as xr
+    from PaddockTS.Sentinel2.check_if_valid_zarr_exists import check_if_valid_zarr_exists
+    from PaddockTS.PaddockSegmentation.check_if_valid_paddocks_exists import check_if_valid_paddocks_exists
 
     ds_sentinel2 = None
     ds_fractional_cover = None
@@ -315,9 +345,17 @@ def _run_s2_steps(query, statuses, times, paddocks_filepath=None, skip_sam=False
 
         statuses[i] = 'running'
         t0 = time.time()
+
+        # Short-circuit if any upstream step failed or was itself skipped.
+        deps = _S2_STEP_DEPS.get(i, [])
+        if deps and any(statuses[j] in ('error', 'skipped') for j in deps):
+            statuses[i] = 'skipped'
+            times[i] = time.time() - t0
+            continue
+
         try:
             if i == 0:
-                if not exists(query.sentinel2_path):
+                if not check_if_valid_zarr_exists(query.sentinel2_path):
                     from PaddockTS.Sentinel2.download_sentinel2 import download_sentinel2
                     ds_sentinel2 = download_sentinel2(query)
                 else:
@@ -340,7 +378,7 @@ def _run_s2_steps(query, statuses, times, paddocks_filepath=None, skip_sam=False
                     statuses[i] = 'skipped'
                     times[i] = time.time() - t0
                     continue
-                elif not exists(gpkg_path):
+                elif not check_if_valid_paddocks_exists(gpkg_path):
                     from PaddockTS.PaddockSegmentation.get_paddocks import get_paddocks
                     get_paddocks(query, ds_sentinel2=ds_sentinel2)
 
@@ -516,24 +554,33 @@ def get_outputs(query: Query, reload: bool = False, show_log: bool = False,
 
     - **Environmental** (7 steps): terrain DEM, OzWALD daily climate,
       SILO climate, SLGA soils, and three diagnostic plots.
-    - **Sentinel-2 → PaddockTS** (13 steps): S2 download, indices,
-      fractional cover, S2 video, paddock segmentation, paddock-overlay
-      videos, paddockTS aggregation, yearly split, phenology, calendar
-      and phenology plots.
+    - **Sentinel-2 → PaddockTS** (21 steps): S2 download + clean,
+      indices, fractional cover, S2 video, paddock segmentation,
+      paddock-overlay videos (SAM and user variants), paddockTS
+      aggregation, yearly split, phenology, calendar and phenology
+      plots (SAM and user variants), and a final PDF report.
 
     Args:
         query: The :class:`PaddockTS.query.Query` to run the pipeline for.
-        reload: If ``True``, recursively delete ``query.tmp_dir`` and
-            ``query.out_dir`` before starting, forcing every cached step
-            to re-run. Default ``False``.
+        reload: If ``True``, delete this query's cached artifacts under
+            ``query.query_dir`` (Sentinel-2, indices, fractional cover,
+            SAM paddocks), the terrain DEM at ``query.terrain_path``,
+            and the per-stub ``query.tmp_dir`` / ``query.out_dir``
+            directories before starting. Forces every step to re-run.
+            Default ``False``.
         show_log: If ``True``, render a tail-of-log panel below the
             status tables. Useful for debugging stuck steps; turns off
             by default to keep the dashboard compact.
         paddocks_filepath: Optional path to a user-provided paddocks file
-            (GeoPackage, Shapefile, or GeoJSON). Used when ``skip_sam=True``.
-        skip_sam: If ``True``, skip SAM auto-segmentation and use the
-            paddocks from ``paddocks_filepath`` instead. Requires
+            (GeoPackage, Shapefile, or GeoJSON). When given, the user
+            variants of the per-paddock TS, plots, and videos are
+            produced alongside (or instead of, with ``skip_sam=True``)
+            the SAM-based ones.
+        skip_sam: If ``True``, skip SAM auto-segmentation. Requires
             ``paddocks_filepath`` to be provided.
+        label_col: Column name in the user paddocks file to use for
+            human-readable labels in plots and video overlays. If
+            ``None``, falls back to the numeric ``paddock`` ID column.
 
     Raises:
         Exception: Re-raises the first exception encountered by either
@@ -560,6 +607,19 @@ def get_outputs(query: Query, reload: bool = False, show_log: bool = False,
         raise ValueError("skip_sam=True requires a valid paddocks_filepath")
 
     if reload:
+        # Per-(bbox, time) caches: S2 raw + clean, indices, fractional cover,
+        # presegmentation tif, SAM masks, and the SAM paddocks gpkg. These
+        # all live under query_dir (= {tmp_dir}/aoi/{bbox_hash}/{time_hash})
+        # which is shared only by Queries with identical (bbox, start, end).
+        if exists(query.query_dir):
+            shutil.rmtree(query.query_dir)
+        # Terrain DEM is per-bbox, time-invariant. Remove the file + marker
+        # but leave aoi_dir intact so unrelated time-range queries with the
+        # same bbox aren't surprised.
+        for path in (query.terrain_path, f'{query.terrain_path}._SUCCESS'):
+            if exists(path):
+                os.remove(path)
+        # Per-stub time-series zarrs + final outputs.
         if exists(query.tmp_dir):
             shutil.rmtree(query.tmp_dir)
         if exists(query.out_dir):
@@ -621,9 +681,6 @@ def get_outputs(query: Query, reload: bool = False, show_log: bool = False,
 
 
 if __name__ == '__main__':
-    from PaddockTS.utils import get_example_query
-    from PaddockTS.config import Config
-    from PaddockTS.query import Query
     from datetime import date
     fp = 'artifacts/PaddockSet1.gpkg'
     query = Query.build_from_paddocks(fp, date(2024, 1, 1), date(2025, 1, 1), 'PaddockSet1')

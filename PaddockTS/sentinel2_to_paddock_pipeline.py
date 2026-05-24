@@ -54,13 +54,21 @@ def _make_table(statuses, times):
 def run(query: Query, reload: bool = False):
     if reload:
         import shutil
-        for path in [query.sentinel2_path, query.sentinel2_clean_path, query.fractional_cover_path]:
+        for path in [
+            query.sentinel2_path,
+            query.sentinel2_clean_path,
+            query.indices_path,
+            query.fractional_cover_path,
+            query.sam_paddocks_path,
+            query.preseg_path,
+            query.sam_mask_path,
+            query.sam_raw_path,
+        ]:
             if exists(path):
-                shutil.rmtree(path)
-        for suffix in ['_sam_paddocks.gpkg', '_preseg.tif', '_sam_mask.tif', '_sam_raw.gpkg']:
-            path = f'{query.tmp_dir}/{query.stub}{suffix}'
-            if exists(path):
-                os.remove(path)
+                if os.path.isdir(path):
+                    shutil.rmtree(path)
+                else:
+                    os.remove(path)
 
     statuses = ['pending'] * len(STEPS)
     times = [None] * len(STEPS)

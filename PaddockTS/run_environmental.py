@@ -67,10 +67,22 @@ def _run_env_steps(query, statuses, times, log, concurrent, update_callback=None
                     download_ozwald_daily(query)
 
                 elif i == 2:
+                    if not query.config.email:
+                        statuses[i] = 'skipped'
+                        times[i] = time.time() - t0
+                        if update_callback:
+                            update_callback()
+                        continue
                     from PaddockTS.Environmental.SILO.download_silo import download_silo
                     download_silo(query)
 
                 elif i == 3:
+                    if not query.config.tern_api_key:
+                        statuses[i] = 'skipped'
+                        times[i] = time.time() - t0
+                        if update_callback:
+                            update_callback()
+                        continue
                     from PaddockTS.Environmental.SLGASoils.download_slgasoils import download_slga_soils
                     download_slga_soils(query)
 
@@ -83,6 +95,12 @@ def _run_env_steps(query, statuses, times, log, concurrent, update_callback=None
                     ozwald_daily_plot(query)
 
                 elif i == 6:
+                    if not query.config.email:
+                        statuses[i] = 'skipped'
+                        times[i] = time.time() - t0
+                        if update_callback:
+                            update_callback()
+                        continue
                     from PaddockTS.Plotting.silo_plot import silo_plot
                     silo_plot(query)
 
