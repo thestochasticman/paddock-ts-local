@@ -117,6 +117,9 @@ get_outputs(
   reads, what it caches, and how to skip or replace any of it.
 - **[API reference](api/index.md)** — full signatures and runnable
   examples for every public function.
+- **[Demo notebooks](https://github.com/thestochasticman/paddock-ts-local/tree/main/demo)** —
+  three runnable Jupyter notebooks: the quickstart, calling stages
+  individually, and using your own paddock boundaries.
 
 ---
 

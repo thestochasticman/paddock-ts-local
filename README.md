@@ -110,6 +110,21 @@ page.
 
 ---
 
+## Runnable demos
+
+Three Jupyter notebooks under [`demo/`](demo/) walk through the most
+common workflows:
+
+- [`demo/01_quickstart.ipynb`](demo/01_quickstart.ipynb) — bbox + dates → `get_outputs(query)` → review the calendar / phenology / PDF.
+- [`demo/02_pipeline_stages.ipynb`](demo/02_pipeline_stages.ipynb) — call each Sentinel-2 stage individually, inspect intermediate outputs.
+- [`demo/03_custom_paddocks.ipynb`](demo/03_custom_paddocks.ipynb) — bring your own paddock boundaries and skip SAM.
+
+```bash
+jupyter lab demo/
+```
+
+---
+
 ## Quick example
 
 ```python
