@@ -123,6 +123,101 @@ def estimate_phenology(query, ds_yearly=None, variable='NDVI', min_observations=
     return results
 
 
+def get_paddock_year_phenology(query, paddock_id, year: int, variable: str = 'NDVI') -> dict:
+    """Return per-observation veg-index points + SoS/PoS/EoS metrics for one paddock × year.
+
+    Same phenolopy configuration as :func:`estimate_phenology` (seasonal-amplitude method,
+    5% factor, two-sided threshold), but computed for a single paddock so it can be
+    served as a web payload.
+
+    Args:
+        query: The :class:`PaddockTS.query.Query`.
+        paddock_id: Paddock identifier matching the ``paddock`` coord of the cached
+            timeseries zarrs (compared as strings).
+        year: Calendar year to extract.
+        variable: Vegetation index column name. Default ``'NDVI'``.
+
+    Returns:
+        dict with keys ``paddock_id`` (str), ``year`` (int), ``variable`` (str),
+        ``observations`` (list[{doy, value}] for this paddock × year), and ``metrics``
+        (dict with sos_time/value, pos_time/value, eos_time/value, num_peaks) or ``None``
+        if phenometrics could not be computed.
+    """
+    import numpy as np
+    import pandas as pd
+    import traceback
+    from os.path import exists
+
+    paddock_str = str(paddock_id)
+    yearly_zarr = f'{query.tmp_dir}/sam_paddocks_timeseries_{year}.zarr'
+    if not exists(yearly_zarr):
+        raise FileNotFoundError(f'yearly timeseries zarr not found: {yearly_zarr}')
+
+    ds_year = xr.open_zarr(yearly_zarr, chunks=None, decode_coords='all')
+    paddock_strs = [str(p) for p in ds_year.paddock.values]
+    if paddock_str not in paddock_strs:
+        raise ValueError(f'paddock_id {paddock_id!r} not in {yearly_zarr}')
+
+    da = ds_year[variable].sel(paddock=paddock_str)
+    doy = ds_year['doy'].values
+    values = da.values
+    observations = [
+        {'doy': int(d), 'value': float(v)}
+        for d, v in zip(doy, values)
+        if np.isfinite(v)
+    ]
+
+    metrics = None
+    try:
+        ds_veg = (
+            ds_year[[variable]]
+            .rename({variable: 'veg_index'})
+            .drop_vars('doy')
+            .sel(paddock=[paddock_str])
+        )
+        da_num_seasons = phenolopy.calc_num_seasons(ds=ds_veg)
+        with _override_xr_merge():
+            ds_phenos = phenolopy.calc_phenometrics(
+                da=ds_veg['veg_index'],
+                peak_metric='pos',
+                base_metric='bse',
+                method='seasonal_amplitude',
+                factor=0.05,
+                thresh_sides='two_sided',
+                abs_value=0,
+            )
+        phenos_df = (
+            ds_phenos
+            .drop_vars(['spatial_ref', 'time'], errors='ignore')
+            .to_dataframe()
+            .reset_index()
+        )
+        if not phenos_df.empty:
+            r = phenos_df.iloc[0]
+            def _safe(name):
+                v = r.get(name)
+                return float(v) if v is not None and pd.notna(v) else None
+            metrics = {
+                'sos_time': _safe('sos_times'),
+                'sos_value': _safe('sos_values'),
+                'pos_time': _safe('pos_times'),
+                'pos_value': _safe('pos_values'),
+                'eos_time': _safe('eos_times'),
+                'eos_value': _safe('eos_values'),
+                'num_peaks': int(da_num_seasons.values[0]) if da_num_seasons.size else None,
+            }
+    except Exception:
+        traceback.print_exc()
+
+    return {
+        'paddock_id': paddock_str,
+        'year': int(year),
+        'variable': variable,
+        'observations': observations,
+        'metrics': metrics,
+    }
+
+
 def test():
     from PaddockTS.utils import get_example_query
 

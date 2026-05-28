@@ -3,6 +3,7 @@
 #
 # Local modifications:
 #   - np.trapz -> np.trapezoid (NumPy 2.0 compatibility; trapz was removed in NumPy 2.0).
+#   - shim below restores np.trapezoid on NumPy < 2.0 so this file works on both.
 
 # phenolopy
 '''
@@ -35,6 +36,11 @@ from collections import Counter
 import xarray as xr
 import numpy as np
 import pandas as pd
+
+# NumPy < 2.0 has np.trapz; NumPy 2.0 renamed it to np.trapezoid. This
+# vendored copy uses np.trapezoid throughout, so alias it on older NumPy.
+if not hasattr(np, 'trapezoid'):
+    np.trapezoid = np.trapz
 import math
 import dask
 from datetime import datetime, timedelta

@@ -52,6 +52,116 @@ def _to_rgb(ds, time_idx):
     return rgb
 
 
+def extract_paddock_thumbnails(
+    query: Query,
+    paddock_id,
+    year: int,
+    ds_sentinel2: 'xr.Dataset | None' = None,
+    paddocks_filepath: str | None = None,
+    thumb_size: int = 256,
+    n_slots: int = 48,
+) -> dict:
+    """Return per-slot RGB thumbnails for one paddock × one year.
+
+    Same per-slot semantics as :func:`calendar_plot` (n_slots evenly-spaced
+    day-of-year slots, each filled with the closest observation), but
+    extracted just for the requested paddock so it can be served as a
+    lightweight web payload rather than a full composite PNG.
+
+    Args:
+        query: The :class:`PaddockTS.query.Query`.
+        paddock_id: Paddock identifier matching the ``paddock`` column of
+            ``paddocks_filepath`` (compared as strings).
+        year: Calendar year to extract.
+        ds_sentinel2: Optional in-memory cleaned Sentinel-2 dataset. If
+            ``None``, ``query.sentinel2_clean_path`` is opened (and produced
+            via :func:`clean_sentinel2` if missing).
+        paddocks_filepath: Path to the paddocks file. Defaults to
+            ``query.sam_paddocks_path``.
+        thumb_size: Edge length of each thumbnail in pixels. Default 256.
+        n_slots: Number of slots across the year. Default 48.
+
+    Returns:
+        dict with keys ``paddock_id`` (str), ``label`` (str), ``area_ha`` (float|None),
+        ``year`` (int), ``thumb_size`` (int), ``n_slots`` (int),
+        ``dates`` (list[str|None], iso ``YYYY-MM-DD`` per slot),
+        ``thumbnails`` (list[np.ndarray], each uint8 ``(H, W, 3)``).
+    """
+    from PIL import Image
+    import rioxarray  # noqa: F401
+    from PaddockTS.utils import load_user_paddocks
+
+    if paddocks_filepath is None:
+        paddocks_filepath = query.sam_paddocks_path
+
+    if ds_sentinel2 is None:
+        from PaddockTS.Sentinel2.check_if_valid_clean_zarr_exists import check_if_valid_clean_zarr_exists
+        if not check_if_valid_clean_zarr_exists(query.sentinel2_clean_path):
+            from PaddockTS.Sentinel2.clean_sentinel2 import clean_sentinel2
+            clean_sentinel2(query)
+        ds_sentinel2 = xr.open_zarr(query.sentinel2_clean_path, chunks=None, decode_coords='all')
+
+    paddocks = load_user_paddocks(paddocks_filepath)
+    ds_crs = ds_sentinel2.rio.crs
+    if paddocks.crs != ds_crs:
+        paddocks = paddocks.to_crs(ds_crs)
+
+    paddock_str = str(paddock_id)
+    matches = paddocks[paddocks['paddock'].astype(str) == paddock_str]
+    if matches.empty:
+        raise ValueError(f'paddock_id {paddock_id!r} not found in {paddocks_filepath}')
+    row = matches.iloc[0]
+    area_ha = float(row['area_ha']) if 'area_ha' in row.index and row['area_ha'] is not None else None
+    label = paddock_str
+
+    transform = ds_sentinel2.rio.transform()
+    h, w = ds_sentinel2.sizes['y'], ds_sentinel2.sizes['x']
+    pid = 1
+    mask = rasterize([(row.geometry, pid)], out_shape=(h, w), transform=transform, fill=0, dtype=np.int32)
+    ys, xs = np.where(mask == pid)
+
+    black = np.zeros((thumb_size, thumb_size, 3), dtype=np.uint8)
+    base = {
+        'paddock_id': paddock_str,
+        'label': label,
+        'area_ha': area_ha,
+        'year': int(year),
+        'thumb_size': int(thumb_size),
+        'n_slots': int(n_slots),
+    }
+    if len(ys) == 0:
+        return {**base, 'dates': [None] * n_slots, 'thumbnails': [black] * n_slots}
+
+    pad = 2
+    y0, y1 = max(int(ys.min()) - pad, 0), min(int(ys.max()) + pad + 1, h)
+    x0, x1 = max(int(xs.min()) - pad, 0), min(int(xs.max()) + pad + 1, w)
+    mask_crop = mask[y0:y1, x0:x1]
+
+    year_mask = ds_sentinel2.time.dt.year.values == year
+    ds_year = ds_sentinel2.isel(time=year_mask)
+    if ds_year.sizes['time'] == 0:
+        return {**base, 'dates': [None] * n_slots, 'thumbnails': [black] * n_slots}
+
+    obs_doy = ds_year.time.dt.dayofyear.values
+    slot_centres = np.linspace(1, 365, n_slots + 1)
+    slot_centres = (slot_centres[:-1] + slot_centres[1:]) / 2
+    slot_to_obs = [int(np.argmin(np.abs(obs_doy - sc))) for sc in slot_centres]
+
+    obs_times = ds_year.time.values  # numpy datetime64
+
+    obs_thumbs = {}
+    for obs_idx in set(slot_to_obs):
+        rgb = _to_rgb(ds_year, obs_idx)
+        crop = rgb[y0:y1, x0:x1].copy()
+        crop[mask_crop != pid] = 0.0
+        img = Image.fromarray((crop * 255).astype(np.uint8))
+        obs_thumbs[obs_idx] = np.array(img.resize((thumb_size, thumb_size), Image.NEAREST))
+
+    thumbnails = [obs_thumbs[idx] for idx in slot_to_obs]
+    dates = [str(obs_times[idx])[:10] for idx in slot_to_obs]
+    return {**base, 'dates': dates, 'thumbnails': thumbnails}
+
+
 def _resolve_ds(query: Query, ds_sentinel2):
     if ds_sentinel2 is not None:
         return ds_sentinel2
