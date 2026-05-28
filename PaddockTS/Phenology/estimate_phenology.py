@@ -38,7 +38,11 @@ def _override_xr_merge():
         phenolopy.xr.merge = _real_merge
 
 
-def estimate_phenology(query, ds_yearly=None, variable='NDVI', min_observations=25):
+def _phenology_csv_path(query, year: int) -> str:
+    return f'{query.tmp_dir}/sam_paddocks_phenology_{year}.csv'
+
+
+def estimate_phenology(query, ds_yearly=None, variable='NDVI', min_observations=25, persist: bool = True):
     """Compute per-paddock phenology metrics for each year.
 
     For each year in ``ds_yearly``, this:
@@ -63,6 +67,10 @@ def estimate_phenology(query, ds_yearly=None, variable='NDVI', min_observations=
             and are sometimes preferred for low-LAI canopies.
         min_observations: Minimum number of valid observations required
             per paddock. Paddocks with fewer are skipped. Default 25.
+        persist: If True (default), write each year's DataFrame to
+            ``{query.tmp_dir}/sam_paddocks_phenology_{year}.csv`` so
+            downstream consumers (e.g. the web /phenology endpoint)
+            can look metrics up without re-running phenolopy.
 
     Returns:
         dict[int, pandas.DataFrame]: One DataFrame per year. Columns
@@ -120,6 +128,9 @@ def estimate_phenology(query, ds_yearly=None, variable='NDVI', min_observations=
         results[year] = phenos_df
         print(f'  {year}: {len(phenos_df)} paddocks, {phenos_df["num_peaks"].mean():.1f} avg peaks')
 
+        if persist:
+            phenos_df.to_csv(_phenology_csv_path(query, year), index=False)
+
     return results
 
 
@@ -167,47 +178,30 @@ def get_paddock_year_phenology(query, paddock_id, year: int, variable: str = 'ND
         if np.isfinite(v)
     ]
 
+    # Metrics come from the per-year CSV that estimate_phenology persisted
+    # at pipeline time. Avoid re-running phenolopy on every request.
     metrics = None
-    try:
-        ds_veg = (
-            ds_year[[variable]]
-            .rename({variable: 'veg_index'})
-            .drop_vars('doy')
-            .sel(paddock=[paddock_str])
-        )
-        da_num_seasons = phenolopy.calc_num_seasons(ds=ds_veg)
-        with _override_xr_merge():
-            ds_phenos = phenolopy.calc_phenometrics(
-                da=ds_veg['veg_index'],
-                peak_metric='pos',
-                base_metric='bse',
-                method='seasonal_amplitude',
-                factor=0.05,
-                thresh_sides='two_sided',
-                abs_value=0,
-            )
-        phenos_df = (
-            ds_phenos
-            .drop_vars(['spatial_ref', 'time'], errors='ignore')
-            .to_dataframe()
-            .reset_index()
-        )
-        if not phenos_df.empty:
-            r = phenos_df.iloc[0]
-            def _safe(name):
-                v = r.get(name)
-                return float(v) if v is not None and pd.notna(v) else None
-            metrics = {
-                'sos_time': _safe('sos_times'),
-                'sos_value': _safe('sos_values'),
-                'pos_time': _safe('pos_times'),
-                'pos_value': _safe('pos_values'),
-                'eos_time': _safe('eos_times'),
-                'eos_value': _safe('eos_values'),
-                'num_peaks': int(da_num_seasons.values[0]) if da_num_seasons.size else None,
-            }
-    except Exception:
-        traceback.print_exc()
+    csv_path = _phenology_csv_path(query, year)
+    if exists(csv_path):
+        try:
+            df = pd.read_csv(csv_path)
+            row = df[df['paddock'].astype(str) == paddock_str]
+            if not row.empty:
+                r = row.iloc[0]
+                def _safe(name):
+                    v = r.get(name)
+                    return float(v) if v is not None and pd.notna(v) else None
+                metrics = {
+                    'sos_time': _safe('sos_times'),
+                    'sos_value': _safe('sos_values'),
+                    'pos_time': _safe('pos_times'),
+                    'pos_value': _safe('pos_values'),
+                    'eos_time': _safe('eos_times'),
+                    'eos_value': _safe('eos_values'),
+                    'num_peaks': int(r['num_peaks']) if 'num_peaks' in r.index and pd.notna(r['num_peaks']) else None,
+                }
+        except Exception:
+            traceback.print_exc()
 
     return {
         'paddock_id': paddock_str,
