@@ -179,9 +179,18 @@ def get_paddock_year_phenology(query, paddock_id, year: int, variable: str = 'ND
     ]
 
     # Metrics come from the per-year CSV that estimate_phenology persisted
-    # at pipeline time. Avoid re-running phenolopy on every request.
+    # at pipeline time. If it's not there (e.g. the pipeline ran before
+    # persist=True landed), compute metrics for this single year using the
+    # cached yearly zarr we already have open — no upstream pipeline re-run,
+    # and the CSV is written so subsequent paddock switches in this year
+    # are a pure file lookup.
     metrics = None
     csv_path = _phenology_csv_path(query, year)
+    if not exists(csv_path):
+        try:
+            estimate_phenology(query, ds_yearly={int(year): ds_year}, variable=variable)
+        except Exception:
+            traceback.print_exc()
     if exists(csv_path):
         try:
             df = pd.read_csv(csv_path)
