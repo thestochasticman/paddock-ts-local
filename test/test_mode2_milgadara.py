@@ -14,6 +14,5 @@ q = Query.build_from_paddocks(
 
 get_outputs(
     q,
-    paddocks_filepath=paddocks_fp,
     skip_sam=False
 )
