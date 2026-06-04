@@ -12,6 +12,10 @@ This depends on artifacts/*.gpkg as specified in Query.build_from_paddocks()
 python test/test_mode2.py # provides .gpkg from hand-drawn polygons somewhere in WA. 
 python test/test_mode2_milgadara.py # provides a .json from Agriweb for milgadara
 ```
+## Third, test with user-provided paddocks but run functions individally i.e. don't use get_outputs()
+```
+python test/slow.py # for this, I used milgadara paddocks .gpkg and 2018-2025.
+```
 
 ## Results
 ### jtb June 5 2026 on Mac
@@ -20,5 +24,8 @@ test/test_mode1.py -- works
 test/test_mode2.py -- cant download S2
 
 test/test_mode2_milgadara.py -- cant download S2
+
+python test/slow.py -- test is incomplete. Worked first time walking through in python interactive for 2019 only , but still running it as .py script with 2018-2025. 
+
 
 
