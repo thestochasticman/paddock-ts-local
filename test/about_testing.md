@@ -16,7 +16,9 @@ python test/test_mode2_milgadara.py # provides a .json from Agriweb for milgadar
 ## Results
 ### jtb June 5 2026 on Mac
 test/test_mode1.py -- works
+
 test/test_mode2.py -- cant download S2
+
 test/test_mode2_milgadara.py -- cant download S2
 
 
