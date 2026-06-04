@@ -10,6 +10,8 @@ bbox or different time range gets its own folder.
 """
 
 import os
+import json
+import time
 import odc.stac
 import rioxarray
 import numpy as np
@@ -27,6 +29,69 @@ from PaddockTS.Sentinel2.check_if_valid_zarr_exists import check_if_valid_zarr_e
 
 
 odc.stac.configure_rio(cloud_defaults=True, aws={"aws_unsigned": True})
+
+
+from pystac_client.stac_api_io import StacApiIO
+
+
+class _NanTolerantStacApiIO(StacApiIO):
+    """StacApiIO that parses bodies with stdlib ``json`` instead of orjson.
+
+    DEA's STAC responses contain bare ``NaN`` tokens (e.g.
+    ``"raster:bands": [{"nodata": NaN, ...}]``) — invalid strict JSON.
+    pystac prefers orjson when installed, which rejects NaN at a fixed byte
+    offset, so every parse fails deterministically. stdlib ``json`` accepts
+    NaN/Infinity by default. See diagnostics.md §3.
+    """
+
+    def json_loads(self, txt):
+        return json.loads(txt)
+
+
+def _search_stac_items(sentinel2: Sentinel2, query: Query, attempts: int = 4,
+                       base_delay: float = 2.0) -> list:
+    """Search the STAC catalog for ``query`` with retry on flaky responses.
+
+    Three layers of defence (see diagnostics.md §1 and §3):
+
+    - ``_NanTolerantStacApiIO`` parses the (deterministically) NaN-laced
+      bodies DEA serves, which strict orjson rejects.
+    - ``urllib3.Retry`` inside ``StacApiIO`` handles non-200 statuses
+      (408/429/502/503/504) — DEA's cold load-balancer.
+    - This loop handles what those can't: a 200 whose body is genuinely
+      truncated/garbled. ``orjson.JSONDecodeError`` / ``json.JSONDecodeError``
+      both subclass ``ValueError``; ``APIError`` covers pystac_client-wrapped
+      connection failures mid-paging once the inner retries are exhausted.
+
+    A fresh ``StacApiIO`` (and so a fresh requests session) is built per
+    attempt so a poisoned connection isn't reused. Delays are
+    ``base_delay * 2**attempt`` — 2s, 4s, 8s for the defaults.
+    """
+    from urllib3 import Retry
+    from pystac_client.exceptions import APIError
+    for attempt in range(attempts):
+        try:
+            stac_io = _NanTolerantStacApiIO(max_retries=Retry(
+                total=5,
+                backoff_factor=1.0,
+                status_forcelist=[408, 429, 502, 503, 504],
+                allowed_methods=['GET', 'POST'],
+            ))
+            catalog = pystac_client.Client.open(sentinel2.stac_url, stac_io=stac_io)
+            result = catalog.search(
+                bbox=query.bbox,
+                collections=sentinel2.collections,
+                datetime=f'{query.start}/{query.end}',
+                filter=sentinel2.cloud_cover_filter
+            )
+            return list(result.items())
+        except (ValueError, APIError) as e:
+            if attempt == attempts - 1:
+                raise
+            delay = base_delay * 2 ** attempt
+            print(f'STAC search failed ({type(e).__name__}: {e}); '
+                  f'retrying in {delay:.0f}s ({attempt + 1}/{attempts - 1})')
+            time.sleep(delay)
 
 
 def download_sentinel2(
@@ -96,24 +161,7 @@ def download_sentinel2(
         rmtree(query.sentinel2_path)
 
     bands = sentinel2.bands
-    # DEA STAC's first request after a cold cache often hits a 504; the next
-    # one (~150ms later) succeeds. See diagnostics.md at the repo root.
-    from urllib3 import Retry
-    from pystac_client.stac_api_io import StacApiIO
-    stac_io = StacApiIO(max_retries=Retry(
-        total=5,
-        backoff_factor=1.0,
-        status_forcelist=[408, 429, 502, 503, 504],
-        allowed_methods=['GET', 'POST'],
-    ))
-    catalog = pystac_client.Client.open(sentinel2.stac_url, stac_io=stac_io)
-    result = catalog.search(
-        bbox=query.bbox,
-        collections=sentinel2.collections,
-        datetime=f'{query.start}/{query.end}',
-        filter=sentinel2.cloud_cover_filter
-    )
-    items = list(result.items())
+    items = _search_stac_items(sentinel2, query)
 
     if not items:
         raise RuntimeError(
@@ -196,6 +244,52 @@ def _shared_test_cfg():
         tmpdir = tempfile.mkdtemp(prefix='paddockts_s2_test_')
         _test_cfg = Config(out_dir=tmpdir, tmp_dir=tmpdir)
     return _test_cfg
+
+
+def test_search_retries_on_malformed_json():
+    """A 200-with-garbage response (ValueError from the JSON decoder) is
+    retried; the search succeeds once the catalog answers cleanly. Offline —
+    Client.open is monkeypatched, no network involved."""
+    from types import SimpleNamespace
+
+    sentinel_items = [object(), object()]
+    calls = {'n': 0}
+
+    class _FakeSearch:
+        def items(self):
+            return iter(sentinel_items)
+
+    class _FakeCatalog:
+        def search(self, **kwargs):
+            return _FakeSearch()
+
+    def _fake_open(url, stac_io=None):
+        calls['n'] += 1
+        if calls['n'] <= 2:
+            # What pystac raises on a malformed body: orjson.JSONDecodeError,
+            # a ValueError subclass.
+            raise ValueError('unexpected character: line 468 column 11')
+        return _FakeCatalog()
+
+    fake_query = SimpleNamespace(
+        bbox=_TEST_BBOX, start=_TEST_START, end=_TEST_END,
+    )
+    original_open = pystac_client.Client.open
+    try:
+        pystac_client.Client.open = staticmethod(_fake_open)
+        items = _search_stac_items(defaultsentinel2, fake_query, base_delay=0)
+    finally:
+        pystac_client.Client.open = original_open
+    return items == sentinel_items and calls['n'] == 3
+
+
+def test_json_loads_tolerates_nan():
+    """The NaN-laced JSON DEA actually serves parses via our StacApiIO
+    (orjson, pystac's preferred parser, rejects it). Offline."""
+    txt = '{"raster:bands": [{"nodata": NaN, "data_type": "float32"}]}'
+    parsed = _NanTolerantStacApiIO().json_loads(txt)
+    nodata = parsed['raster:bands'][0]['nodata']
+    return nodata != nodata  # NaN is the only value that != itself
 
 
 def test_download_writes_zarr():
@@ -287,6 +381,8 @@ def test_missing_marker_triggers_refetch():
 
 def test():
     return all([
+        test_search_retries_on_malformed_json(),
+        test_json_loads_tolerates_nan(),
         test_internet(None),
         test_different_time_different_path(),
         test_download_writes_zarr(),
