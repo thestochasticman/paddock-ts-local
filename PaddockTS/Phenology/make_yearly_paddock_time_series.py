@@ -65,7 +65,7 @@ def make_yearly_paddock_time_series(query, ds_paddockTS=None, paddocks_filepath=
         paddocks_filepath = query.sam_paddocks_path
 
     paddocks_path = Path(paddocks_filepath)
-    timeseries_zarr = f'{query.tmp_dir}/{paddocks_path.stem}_timeseries.zarr'
+    timeseries_zarr = f'{query.tmp_dir}/{paddocks_path.stem}_timeseries_smoothed.zarr'
 
     if ds_paddockTS is None:
         if not check_if_valid_zarr_exists(timeseries_zarr):
