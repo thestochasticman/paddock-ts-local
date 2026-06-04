@@ -27,6 +27,7 @@ STEPS = [
     'Fractional cover video',
     'Fractional cover + paddocks video',
     'Make paddock time series',
+    'Smooth paddock time series',
     'Make yearly paddock time series',
     'Estimate phenology',
     'Calendar plot',
@@ -63,6 +64,7 @@ def _run_pipeline_steps(query, statuses, times, log, update_callback=None):
     ds_fractional_cover = None
     paddocks = None
     ds_paddockTS = None
+    ds_smoothed = None
     ds_yearly = None
     phenology_results = None
 
@@ -143,21 +145,26 @@ def _run_pipeline_steps(query, statuses, times, log, update_callback=None):
                     ds_paddockTS = make_paddock_time_series(query, ds_sentinel2=ds_sentinel2, paddocks_filepath=query.sam_paddocks_path)
 
                 elif i == 9:
-                    # Make yearly paddock time series
-                    from PaddockTS.Phenology.make_yearly_paddock_time_series import make_yearly_paddock_time_series
-                    ds_yearly = make_yearly_paddock_time_series(query, ds_paddockTS=ds_paddockTS, paddocks_filepath=query.sam_paddocks_path)
+                    # Smooth paddock time series (resample + gap-fill + Savitzky-Golay)
+                    from PaddockTS.Phenology.make_smoothed_paddock_time_series import make_smoothed_paddock_time_series
+                    ds_smoothed = make_smoothed_paddock_time_series(query, ds_paddockTS=ds_paddockTS, paddocks_filepath=query.sam_paddocks_path)
 
                 elif i == 10:
+                    # Make yearly paddock time series (from the smoothed series)
+                    from PaddockTS.Phenology.make_yearly_paddock_time_series import make_yearly_paddock_time_series
+                    ds_yearly = make_yearly_paddock_time_series(query, ds_paddockTS=ds_smoothed, paddocks_filepath=query.sam_paddocks_path)
+
+                elif i == 11:
                     # Estimate phenology
                     from PaddockTS.Phenology.estimate_phenology import estimate_phenology
                     phenology_results = estimate_phenology(query, ds_yearly=ds_yearly)
 
-                elif i == 11:
+                elif i == 12:
                     # Calendar plot
                     from PaddockTS.Plotting.calendar_plot import calendar_plot
                     calendar_plot(query, ds_sentinel2=ds_sentinel2, paddocks_filepath=query.sam_paddocks_path)
 
-                elif i == 12:
+                elif i == 13:
                     # Phenology plot
                     from PaddockTS.Plotting.phenology_plot import phenology_plot
                     phenology_plot(query, phenology_results=phenology_results, ds_yearly=ds_yearly, ds_paddockTS=ds_paddockTS)

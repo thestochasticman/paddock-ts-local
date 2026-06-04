@@ -47,7 +47,9 @@ def make_smoothed_paddock_time_series(query, ds_paddockTS=None, paddocks_filepat
 
     Returns:
         xarray.Dataset: Smoothed dataset on dims ``(paddock, time)``
-        with the same data variables as the input. Also persisted to
+        with the same data variables as the input, plus an ``observed``
+        boolean variable marking which resampled bins contained at least
+        one real observation (False = gap-filled). Also persisted to
         ``{paddocks_filepath stem}_timeseries_smoothed.zarr``.
     """
     from datetime import datetime
@@ -80,6 +82,14 @@ def make_smoothed_paddock_time_series(query, ds_paddockTS=None, paddocks_filepat
     # 2. resample on a fixed grid
     ds_resampled = ds_time_dep.resample(time=f"{days}D").median()
     ds_resampled = ds_resampled.transpose("paddock", "time")
+
+    # Bins that contained at least one real observation, captured before
+    # gap-fill. Persisted as an `observed` data variable so downstream
+    # consumers (e.g. the web /phenology endpoint) can distinguish
+    # observed from interpolated samples.
+    observed = np.zeros((ds_resampled.sizes["paddock"], ds_resampled.sizes["time"]), dtype=bool)
+    for var in time_dependent_vars:
+        observed |= np.isfinite(ds_resampled[var].values)
 
     # 3. interpolate with PCHIP
     interp_dict = {}
@@ -114,6 +124,7 @@ def make_smoothed_paddock_time_series(query, ds_paddockTS=None, paddocks_filepat
     ds_new = ds_resampled.copy()
     for var, da in interp_dict.items():
         ds_new[var] = da
+    ds_new["observed"] = (("paddock", "time"), observed)
     for var in non_time_dependent_vars:
         ds_new[var] = ds_non_time[var]
 

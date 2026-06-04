@@ -150,7 +150,8 @@ def get_paddock_year_phenology(query, paddock_id, year: int, variable: str = 'ND
 
     Returns:
         dict with keys ``paddock_id`` (str), ``year`` (int), ``variable`` (str),
-        ``observations`` (list[{doy, value}] for this paddock × year), and ``metrics``
+        ``observations`` (list[{doy, value, observed}] for this paddock × year, where
+        ``observed`` is False for gap-filled/interpolated samples), and ``metrics``
         (dict with sos_time/value, pos_time/value, eos_time/value, num_peaks) or ``None``
         if phenometrics could not be computed.
     """
@@ -172,9 +173,15 @@ def get_paddock_year_phenology(query, paddock_id, year: int, variable: str = 'ND
     da = ds_year[variable].sel(paddock=paddock_str)
     doy = ds_year['doy'].values
     values = da.values
+    if 'observed' in ds_year:
+        observed = ds_year['observed'].sel(paddock=paddock_str).values
+    else:
+        # Yearly zarrs written before the observed mask existed: treat
+        # every sample as a real observation.
+        observed = np.ones(values.shape, dtype=bool)
     observations = [
-        {'doy': int(d), 'value': float(v)}
-        for d, v in zip(doy, values)
+        {'doy': int(d), 'value': float(v), 'observed': bool(o)}
+        for d, v, o in zip(doy, values, observed)
         if np.isfinite(v)
     ]
 
