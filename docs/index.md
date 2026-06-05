@@ -118,8 +118,10 @@ get_outputs(
 - **[API reference](api/index.md)** — full signatures and runnable
   examples for every public function.
 - **[Demo notebooks](https://github.com/thestochasticman/paddock-ts-local/tree/main/demo)** —
-  three runnable Jupyter notebooks: the quickstart, calling stages
-  individually, and using your own paddock boundaries.
+  eight runnable Jupyter notebooks: three workflow demos (quickstart,
+  individual stages, BYO paddocks) and five inspection demos covering
+  the outputs in pipeline order (videos → paddocks → time series →
+  phenology → stitched PDF report).
 
 ---
 

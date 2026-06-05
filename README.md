@@ -112,12 +112,23 @@ page.
 
 ## Runnable demos
 
-Three Jupyter notebooks under [`demo/`](demo/) walk through the most
-common workflows:
+Eight Jupyter notebooks under [`demo/`](demo/) — three for running the
+pipeline, five for mining its outputs (ordered to match the pipeline
+output order):
+
+**How to run the pipeline:**
 
 - [`demo/01_quickstart.ipynb`](demo/01_quickstart.ipynb) — bbox + dates → `get_outputs(query)` → review the calendar / phenology / PDF.
 - [`demo/02_pipeline_stages.ipynb`](demo/02_pipeline_stages.ipynb) — call each Sentinel-2 stage individually, inspect intermediate outputs.
 - [`demo/03_custom_paddocks.ipynb`](demo/03_custom_paddocks.ipynb) — bring your own paddock boundaries and skip SAM.
+
+**What to do with the outputs:**
+
+- [`demo/04_inspect_videos.ipynb`](demo/04_inspect_videos.ipynb) — embed the MP4s + calendar PNGs inline.
+- [`demo/05_inspect_paddocks.ipynb`](demo/05_inspect_paddocks.ipynb) — load the GeoPackage, filter, summarise, join with per-paddock NDVI for thematic maps.
+- [`demo/06_inspect_time_series.ipynb`](demo/06_inspect_time_series.ipynb) — slice the `(paddock, time)` cube, compare indices, smoothed vs raw NDVI.
+- [`demo/07_inspect_phenology.ipynb`](demo/07_inspect_phenology.ipynb) — SoS / PoS / EoS distributions, outliers, year-over-year comparison.
+- [`demo/08_inspect_pdf.ipynb`](demo/08_inspect_pdf.ipynb) — locate the stitched PDF report, read its metadata, preview it inline.
 
 ```bash
 jupyter lab demo/
@@ -239,21 +250,84 @@ them, so you can call them out of order or in isolation.
 
 ## Data sources and acknowledgments
 
-PaddockTS does not redistribute upstream data; it queries them on
-demand:
+PaddockTS does not redistribute upstream data; it queries each source
+on demand. If you publish work that uses PaddockTS, please cite the
+data sources below in addition to the third-party libraries listed
+under [License and attribution](#license-and-attribution) and the
+PaddockTS repository itself.
 
-- **Sentinel-2 ARD** — Geoscience Australia
-  [Digital Earth Australia](https://explorer.dea.ga.gov.au/) STAC.
-- **Copernicus DEM 30 m** —
+### Sentinel-2 ARD (Digital Earth Australia)
+
+- **Product:** Geoscience Australia surface-reflectance ARD —
+  `ga_s2am_ard_3` (Sentinel-2A) and `ga_s2bm_ard_3` (Sentinel-2B),
+  served via the [DEA STAC catalog](https://explorer.dea.ga.gov.au/).
+- **Underlying data:** Copernicus Sentinel data, processed by ESA /
+  Copernicus.
+- **Cite:**
+  > Dwyer, J.L., Roy, D.P., Sauer, B., Jenkerson, C.B., Zhang, H.K., &
+  > Lymburner, L. (2018). Analysis Ready Data: Enabling Analysis of the
+  > Landsat Archive. *Remote Sensing*, 10(9), 1363.
+  > <https://doi.org/10.3390/rs10091363>
+  >
+  > Lewis, A., Oliver, S., Lymburner, L., Evans, B., Wyborn, L.,
+  > Mueller, N., et al. (2017). The Australian Geoscience Data Cube —
+  > Foundations and lessons learned. *Remote Sensing of Environment*,
+  > 202, 276–292. <https://doi.org/10.1016/j.rse.2017.03.015>
+
+  Also acknowledge ESA / Copernicus per the Sentinel data terms of use.
+
+### Copernicus DEM 30 m
+
+- **Product:** Copernicus DEM GLO-30 (30 m global), distributed via
   [AWS Open Data](https://registry.opendata.aws/copernicus-dem/).
-- **OzWALD** — Australian Water and Landscape Dynamics, hosted by ANU.
-- **SILO** — Queensland Government's gridded climate dataset.
-- **SLGA** — TERN / CSIRO Soil and Landscape Grid of Australia
-  (TERN API key required).
+- **Cite:**
+  > European Space Agency, Sinergise (2021). *Copernicus Global Digital
+  > Elevation Model.* Distributed by OpenTopography.
+  > <https://doi.org/10.5069/G9028PQB>
 
-If you publish work that uses PaddockTS, please cite the upstream data
-sources, the third-party libraries listed below, and the PaddockTS
-repository.
+### OzWALD
+
+- **Product:** Australian Water and Landscape Dynamics — modelled
+  daily meteorology and 8-day vegetation aggregates over Australia,
+  served by ANU via OPeNDAP. See <https://www.wenfo.org/ozwald/>.
+- **Cite:**
+  > van Dijk, A.I.J.M., Schellekens, J., Yebra, M., Beck, H.E.,
+  > Renzullo, L.J., Weerts, A., et al. (2018). Global 5 km resolution
+  > estimates of secondary evaporation including irrigation through
+  > satellite data assimilation. *Hydrology and Earth System Sciences*,
+  > 22(9), 4959–4980. <https://doi.org/10.5194/hess-22-4959-2018>
+
+### SILO (Queensland gridded climate)
+
+- **Product:** Daily climate variables across Australia from 1889
+  onward, by spatial interpolation of station observations. Served by
+  the Queensland Department of Environment, Science and Innovation —
+  see <https://www.longpaddock.qld.gov.au/silo/>.
+- **Cite:**
+  > Jeffrey, S.J., Carter, J.O., Moodie, K.B., & Beswick, A.R. (2001).
+  > Using spatial interpolation to construct a comprehensive archive of
+  > Australian climate data. *Environmental Modelling & Software*,
+  > 16(4), 309–330.
+  > <https://doi.org/10.1016/S1364-8152(01)00008-1>
+
+### SLGA (Soil and Landscape Grid of Australia)
+
+- **Product:** 90 m national soil-attribute grids (Release 2 / v2, 2021)
+  served from the [TERN Datastore](https://data.tern.org.au/model-derived/slga/NationalMaps/SoilAndLandscapeGrid/).
+  TERN API key required.
+- **Cite:**
+  > Grundy, M.J., Viscarra Rossel, R.A., Searle, R.D., Wilson, P.L.,
+  > Chen, C., & Gregory, L.J. (2015). Soil and landscape grid of
+  > Australia. *Soil Research*, 53(8), 835–844.
+  > <https://doi.org/10.1071/SR15191>
+  >
+  > Malone, B.P., Searle, R., Wilson, P., Stockmann, U., Austin, J.,
+  > Robinson, N., et al. (2021). *Soil and Landscape Grid National Soil
+  > Attribute Maps — Release 2.* CSIRO Data Collection.
+  > <https://doi.org/10.25919/h7nf-9z42>
+
+Please also cite the dataset DOI for the specific attribute you use
+(each Release 2 layer has its own DOI in the TERN catalog).
 
 ---
 
@@ -287,10 +361,16 @@ relevant to your work:
 
 - [`segment-geospatial`](https://samgeo.gishub.org/) (`samgeo`) by
   Qiusheng Wu — MIT. Wraps Segment Anything for geospatial use; drives
-  the paddock segmentation stage. Cite:
-  [Wu & Osco (2023), J. Open Source Software](https://joss.theoj.org/papers/10.21105/joss.05663).
+  the paddock segmentation stage.
+  > Wu, Q., & Osco, L.P. (2023). samgeo: A Python package for segmenting
+  > geospatial data with the Segment Anything Model (SAM). *Journal of
+  > Open Source Software*, 8(89), 5663.
+  > <https://doi.org/10.21105/joss.05663>
 - [Segment Anything Model](https://segment-anything.com/) (SAM) by
   Meta AI Research — Apache 2.0. The underlying segmentation model.
+  > Kirillov, A., Mintun, E., Ravi, N., Mao, H., Rolland, C.,
+  > Gustafson, L., et al. (2023). *Segment Anything.* arXiv:2304.02643.
+  > <https://arxiv.org/abs/2304.02643>
 
 ---
 

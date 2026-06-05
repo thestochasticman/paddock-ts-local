@@ -1,14 +1,33 @@
 # PaddockTS demos
 
-Runnable Jupyter notebooks showing how to use the system end-to-end.
-Start with [`01_quickstart.ipynb`](01_quickstart.ipynb) and pick the
-others based on what you need.
+Runnable Jupyter notebooks showing how to use the system end-to-end
+and how to mine its outputs. Start with
+[`01_quickstart.ipynb`](01_quickstart.ipynb) and then pick the others
+based on what you need.
+
+### Workflow notebooks — *how to run the pipeline*
 
 | Notebook | What it covers |
 |---|---|
 | [`01_quickstart.ipynb`](01_quickstart.ipynb) | The simplest end-to-end run: bbox + dates → `get_outputs(query)` → live dashboard → review the calendar / phenology / PDF. |
-| [`02_pipeline_stages.ipynb`](02_pipeline_stages.ipynb) | Calling each stage individually (Sentinel-2 download, clean, indices, fractional cover, SAM segmentation, per-paddock TS, phenology) — useful for debugging, fine-tuning, or replacing a single stage with your own implementation. Also shows how to inspect the outputs (geopackage, zarr, dataframes). |
+| [`02_pipeline_stages.ipynb`](02_pipeline_stages.ipynb) | Calling each stage individually (Sentinel-2 download, clean, indices, fractional cover, SAM segmentation, per-paddock TS, phenology) — useful for debugging, fine-tuning, or replacing a single stage with your own implementation. |
 | [`03_custom_paddocks.ipynb`](03_custom_paddocks.ipynb) | Bringing your own paddock boundaries (GeoPackage / Shapefile / GeoJSON) and skipping SAM. Uses the bundled `artifacts/PaddockSet1.gpkg` as the worked example. |
+
+### Inspection notebooks — *what to do with the outputs*
+
+Ordered to follow the pipeline output order: raw S2 / fractional-cover
+videos → paddock polygons → per-paddock time series → phenology
+metrics → the stitched PDF report. Each notebook assumes you've
+finished a pipeline run for the query in its config cell (or you've
+edited that cell to point at your own run).
+
+| Notebook | What it covers |
+|---|---|
+| [`04_inspect_videos.ipynb`](04_inspect_videos.ipynb) | Embed the Sentinel-2 / fractional-cover / paddocks-overlay MP4s inline and view the per-paddock calendar PNGs. |
+| [`05_inspect_paddocks.ipynb`](05_inspect_paddocks.ipynb) | Load the paddocks GeoPackage, summarise by area / compactness, filter, join with per-paddock NDVI from the time-series cube, and produce thematic maps. |
+| [`06_inspect_time_series.ipynb`](06_inspect_time_series.ipynb) | The `(paddock, time)` Zarr cube. Slice by paddock / index / year, compare paddocks, compare indices, AOI-average plots, raw vs Savitzky-Golay-smoothed traces. |
+| [`07_inspect_phenology.ipynb`](07_inspect_phenology.ipynb) | Per-paddock SoS / PoS / EoS / amplitude / integral metrics. Distributions, outlier detection, year-over-year comparison, and overlaying SoS / PoS / EoS markers on a paddock's NDVI trace. |
+| [`08_inspect_pdf.ipynb`](08_inspect_pdf.ipynb) | Locate the stitched A4 PDF report, read its embedded metadata, and preview it inline — either as an in-browser `<iframe>` or as page-by-page PNGs via `pdf2image`. |
 
 ## Running the notebooks
 
