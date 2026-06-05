@@ -25,7 +25,7 @@ test/test_mode2.py -- cant download S2
 
 test/test_mode2_milgadara.py -- cant download S2
 
-python test/slow.py -- test is incomplete. Worked first time walking through in python interactive for 2019 only , but still running it as .py script with 2018-2025. 
+python test/slow.py -- finished running when copy-pasted into python.
 
 
 
