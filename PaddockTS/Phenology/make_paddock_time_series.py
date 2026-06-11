@@ -6,30 +6,34 @@ each timestep. The result is the central time-series dataset that
 downstream stages (yearly split, smoothing, phenology, plotting) consume.
 """
 
+import warnings
 import numpy as np
 import xarray as xr
-from concurrent.futures import ProcessPoolExecutor
 from PaddockTS.query import Query
-import os
 
-def _band_medians(band_array, mask_flat, paddock_ids):
-    """
-    band_array: np.ndarray (time, y, x)
-    mask_flat:  1D np.ndarray of length y*x, containing integer paddock IDs
-    paddock_ids: list/array of integer paddock IDs (same ones used in rasterize)
-    """
-    T, Y, X = band_array.shape
-    flat   = band_array.reshape(T, -1)
-    out    = np.empty((len(paddock_ids), T), dtype=np.float64)
+def _band_medians(band_array, paddock_pixel_idx):
+    """Per-paddock NaN-aware median across pixels, for every timestep.
 
-    for t in range(T):
-        row = flat[t]
-        for i, pid in enumerate(paddock_ids):
-            sel = row[mask_flat == pid]
-            if sel.size and not np.all(np.isnan(sel)):  # suppress warning if all NaN
-                out[i, t] = np.nanmedian(sel)
-            else:
-                out[i, t] = np.nan
+    band_array:        np.ndarray (time, y, x)
+    paddock_pixel_idx: list of 1D index arrays into the flattened (y*x) grid,
+        one per paddock in output order. An empty array yields an all-NaN row.
+
+    Returns (n_paddocks, time) float64. Vectorised over time: each paddock's
+    median is computed for all timesteps in one ``np.nanmedian(..., axis=1)``
+    call rather than looping per timestep — same numbers as the old per-pixel
+    loop, no Python-level T loop.
+    """
+    T = band_array.shape[0]
+    flat = band_array.reshape(T, -1)
+    out  = np.full((len(paddock_pixel_idx), T), np.nan, dtype=np.float64)
+
+    with warnings.catch_warnings():
+        # All-NaN pixel set at a timestep → nanmedian returns NaN (what we
+        # want) but warns; the old code guarded this per timestep instead.
+        warnings.filterwarnings('ignore', r'All-NaN slice encountered', RuntimeWarning)
+        for i, idx in enumerate(paddock_pixel_idx):
+            if idx.size:
+                out[i] = np.nanmedian(flat[:, idx], axis=1)
 
     return out
 
@@ -137,15 +141,21 @@ def make_paddock_time_series(query: Query, ds_sentinel2=None, paddocks_filepath=
     # 4) Grab all band arrays in memory
     bands = {var: ds[var].values for var in ds.data_vars}
 
-    # 5) Parallel median for each band
-    results = {}
-    with ProcessPoolExecutor(max_workers=os.cpu_count()) as exe:
-        futures = {
-            var: exe.submit(_band_medians, arr, mask_flat, paddock_ids)
-            for var, arr in bands.items()
-        }
-        for var, fut in futures.items():
-            results[var] = fut.result()
+    # Precompute the flat pixel indices for each paddock once — shared across
+    # every band, so the mask comparison isn't repeated per band.
+    paddock_pixel_idx = [np.flatnonzero(mask_flat == pid) for pid in paddock_ids]
+
+    # 5) Per-paddock NaN-aware median for each band, in-process. The previous
+    #    ProcessPoolExecutor deadlocked when this stage ran inside the
+    #    get_outputs Sentinel-2 worker thread: the spawned subprocesses
+    #    inherited the dashboard's redirected fd 2, and the result-queue feeder
+    #    thread blocked on a full pipe so fut.result() never returned. The
+    #    median is now vectorised over time, so a plain loop is fast enough and
+    #    spawns nothing.
+    results = {
+        var: _band_medians(arr, paddock_pixel_idx)
+        for var, arr in bands.items()
+    }
 
     # 6) Stitch back into xarray
     coords = {

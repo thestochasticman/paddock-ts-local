@@ -10,6 +10,7 @@ bbox or different time range gets its own folder.
 """
 
 import os
+import dask
 import odc.stac
 import rioxarray
 import numpy as np
@@ -20,13 +21,33 @@ from os.path import exists
 from datetime import datetime
 from xarray import Dataset
 from PaddockTS.query import Query
-from dask.distributed import Client as DaskClient
 from PaddockTS.Sentinel2.sentinel2 import Sentinel2
 from PaddockTS.Sentinel2.sentinel2 import defaultsentinel2
 from PaddockTS.Sentinel2.check_if_valid_zarr_exists import check_if_valid_zarr_exists
 
 
-odc.stac.configure_rio(cloud_defaults=True, aws={"aws_unsigned": True})
+# GDAL/CURL hardening for reads from DEA's public S3 over /vsicurl. Without a
+# timeout, a stalled connection (DEA's S3 intermittently half-closes sockets —
+# they show up in CLOSE_WAIT) leaves the rasterio.warp.reproject read blocked
+# forever, hanging the whole download. We can't use a total-request timeout
+# (GDAL_HTTP_TIMEOUT) because a legitimately large COG read can run long; the
+# low-speed timeout instead aborts only a read that makes *no progress*
+# (< LOW_SPEED_LIMIT bytes/s for LOW_SPEED_TIME seconds), then MAX_RETRY rounds
+# of exponential-ish backoff recover the transient stall. See diagnostics.md §1/§2.
+_GDAL_HTTP_CONFIG = {
+    'GDAL_HTTP_CONNECTTIMEOUT': '20',     # give up establishing a connection after 20s
+    'GDAL_HTTP_LOW_SPEED_TIME': '60',     # abort only a read that is *dead* for 60s...
+    'GDAL_HTTP_LOW_SPEED_LIMIT': '1',     # ...i.e. effectively zero bytes/s, not merely slow
+    'GDAL_HTTP_MAX_RETRY': '5',
+    'GDAL_HTTP_RETRY_DELAY': '1',
+    'CPL_VSIL_CURL_USE_HEAD': 'NO',       # skip HEAD probes DEA's bucket mishandles (§2)
+}
+# Set in the environment too: GDAL reads these directly, so they apply on every
+# read thread of the in-process threaded scheduler regardless of odc's plumbing.
+for _k, _v in _GDAL_HTTP_CONFIG.items():
+    os.environ.setdefault(_k, _v)
+
+odc.stac.configure_rio(cloud_defaults=True, aws={"aws_unsigned": True}, **_GDAL_HTTP_CONFIG)
 
 
 def download_sentinel2(
@@ -47,17 +68,23 @@ def download_sentinel2(
     ``query.sentinel2_path``. Raw bands — including the fmask band —
     are written as-is; cloud masking is a downstream concern.
 
-    The function temporarily restores ``OMP_NUM_THREADS`` after Dask sets
-    it to ``1``, since downstream stages (PyTorch in segmentation,
-    TFLite in fractional cover) need multi-threaded BLAS.
+    The compute runs on Dask's in-process threaded scheduler — no
+    ``distributed`` cluster, so no worker subprocesses are spawned. This
+    avoids a deadlock when called from ``get_outputs.py``, where the S2
+    worker thread runs concurrently with the environmental worker thread:
+    spinning up a ``distributed`` ``LocalCluster`` (macOS ``spawn`` start
+    method) under that concurrency hangs cluster bring-up, so ``Client()``
+    blocks forever waiting for a worker that never connects. The threaded
+    scheduler also leaves ``OMP_NUM_THREADS`` untouched (distributed used
+    to clobber it to ``1``), so downstream PyTorch/TFLite stages keep their
+    multi-threaded BLAS.
 
     Args:
         query: The :class:`PaddockTS.query.Query` describing the region
             and time range. ``query.query_dir`` is created if missing.
-        num_workers: Number of Dask processes. Each holds its own copy
-            of GDAL/PROJ state, so memory grows roughly linearly. Tune
-            down on small machines.
-        threads_per_worker: Threads per Dask worker for I/O concurrency.
+        num_workers: Retained for API compatibility; ignored now that the
+            threaded scheduler runs everything in-process.
+        threads_per_worker: Number of scheduler threads for I/O concurrency.
         chunk_x: Chunk size along the ``x`` dimension (pixels).
         chunk_y: Chunk size along the ``y`` dimension (pixels).
         chunk_time: Chunk size along the ``time`` dimension (scenes).
@@ -121,50 +148,43 @@ def download_sentinel2(
             f'{query.start} and {query.end}.'
         )
 
-    # Dask sets OMP_NUM_THREADS=1 (and the MKL / OpenBLAS equivalents) on the
-    # parent process when the cluster spins up, which would cripple PyTorch
-    # in the SAM segmentation stage that runs later in the same process.
-    # Snapshot the originals so we can restore them on the way out — and put
-    # the restore in a `finally` so a failed download doesn't poison the env
-    # for the rest of the run.
-    _THREAD_VARS = ('OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS')
-    thread_env_before = {v: os.environ.get(v) for v in _THREAD_VARS}
     makedirs(os.path.dirname(query.sentinel2_path), exist_ok=True)
     timestamp = datetime.utcnow().isoformat() + 'Z'
-    try:
-        with DaskClient(n_workers=num_workers, threads_per_worker=threads_per_worker) as client:
-            odc.stac.configure_rio(cloud_defaults=True, aws={"aws_unsigned": True}, client=client)
-            try:
-                ds: Dataset = odc.stac.load(
-                    items,
-                    bands=bands,
-                    crs=sentinel2.crs,
-                    resolution=sentinel2.resolution,
-                    groupby=sentinel2.groupby,
-                    bbox=query.bbox,
-                    chunks={'time': chunk_time, 'x': chunk_x, 'y': chunk_y},
-                )
-                # Pin the CRS in a form rioxarray reliably picks up on re-open;
-                # without this the spatial_ref coord round-trips but ds.rio.crs
-                # comes back as None, which breaks downstream stages (preseg,
-                # SAM, paddocks).
-                ds = ds.rio.write_crs(sentinel2.crs, inplace=False)
-                ds = ds.assign_attrs(downloaded_at=timestamp)
-                # Stream chunks directly to disk via the active Dask client —
-                # avoids materializing the full cube in the driver process. On
-                # large AOIs the in-driver path (client.compute + .result)
-                # would peak at the whole-cube memory footprint; this path
-                # peaks at ~workers × chunk_size.
-                ds.to_zarr(query.sentinel2_path, mode='w', zarr_format=2)
-            except Exception as e:
-                print(f'Creating dataset using dask failed due to: {e}')
-                raise
-    finally:
-        for var, prev in thread_env_before.items():
-            if prev is None:
-                os.environ.pop(var, None)
-            else:
-                os.environ[var] = prev
+    # Run on the in-process threaded scheduler: no distributed cluster, no
+    # spawned worker subprocesses (see the deadlock note in the docstring and
+    # diagnostics.md §2). GDAL/AWS-unsigned config is applied in-process by the
+    # module-level configure_rio call, so no per-client broadcast is needed.
+    with dask.config.set(scheduler='threads', num_workers=threads_per_worker):
+        try:
+            ds: Dataset = odc.stac.load(
+                items,
+                bands=bands,
+                crs=sentinel2.crs,
+                resolution=sentinel2.resolution,
+                groupby=sentinel2.groupby,
+                bbox=query.bbox,
+                chunks={'time': chunk_time, 'x': chunk_x, 'y': chunk_y},
+                # DEA's S3 intermittently serves a truncated/corrupt tile
+                # (e.g. band08 of some 50HNH/50HNJ Dec-2024 scenes → GDAL
+                # `TIFFReadEncodedTile() failed`). With the default
+                # fail_on_error=True a single bad tile aborts the whole cube;
+                # here we let odc fill that block with nodata and carry on, so
+                # one flaky read costs a small data gap instead of the download.
+                # Downstream cleaning already treats nodata as missing.
+                fail_on_error=False,
+            )
+            # Pin the CRS in a form rioxarray reliably picks up on re-open;
+            # without this the spatial_ref coord round-trips but ds.rio.crs
+            # comes back as None, which breaks downstream stages (preseg,
+            # SAM, paddocks).
+            ds = ds.rio.write_crs(sentinel2.crs, inplace=False)
+            ds = ds.assign_attrs(downloaded_at=timestamp)
+            # Stream chunks directly to disk — the cube stays lazy/chunked, so
+            # peak memory is ~threads × chunk_size rather than the whole cube.
+            ds.to_zarr(query.sentinel2_path, mode='w', zarr_format=2)
+        except Exception as e:
+            print(f'Creating dataset using dask failed due to: {e}')
+            raise
 
     # Touch the _SUCCESS marker *after* the zarr write completes; its presence
     # is what the next call uses as the cache-validity check, so a kill-9
