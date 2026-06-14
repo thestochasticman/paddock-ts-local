@@ -10,24 +10,36 @@ PaddockTS runs two pipelines in parallel from a single `Query`:
 `PaddockTS.get_outputs.get_outputs(query)` orchestrates both on two
 threads with a live `rich` dashboard.
 
-```text
-┌────────────────────────────────────────────────────────────────────┐
-│                            get_outputs(query)                      │
-└────────────────────────────────────────────────────────────────────┘
-                │                                  │
-                ▼                                  ▼
-   ┌──────────────────────┐           ┌─────────────────────────┐
-   │ Environmental thread │           │ Sentinel-2 → PaddockTS  │
-   │  • terrain (DEM)     │           │  • S2 download + clean  │
-   │  • OzWALD daily      │           │  • spectral indices     │
-   │  • SILO climate      │           │  • fractional cover     │
-   │  • SLGA soils        │           │  • SAM segmentation     │
-   │  • diagnostic plots  │           │  • per-paddock TS       │
-   │  • topography plot ──┼─ waits ─► │  • yearly split         │
-   │      (needs S2 grid) │           │  • phenology metrics    │
-   └──────────────────────┘           │  • calendar + phenology │
-                                      │  • PDF report           │
-                                      └─────────────────────────┘
+```mermaid
+flowchart TD
+    Q["<b>Query</b><br/>bbox · dates · stub"] --> GO(["get_outputs(query)"])
+
+    GO -->|"thread 1 · Sentinel-2 → PaddockTS"| D["Download + clean<br/>Sentinel-2"]
+    D --> IDX["Spectral indices<br/>NDVI · CFI · NIRv · NDTI · CAI"]
+    D --> FC["Fractional cover<br/>bg · pv · npv"]
+    D --> SAM["Segment paddocks<br/>(SAM)"]
+    IDX --> TS["Per-paddock<br/>time series"]
+    SAM --> TS
+    TS --> YR["Yearly split<br/>+ DOY"]
+    YR --> PH["Phenology<br/>SoS · PoS · EoS"]
+    FC --> PLOT["Videos · calendar ·<br/>phenology plots"]
+    SAM --> PLOT
+    PH --> PLOT
+
+    GO -->|"thread 2 · Environmental"| TER["Terrain DEM<br/>slope · aspect · TWI"]
+    GO --> OZ["OzWALD<br/>daily climate"]
+    GO --> SILO["SILO<br/>climate"]
+    GO --> SLGA["SLGA<br/>soils"]
+    TER --> EPLOT["Climate +<br/>terrain plots"]
+    OZ --> EPLOT
+    SILO --> EPLOT
+    SLGA --> EPLOT
+
+    D -.->|"clean cube<br/>(terrain plot waits)"| EPLOT
+    PLOT --> PDF[["Stitched PDF report"]]
+    EPLOT --> PDF
+
+    classDef default color:#000;
 ```
 
 ## How a stage works

@@ -71,6 +71,9 @@ docs = [
   "mkdocstrings[python]",
   "mkdocs-jupyter",
 ]
+viewer = [
+  "streamlit",
+]
 
 [project.urls]
 Homepage = "https://github.com/thestochasticman/paddock-ts-local"

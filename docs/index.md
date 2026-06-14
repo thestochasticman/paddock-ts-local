@@ -32,28 +32,6 @@ Given a `Query` (a bounding box + date range), PaddockTS produces:
 
 ---
 
-## Why PaddockTS
-
-- **One bounding box → everything.** No glue scripts. The full chain
-  runs end-to-end from a single immutable `Query` object.
-- **Built for Australian agronomy.** Defaults and integrations target
-  Sentinel-2 ARD on Digital Earth Australia, OzWALD, SILO, SLGA, and
-  TERN datasets.
-- **Composable.** Every stage — `download_sentinel2`,
-  `compute_indices`, `compute_fractional_cover`, `get_paddocks`,
-  `make_paddock_time_series`, `estimate_phenology` — is independently
-  callable. Skip stages, swap in your own paddocks file, plug in a
-  different segmentation backbone.
-- **Cache-aware.** Each stage writes a `_SUCCESS` marker after a
-  complete write; reruns load from cache, partial writes are detected
-  and re-fetched. A query's content-addressed `stub` (SHA-256 of bbox +
-  dates) means two queries with the same inputs share outputs on disk.
-- **Lives in process.** No queue, no cluster — `get_outputs` runs the
-  Sentinel-2 and environmental pipelines on parallel threads with a
-  live `rich` dashboard.
-
----
-
 ## Quick example
 
 ```python

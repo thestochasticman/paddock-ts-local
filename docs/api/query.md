@@ -31,6 +31,35 @@ absent).
   `query.terrain_path` etc. are computed lazily from the stub and bbox
   hash — see the auto-generated reference below.
 
+The diagram below shows how the four inputs fan out into hashes and
+on-disk paths. Note the two distinct cache scopes: the **AOI cache**
+(`bbox_hash`) is shared by every time range over the same region, while
+the **time-scoped cache** (`bbox_hash/time_hash`) holds the Sentinel-2
+chain for one specific window. The human-readable `stub` only names the
+per-query scratch and final-output directories.
+
+```mermaid
+flowchart TD
+  Q["<b>Query</b><br/>bbox · start · end · stub"]
+
+  Q -->|"snap to ~100 m,<br/>then sha256"| BH["<b>bbox_hash</b>"]
+  Q -->|"sha256(start+end)"| TH["<b>time_hash</b>"]
+  Q -->|"verbatim"| ST["<b>stub</b>"]
+
+  BH --> AOI["{tmp_dir}/aoi/{bbox_hash}/<br/><i>AOI cache — shared across time ranges</i>"]
+  AOI --> TER["terrain.tif<br/><i>(time-invariant)</i>"]
+
+  AOI --> QD["…/{time_hash}/<br/><i>time-scoped cache</i>"]
+  TH --> QD
+  QD --> S2["sentinel2.zarr<br/>sentinel2_clean.zarr<br/>indices.zarr<br/>fractional_cover.zarr"]
+  QD --> SAM["preseg.tif · sam_mask.tif<br/>sam_raw.gpkg · sam_paddocks.gpkg"]
+
+  ST --> TMP["{tmp_dir}/{stub}/<br/><i>per-query intermediates</i>"]
+  ST --> OUT["{out_dir}/{stub}/<br/><i>final outputs + queries.json</i>"]
+
+  classDef default color:#000;
+```
+
 ---
 
 ## Construct a `Query`

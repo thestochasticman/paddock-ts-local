@@ -9,5 +9,5 @@ query = Query(
     stub="test_mode1",
 )
 
-get_outputs(query)
+get_outputs(query, show_log=True)
 

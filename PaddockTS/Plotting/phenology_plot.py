@@ -1,10 +1,14 @@
 """Per-paddock × per-year phenology curves with SoS / PoS / EoS markers.
 
 Generates a single multi-panel PNG: rows are paddocks, columns are
-years, and each panel overlays the raw vegetation-index series (filled
-blue dots) and the resampled-and-smoothed series (open blue dots) on a
-DOY axis, with the start-of-season, peak-of-season, and end-of-season
-DOYs drawn as vertical reference lines.
+years, and each panel plots the sampled + interpolated vegetation-index
+series (the smoothed yearly dataset: 10-day median resample -> PCHIP
+gap-fill -> Savitzky-Golay) as markers on a DOY axis — filled circles
+for sampled bins (held a real observation), hollow circles for
+interpolated (gap-filled) bins — with the start-of-season,
+peak-of-season, and end-of-season DOYs drawn as vertical reference
+lines. This mirrors the web viewer's phenology panel, which scatters the
+same series rather than connecting it into a line.
 """
 
 from __future__ import annotations
@@ -30,9 +34,10 @@ def phenology_plot(query: Query, phenology_results: dict[int, pd.DataFrame] | No
         ds_yearly: Optional ``{year: Dataset}`` from
             :func:`PaddockTS.Phenology.make_yearly_paddock_time_series`. If
             ``None``, built on demand.
-        ds_paddockTS: Optional raw per-paddock time series Dataset. If
-            ``None``, opened (or generated, then opened) from cache.
-            Used to plot the un-resampled raw observations.
+        ds_paddockTS: Deprecated and unused. Retained for backward
+            compatibility with callers that still pass it (the raw
+            overlay was removed in favour of plotting only the sampled +
+            interpolated series, matching the web viewer).
         variable: Vegetation index column to plot. Default ``'NDVI'``;
             ``'NIRv'`` and ``'CFI'`` also work.
         paddocks_filepath: Path to the paddocks file. Used to derive
@@ -73,14 +78,6 @@ def phenology_plot(query: Query, phenology_results: dict[int, pd.DataFrame] | No
     if ds_yearly is None:
         from PaddockTS.Phenology.make_yearly_paddock_time_series import make_yearly_paddock_time_series
         ds_yearly = make_yearly_paddock_time_series(query)
-
-    if ds_paddockTS is None:
-        paddocks_filepath = query.sam_paddocks_path
-        zarr_path = f'{query.tmp_dir}/{query.stub}_paddocks_timeseries.zarr'
-        if not os.path.exists(zarr_path):
-            from PaddockTS.Phenology.make_paddock_time_series import make_paddock_time_series
-            make_paddock_time_series(query, paddocks_filepath=paddocks_filepath)
-        ds_paddockTS = xr.open_zarr(zarr_path, chunks=None, decode_coords="all")
 
     # Only plot years that have phenology results (some may be skipped due to insufficient data)
     years = sorted(set(ds_yearly.keys()) & set(phenology_results.keys()))
@@ -129,21 +126,25 @@ def phenology_plot(query: Query, phenology_results: dict[int, pd.DataFrame] | No
                 df_year = phenology_results[year]
                 ds_year = ds_yearly[year]
 
-                # Interpolated series
+                # Sampled + interpolated series (10-day median resample ->
+                # PCHIP gap-fill -> Savitzky-Golay) plotted as markers, to
+                # match the web viewer's phenology panel. Sampled bins (held
+                # a real observation) are filled circles; interpolated
+                # (gap-filled) bins are hollow circles. The `observed` mask
+                # comes from make_smoothed; if absent (older caches), every
+                # point is treated as sampled.
                 da_res = ds_year[variable].sel(paddock=str(paddock))
                 res_doy = ds_year['doy'].values
-                ax.scatter(res_doy, da_res.values,
-                           facecolors='white', edgecolors='blue',
-                           s=20, label='interpolated')
-
-                # Raw series
-                ds_raw_year = ds_paddockTS.sel(
-                    time=slice(f"{year}-01-01", f"{year}-12-31")
-                )
-                da_raw = ds_raw_year[variable].sel(paddock=str(paddock))
-                raw_doy = da_raw['time'].dt.dayofyear.values
-                ax.scatter(raw_doy, da_raw.values,
-                           color='blue', s=20, label='raw')
+                vals = da_res.values
+                if 'observed' in ds_year:
+                    obs = ds_year['observed'].sel(paddock=str(paddock)).values.astype(bool)
+                else:
+                    obs = np.ones(vals.shape, dtype=bool)
+                ax.scatter(res_doy[obs], vals[obs],
+                           color='#5aa8ff', s=18, label='sampled')
+                ax.scatter(res_doy[~obs], vals[~obs],
+                           facecolors='none', edgecolors='#5aa8ff', s=18,
+                           label='interpolated')
 
                 # Phenology lines
                 row = df_year[df_year['paddock'].astype(str) == str(paddock)]

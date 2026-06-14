@@ -194,6 +194,45 @@ get_outputs(
 
 ## Pipeline at a glance
 
+`get_outputs(query)` runs two pipelines on parallel threads. The
+Sentinel-2 chain segments paddocks and builds the per-paddock time
+series, phenology, and plots; the Environmental chain pulls terrain,
+climate, and soils. Both feed the final stitched PDF.
+
+```mermaid
+flowchart TD
+    Q["<b>Query</b><br/>bbox · dates · stub"] --> GO(["get_outputs(query)"])
+
+    GO -->|"thread 1 · Sentinel-2 → PaddockTS"| D["Download + clean<br/>Sentinel-2"]
+    D --> IDX["Spectral indices<br/>NDVI · CFI · NIRv · NDTI · CAI"]
+    D --> FC["Fractional cover<br/>bg · pv · npv"]
+    D --> SAM["Segment paddocks<br/>(SAM)"]
+    IDX --> TS["Per-paddock<br/>time series"]
+    SAM --> TS
+    TS --> YR["Yearly split<br/>+ DOY"]
+    YR --> PH["Phenology<br/>SoS · PoS · EoS"]
+    FC --> PLOT["Videos · calendar ·<br/>phenology plots"]
+    SAM --> PLOT
+    PH --> PLOT
+
+    GO -->|"thread 2 · Environmental"| TER["Terrain DEM<br/>slope · aspect · TWI"]
+    GO --> OZ["OzWALD<br/>daily climate"]
+    GO --> SILO["SILO<br/>climate"]
+    GO --> SLGA["SLGA<br/>soils"]
+    TER --> EPLOT["Climate +<br/>terrain plots"]
+    OZ --> EPLOT
+    SILO --> EPLOT
+    SLGA --> EPLOT
+
+    D -.->|"clean cube<br/>(terrain plot waits)"| EPLOT
+    PLOT --> PDF[["Stitched PDF report"]]
+    EPLOT --> PDF
+
+    classDef default color:#000;
+```
+
+The table below is the same chain, stage by stage:
+
 | Sentinel-2 → PaddockTS | Environmental |
 |---|---|
 | Download Sentinel-2 + clean | Download terrain (Copernicus DEM) |

@@ -448,7 +448,11 @@ def _run_s2_steps(query, statuses, times, paddocks_filepath=None, skip_sam=False
                     times[i] = time.time() - t0
                     continue
                 from PaddockTS.Phenology.make_yearly_paddock_time_series import make_yearly_paddock_time_series
-                ds_yearly = make_yearly_paddock_time_series(query, ds_paddockTS=ds_paddockTS, paddocks_filepath=gpkg_path)
+                # Pull the smoothed series (make_yearly opens/generates the
+                # smoothed zarr) rather than passing the raw ds_paddockTS —
+                # the phenology plot's "interpolated" curve and phenolopy's
+                # SoS/PoS/EoS markers need the resampled+smoothed signal.
+                ds_yearly = make_yearly_paddock_time_series(query, paddocks_filepath=gpkg_path)
 
             # Step 13: Make yearly paddock TS (user)
             elif i == 13:
@@ -457,7 +461,8 @@ def _run_s2_steps(query, statuses, times, paddocks_filepath=None, skip_sam=False
                     times[i] = time.time() - t0
                     continue
                 from PaddockTS.Phenology.make_yearly_paddock_time_series import make_yearly_paddock_time_series
-                ds_yearly_user = make_yearly_paddock_time_series(query, ds_paddockTS=ds_paddockTS_user, paddocks_filepath=paddocks_filepath)
+                # See SAM branch above: use the smoothed series, not raw.
+                ds_yearly_user = make_yearly_paddock_time_series(query, paddocks_filepath=paddocks_filepath)
 
             # Step 14: Estimate phenology (SAM)
             elif i == 14:

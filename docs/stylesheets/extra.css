@@ -1,0 +1,11 @@
+/* Force dark text inside Mermaid diagram nodes regardless of the
+   active colour scheme. Material's slate (dark) theme otherwise sets
+   the node label colour to a light value, which is invisible against
+   the light default node fill. */
+.mermaid .nodeLabel,
+.mermaid .node .label,
+.mermaid .node text,
+.mermaid .node span {
+  color: #000 !important;
+  fill: #000 !important;
+}
