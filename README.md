@@ -100,6 +100,21 @@ PaddockTS targets Python ≥ 3.11.
 >
 > Most Linux systems don't hit this.
 
+### Conda only
+
+Everything — PaddockTS, the `troi` core, the five data stores, and the
+full native stack — is also available as conda packages, installable
+in one command with no pip step:
+
+```bash
+conda create -n paddockts -c conda-forge -c thestochasticman paddocktimeseries
+conda activate paddockts
+```
+
+(The packages are being added to conda-forge itself
+([conda-forge/staged-recipes#34735](https://github.com/conda-forge/staged-recipes/pull/34735));
+once merged, `-c thestochasticman` can be dropped.)
+
 ### From source (development)
 
 ```bash
