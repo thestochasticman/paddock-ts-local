@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "paddocktimeseries"
-version = "1.0.0"
+version = "1.0.1"
 description = "Paddock segmentation and time-series analysis from Sentinel-2 imagery"
 readme = "README.md"
 authors = [
@@ -46,7 +46,7 @@ classifiers = [
 # this PaddockTS release (PyPI releases are immutable, so these pins are
 # as reproducible as git SHAs).
 dependencies = [
-  "troi-core==0.1.0",
+  "troi-core==0.1.1",
   "pysentinel2==0.1.0",
   "pysilo-store==0.1.0",
   "pyozwald==0.1.0",
